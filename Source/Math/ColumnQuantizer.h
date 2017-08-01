@@ -1,5 +1,6 @@
 #ifndef __COLUMN_QUANTIZER_H__
 #define __COLUMN_QUANTIZER_H__
+//#include "hip/hip_runtime.h"
 #include "ValueQuantizer.h"
 #include <math.h>
 

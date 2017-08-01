@@ -478,7 +478,7 @@ private:
         if (algo.autotuningState == AutotuningState::Running && batchSize > algo.maxMBSizeSeen)
         {
             algo.autotuningState = AutotuningState::Init;
-            cudaDeviceSynchronize(); // make sure no in-flight GPU kernels using workspace before release its memory
+            hipDeviceSynchronize(); // make sure no in-flight GPU kernels using workspace before release its memory
             workspace.Resize(0,0,0,false);
             algo.AlgoWorkspaceSize = 0;
             algo.MBSizeForCurrentWorkspace = 0;
@@ -527,7 +527,7 @@ private:
             try
             {   // first try allocate as much to run FindEX, this may fail when accumulate is on (in which case additional memory is allocated in finder()), thus we do try...catch...
                 size_t free, total, resizeTo = 0;
-                CUDA_CALL(cudaMemGetInfo(&free, &total));
+                CUDA_CALL(hipMemGetInfo(&free, &total));
                 free += workspace.BufferSize();
                 // We reserve 2% of the total GPU memory because CuDNN seem to behave erroneously when there is no memory left
                 if(free > (total/50))
@@ -669,9 +669,9 @@ bool CuDnnConvolutionEngineFactory<ElemType>::IsSupported(DEVICEID_TYPE deviceId
 {
     // REVIEW alexeyk: IsSupported check should be performed by cuDNN itself. Is there a good way to do that?
 
-    cudaDeviceProp props = {0};
-    // Note that cudaGetDeviceProperties also sets CUDA last error so need to check/clear both.
-    if (deviceId < 0 || (cudaGetDeviceProperties(&props, deviceId) | cudaGetLastError()) != cudaSuccess || props.major < 3)
+    hipDeviceProp_t props = {0};
+    // Note that hipGetDeviceProperties also sets CUDA last error so need to check/clear both.
+    if (deviceId < 0 || (hipGetDeviceProperties(&props, deviceId) | hipGetLastError()) != hipSuccess || props.major < 3)
         return false;
 
     const auto& input = geometry->InputShape();

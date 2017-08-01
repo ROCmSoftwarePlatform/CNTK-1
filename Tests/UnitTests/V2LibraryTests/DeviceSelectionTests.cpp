@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE(TestGPUProperties)
     {
         const auto& properties = DeviceDescriptor::GetGPUProperties(device);
         BOOST_TEST((properties.deviceId == device.Id()));
-        BOOST_TEST((properties.cudaCores >= 0));
+        BOOST_TEST((properties.hipCores >= 0));
         BOOST_TEST((properties.totalMemory >= 0));
         BOOST_TEST((properties.versionMajor >= 0));
     }

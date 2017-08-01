@@ -1,4 +1,4 @@
-// cudalib.cpp -- all CUDA calls (but not cublas) are encapsulated here
+// cudalib.cpp -- all CUDA calls (but not hipblas) are encapsulated here
 // All actual CUDA API calls go here, to keep the header out of our other headers.
 //
 // F. Seide, V-hansu
@@ -12,7 +12,7 @@
 #include "cudadevice.h"
 #include <string>
 #include <assert.h>
-#include <cublas_v2.h>
+#include <hipblas.h>
 
 #undef NOMULTIDEVICE // define this to disable any context/driver stuff
 
@@ -20,7 +20,7 @@
 #pragma comment(lib, "cuda.lib") // link CUDA device API
 #endif
 #pragma comment(lib, "cudart.lib") // link CUDA runtime
-#pragma comment(lib, "cublas.lib")
+#pragma comment(lib, "hipblas.lib")
 
 namespace msra { namespace cuda {
 

@@ -272,7 +272,7 @@ Node 'LSTMoutput1.wx' (LearnableParameter operation): Initializating Parameter[4
 Node 'LSTMoutput1.b' (LearnableParameter operation): Initializing Parameter[4096 x 1] <- 0.000000.
 Node 'LSTMoutput1.Wh' (LearnableParameter operation): Initializating Parameter[4096 x 0] as uniform later when dimensions are fully known.
 Node 'LSTMoutput1.Wci' (LearnableParameter operation): Initializing Parameter[1024] <- uniform(seed=3, range=0.050000*1.000000, onCPU=false).
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 3, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 3, sizeof(ElemType)==4
 Node 'LSTMoutput1.Wcf' (LearnableParameter operation): Initializing Parameter[1024] <- uniform(seed=4, range=0.050000*1.000000, onCPU=false).
 Node 'LSTMoutput1.Wco' (LearnableParameter operation): Initializing Parameter[1024] <- uniform(seed=5, range=0.050000*1.000000, onCPU=false).
 Node 'LSTMoutput1.Wmr' (LearnableParameter operation): Initializing Parameter[512 x 1024] <- uniform(seed=6, range=0.050000*1.000000, onCPU=false).

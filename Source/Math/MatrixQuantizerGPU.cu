@@ -5,9 +5,9 @@
 #include "GPUDataTransferer.h"
 
 #pragma comment(lib, "cudart.lib") // instruct linker to reference these libs
-#pragma comment(lib, "cublas.lib")
+#pragma comment(lib, "hipblas.lib")
 #pragma comment(lib, "cusparse.lib")
-#pragma comment(lib, "curand.lib")
+#pragma comment(lib, "hiprng.lib")
 
 #pragma warning(disable : 4267) // conversion from 'size_t' to 'unsigned int'; happens in CUDA <<<a,b>>> syntax if a and b are size_t
 #pragma warning(disable : 4127) // conditional expression is constant; "if (sizeof(ElemType)==sizeof(float))" triggers this
@@ -41,12 +41,12 @@ static
     __declspec(noinline)
 #endif
         void
-        operator||(cudaError_t rc, const char* msg)
+        operator||(hipError_t rc, const char* msg)
 {
-    if (rc != cudaSuccess)
+    if (rc != hipSuccess)
     {
         char buf[1000];
-        sprintf_s(buf, 1000, "%s: %s (cuda error %d)", msg, cudaGetErrorString(rc), rc);
+        sprintf_s(buf, 1000, "%s: %s (cuda error %d)", msg, hipGetErrorString(rc), rc);
         cudafail(buf);
     }
 }
@@ -54,55 +54,55 @@ static
 template <class ElemType>
 void MatrixQuantizerGPU<ElemType>::Sync()
 {
-    cudaDeviceSynchronize() || "cudaDeviceSynchronize failed";
+    hipDeviceSynchronize() || "hipDeviceSynchronize failed";
 }
 
 // wait until stream has completed all scheduled operations
 template <class ElemType>
-void MatrixQuantizerGPU<ElemType>::SyncStream(cudaStream_t stream)
+void MatrixQuantizerGPU<ElemType>::SyncStream(hipStream_t stream)
 {
-    cudaStreamSynchronize(stream) || "cudaStreamSynchronize failed";
+    hipStreamSynchronize(stream) || "hipStreamSynchronize failed";
 }
 
 // same but for event
 template <class ElemType>
-void MatrixQuantizerGPU<ElemType>::SyncEvent(cudaEvent_t ev)
+void MatrixQuantizerGPU<ElemType>::SyncEvent(hipEvent_t ev)
 {
     auto rc = cudaEventQuery(ev);
-    if (rc != cudaErrorNotReady)
+    if (rc != hipErrorNotReady)
     {
         // if Event is ready then no need to wait
         rc || "cudaEventQuery failed";
         return;
     }
     // we must wait
-    cudaEventSynchronize(ev) || "cudaEventSynchronize failed";
+    hipEventSynchronize(ev) || "hipEventSynchronize failed";
 }
 
 //streams
 template <class ElemType>
-cudaStream_t MatrixQuantizerGPU<ElemType>::m_computeStream = NULL;
+hipStream_t MatrixQuantizerGPU<ElemType>::m_computeStream = NULL;
 
 template <class ElemType>
-cudaStream_t MatrixQuantizerGPU<ElemType>::m_fetchStream = NULL;
+hipStream_t MatrixQuantizerGPU<ElemType>::m_fetchStream = NULL;
 
 template <class ElemType>
-cudaStream_t MatrixQuantizerGPU<ElemType>::m_assignStream = NULL;
+hipStream_t MatrixQuantizerGPU<ElemType>::m_assignStream = NULL;
 
 template <class ElemType>
-cudaStream_t MatrixQuantizerGPU<ElemType>::GetComputeStream()
+hipStream_t MatrixQuantizerGPU<ElemType>::GetComputeStream()
 {
     return m_computeStream;
 }
 
 template <class ElemType>
-cudaStream_t MatrixQuantizerGPU<ElemType>::GetFetchStream()
+hipStream_t MatrixQuantizerGPU<ElemType>::GetFetchStream()
 {
     return m_fetchStream;
 }
 
 template <class ElemType>
-cudaStream_t MatrixQuantizerGPU<ElemType>::GetAssignStream()
+hipStream_t MatrixQuantizerGPU<ElemType>::GetAssignStream()
 {
     return m_assignStream;
 }
@@ -110,10 +110,10 @@ cudaStream_t MatrixQuantizerGPU<ElemType>::GetAssignStream()
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // computestream: the stream the caller issued the quant op on
 template <class ElemType>
-void MatrixQuantizerGPU<ElemType>::RecordQuantizeCompleteEvent(cudaStream_t computestream) const
+void MatrixQuantizerGPU<ElemType>::RecordQuantizeCompleteEvent(hipStream_t computestream) const
 {
     // schedule to flag the quantize-complete event (on main stream)
-    cudaEventRecord(m_quantizeCompleteEvent, computestream) || "cudaEventRecord failed";
+    hipEventRecord(m_quantizeCompleteEvent, computestream) || "hipEventRecord failed";
 
     // when running synchronously (for time measurements), then we (CPU) wait right here
     if (m_forceSync)
@@ -127,12 +127,12 @@ void MatrixQuantizerGPU<ElemType>::SyncQuantizeCompleEventAndFetchAndRecordFetch
 {
     // schedule fetch stream to wait until the last quantize op is complete, i.e. the data in the buffer is now valid
     // wait until commencement
-    cudaStreamWaitEvent(GetFetchStream(), m_quantizeCompleteEvent, 0 /*flags 'must be 0'*/) || "cudaStreamWaitEvent failed";
+    hipStreamWaitEvent(GetFetchStream(), m_quantizeCompleteEvent, 0 /*flags 'must be 0'*/) || "hipStreamWaitEvent failed";
 
     // schedule to fetch that quantized data into CPU buffer (on a separate transfer stream)
-    cudaMemcpyAsync(cpuBuffer, gpuBuffer, size, cudaMemcpyDeviceToHost, GetFetchStream()) || "cudaMemcpyAsync failed";
+    hipMemcpyAsync(cpuBuffer, gpuBuffer, size, hipMemcpyDeviceToHost, GetFetchStream()) || "hipMemcpyAsync failed";
 
-    cudaEventRecord(m_fetchCompleteEvent, GetFetchStream()) || "cudaEventRecord failed"; // for next GPU operation
+    hipEventRecord(m_fetchCompleteEvent, GetFetchStream()) || "hipEventRecord failed"; // for next GPU operation
 
     // when running synchronously (for time measurements), then we (CPU) wait right here
     if (m_forceSync)
@@ -142,16 +142,16 @@ void MatrixQuantizerGPU<ElemType>::SyncQuantizeCompleEventAndFetchAndRecordFetch
 }
 
 template <class ElemType>
-void MatrixQuantizerGPU<ElemType>::SyncAssignCompleteEvent(cudaStream_t computestream) const
+void MatrixQuantizerGPU<ElemType>::SyncAssignCompleteEvent(hipStream_t computestream) const
 {
     // schedule to wait for the assign-complete event (on main/compute stream)     --CPU buffer free once main stream does anything after this
-    cudaStreamWaitEvent(computestream, m_assignCompleteEvent, 0 /*flags 'must be 0'*/) || "cudaStreamWaitEvent failed";
+    hipStreamWaitEvent(computestream, m_assignCompleteEvent, 0 /*flags 'must be 0'*/) || "hipStreamWaitEvent failed";
 
     // Note that the NVidia doc says somewhat confusingly:
     //  * If \p stream is NULL, any future work submitted in any stream will wait for
     //  * \p event to complete before beginning execution. This effectively creates a
     //  * barrier for all future work submitted to the device on this thread.
-    // -> it says that this may bring the whole machinery to stall. Or does cudaStreamWaitEvent() honor cudaStreamNonBlocking?
+    // -> it says that this may bring the whole machinery to stall. Or does hipStreamWaitEvent() honor hipStreamNonBlocking?
     // According to NVidia (Jiri Kraus), this works as expected.
 }
 
@@ -187,22 +187,22 @@ MatrixQuantizerGPU<ElemType>::MatrixQuantizerGPU(int deviceId, bool useDedicated
     PrepareDevice(this->GetDeviceId());
 
     // events
-    // Note: Do NOT use cudaEventBlockingSync (which supposedly yields the process)--it will totally break cudaEventSynchronize(), causing it to take 50 or 100 ms randomly.
-    cudaEventCreateWithFlags(&m_tempMatrixZeroingCompleteEvent, cudaEventDisableTiming) || "cudaEventCreateWithFlags failed";
-    cudaEventCreateWithFlags(&m_quantizeCompleteEvent, cudaEventDisableTiming) || "cudaEventCreateWithFlags failed";
-    cudaEventCreateWithFlags(&m_fetchCompleteEvent, cudaEventDisableTiming) || "cudaEventCreateWithFlags failed";
-    cudaEventCreateWithFlags(&m_assignCompleteEvent, cudaEventDisableTiming) || "cudaEventCreateWithFlags failed";
+    // Note: Do NOT use cudaEventBlockingSync (which supposedly yields the process)--it will totally break hipEventSynchronize(), causing it to take 50 or 100 ms randomly.
+    hipEventCreateWithFlags(&m_tempMatrixZeroingCompleteEvent, hipEventDisableTiming) || "hipEventCreateWithFlags failed";
+    hipEventCreateWithFlags(&m_quantizeCompleteEvent, hipEventDisableTiming) || "hipEventCreateWithFlags failed";
+    hipEventCreateWithFlags(&m_fetchCompleteEvent, hipEventDisableTiming) || "hipEventCreateWithFlags failed";
+    hipEventCreateWithFlags(&m_assignCompleteEvent, hipEventDisableTiming) || "hipEventCreateWithFlags failed";
 
 #pragma warning(disable : 4127)
     if (useDedicatedComputeStream && (m_computeStream == NULL))
     {
-        cudaStreamCreateWithFlags(&m_computeStream, cudaStreamNonBlocking) || "cudaStreamCreateWithFlags failed";
+        hipStreamCreateWithFlags(&m_computeStream, hipStreamNonBlocking) || "hipStreamCreateWithFlags failed";
     }
 
     if (m_fetchStream == NULL)
     {
-        cudaStreamCreateWithFlags(&m_fetchStream, cudaStreamNonBlocking) || "cudaStreamCreateWithFlags failed";
-        cudaStreamCreateWithFlags(&m_assignStream, cudaStreamNonBlocking) || "cudaStreamCreateWithFlags failed";
+        hipStreamCreateWithFlags(&m_fetchStream, hipStreamNonBlocking) || "hipStreamCreateWithFlags failed";
+        hipStreamCreateWithFlags(&m_assignStream, hipStreamNonBlocking) || "hipStreamCreateWithFlags failed";
     }
 }
 
@@ -217,10 +217,10 @@ MatrixQuantizerGPU<ElemType>::~MatrixQuantizerGPU()
 
     // BUGBUG: we don't destroy our streams (they are static variables); we need a static destructor, I am too lazy now
     // TODO: Check for error code and throw if !std::uncaught_exception()
-    cudaEventDestroy(m_assignCompleteEvent);
-    cudaEventDestroy(m_fetchCompleteEvent);
-    cudaEventDestroy(m_quantizeCompleteEvent);
-    cudaEventDestroy(m_tempMatrixZeroingCompleteEvent);
+    hipEventDestroy(m_assignCompleteEvent);
+    hipEventDestroy(m_fetchCompleteEvent);
+    hipEventDestroy(m_quantizeCompleteEvent);
+    hipEventDestroy(m_tempMatrixZeroingCompleteEvent);
 }
 
 template <class ElemType>
@@ -247,8 +247,8 @@ void MatrixQuantizerGPU<ElemType>::QuantizeAsync(const Matrix<ElemType>& inMatri
     // compute stream is different from the main compute stream
     if (GPUMatrixNewlyAllocated && (GetComputeStream() != GetStream()))
     {
-        cudaEventRecord(m_tempMatrixZeroingCompleteEvent, GetStream()) || "cudaEventRecord failed";
-        cudaStreamWaitEvent(GetComputeStream(), m_tempMatrixZeroingCompleteEvent, 0 /*flags 'must be 0'*/) || "cudaStreamWaitEvent failed";
+        hipEventRecord(m_tempMatrixZeroingCompleteEvent, GetStream()) || "hipEventRecord failed";
+        hipStreamWaitEvent(GetComputeStream(), m_tempMatrixZeroingCompleteEvent, 0 /*flags 'must be 0'*/) || "hipStreamWaitEvent failed";
     }
 
     // Do the quantization on compute sstream and insert event into stream
@@ -305,15 +305,15 @@ void MatrixQuantizerGPU<ElemType>::UnquantizeAsync(QuantizedMatrix<ElemType>& in
         // before assigning the inQMatrix contents
         if (GPUMatrixNewlyAllocated)
         {
-            cudaEventRecord(m_tempMatrixZeroingCompleteEvent, GetStream()) || "cudaEventRecord failed";
-            cudaStreamWaitEvent(GetAssignStream(), m_tempMatrixZeroingCompleteEvent, 0 /*flags 'must be 0'*/) || "cudaStreamWaitEvent failed";
+            hipEventRecord(m_tempMatrixZeroingCompleteEvent, GetStream()) || "hipEventRecord failed";
+            hipStreamWaitEvent(GetAssignStream(), m_tempMatrixZeroingCompleteEvent, 0 /*flags 'must be 0'*/) || "hipStreamWaitEvent failed";
         }
 
         // schedule assign to GPU (on transfer stream)
-        cudaMemcpyAsync(inQMatrixGPU.Buffer(), inQMatrix.Buffer(), inQMatrix.GetSize(), cudaMemcpyHostToDevice, GetAssignStream()) || "cudaMemcpyAsync failed";
+        hipMemcpyAsync(inQMatrixGPU.Buffer(), inQMatrix.Buffer(), inQMatrix.GetSize(), hipMemcpyHostToDevice, GetAssignStream()) || "hipMemcpyAsync failed";
 
         // schedule to flag the assign-complete event
-        cudaEventRecord(m_assignCompleteEvent, GetAssignStream()) || "cudaEventRecord failed"; // for subsequent GPU operation to consume this buffer
+        hipEventRecord(m_assignCompleteEvent, GetAssignStream()) || "hipEventRecord failed"; // for subsequent GPU operation to consume this buffer
 
         if (m_forceSync)
         {
@@ -347,34 +347,34 @@ template class MatrixQuantizerGPU<double>;
 GPUMatrixComputeStreamEvent::GPUMatrixComputeStreamEvent(int deviceId)
     : MatrixComputeStreamEvent(deviceId)
 {
-    // Note: Do NOT use cudaEventBlockingSync (which supposedly yields the process)--it will totally break cudaEventSynchronize(), causing it to take 50 or 100 ms randomly.
-    cudaEventCreateWithFlags(&m_mainGPUComputeStreamCUDAEvent, cudaEventDisableTiming) || "cudaEventCreateWithFlags failed";
+    // Note: Do NOT use cudaEventBlockingSync (which supposedly yields the process)--it will totally break hipEventSynchronize(), causing it to take 50 or 100 ms randomly.
+    hipEventCreateWithFlags(&m_mainGPUComputeStreamCUDAEvent, hipEventDisableTiming) || "hipEventCreateWithFlags failed";
 
     // Record an event on the main GPU compute stream
-    cudaEventRecord(m_mainGPUComputeStreamCUDAEvent, GetStream()) || "cudaEventRecord failed";
+    hipEventRecord(m_mainGPUComputeStreamCUDAEvent, GetStream()) || "hipEventRecord failed";
 }
 
 GPUMatrixComputeStreamEvent::~GPUMatrixComputeStreamEvent()
 {
     // TODO: Check for error code and throw if !std::uncaught_exception()
-    cudaEventDestroy(m_mainGPUComputeStreamCUDAEvent) || "cudaEventDestroy failed";
+    hipEventDestroy(m_mainGPUComputeStreamCUDAEvent) || "hipEventDestroy failed";
 }
 
 void GPUMatrixComputeStreamEvent::SynchronizeEvent()
 {
-    cudaEventSynchronize(m_mainGPUComputeStreamCUDAEvent) || "cudaEventSynchronize failed";
+    hipEventSynchronize(m_mainGPUComputeStreamCUDAEvent) || "hipEventSynchronize failed";
 }
 
 template <typename ElemType>
 void GPUMatrixComputeStreamEvent::SynchronizeQuantizationComputeStreamWithEvent()
 {
-    cudaStreamWaitEvent(MatrixQuantizerGPU<ElemType>::GetComputeStream(), m_mainGPUComputeStreamCUDAEvent, 0 /*flags 'must be 0'*/) || "cudaStreamWaitEvent failed";
+    hipStreamWaitEvent(MatrixQuantizerGPU<ElemType>::GetComputeStream(), m_mainGPUComputeStreamCUDAEvent, 0 /*flags 'must be 0'*/) || "hipStreamWaitEvent failed";
 }
 
 template <typename ElemType>
 void GPUMatrixComputeStreamEvent::SynchronizeDataTransferFetchStreamWithEvent()
 {
-    cudaStreamWaitEvent(GPUDataTransferer::GetFetchStream(), m_mainGPUComputeStreamCUDAEvent, 0 /*flags 'must be 0'*/) || "cudaStreamWaitEvent failed";
+    hipStreamWaitEvent(GPUDataTransferer::GetFetchStream(), m_mainGPUComputeStreamCUDAEvent, 0 /*flags 'must be 0'*/) || "hipStreamWaitEvent failed";
 }
 
 // Explicit template instantiations

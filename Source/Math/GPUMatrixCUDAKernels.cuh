@@ -15,7 +15,7 @@
 #include "GPUMatrix.h"
 #include "TensorOps.h" // for exp_() etc.
 #include "device_functions.h"
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 #include <assert.h>
 #include <float.h>
 #pragma pop_macro("TENSOR_OPS_DECL")
@@ -102,11 +102,11 @@ static INT CeilDiv(INT a, INT2 b) // ceil(a/b)
 struct GridDim
 {
     static const CUDA_LONG maxThreadsPerBlock = 1024; // use this many threads per block
-    static const CUDA_LONG maxWarpsPerBlock = 32;     // use this many warps per block. This means 1024 threads for warpSize=32
+    static const CUDA_LONG maxWarpsPerBlock = 32;     // use this many warps per block. This means 1024 threads for hipWarpSize=32
 
     // use these for launching
     //   GridDim grid(NN);
-    //   kernel<<<grid.m_blocksPerGrid, grid.m_threadsPerBlock, ...>>>(...)
+    //   hipLaunchKernelGGL((kernel), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), ..., 0, ...)
     int m_blocksPerGrid, m_threadsPerBlock; // (these may in the future be extended to multi-dimensional ones)
     CUDA_LONG m_N;
 
@@ -119,10 +119,10 @@ struct GridDim
         // get device information
         const auto& props = GetDeviceProps();
         CUDA_LONG numProcs = props.multiProcessorCount;
-        CUDA_LONG warpSize = props.warpSize;
+        CUDA_LONG hipWarpSize = props.warpSize;
 
         // distribute warps evenly over processors
-        CUDA_LONG warpsPerProc = CeilDiv(N, numProcs * warpSize);
+        CUDA_LONG warpsPerProc = CeilDiv(N, numProcs * hipWarpSize);
 
         // if too many warps per block then reduce #warps
         // This limits the number of threads to 512.
@@ -133,21 +133,21 @@ struct GridDim
         }
 
         // put it back together
-        m_threadsPerBlock = warpsPerProc * warpSize;        // =a multiple of 32 that is as close to 1024 as makes sense given NN
+        m_threadsPerBlock = warpsPerProc * hipWarpSize;        // =a multiple of 32 that is as close to 1024 as makes sense given NN
         m_blocksPerGrid = CeilDiv(N, m_threadsPerBlock);
         if (m_blocksPerGrid == 1)
             m_threadsPerBlock = N; // don't launch more than necessary  --TODO: Does this make a difference at all?
         assert(m_blocksPerGrid * m_threadsPerBlock >= N);
     }
 
-    static const std::vector<cudaDeviceProp>& GetCachedDeviceProps()
+    static const std::vector<hipDeviceProp_t>& GetCachedDeviceProps()
     {
         std::call_once(s_cachedDevicePropsInitFlag, [=]{
             int numDevices;
-            CUDA_CALL(cudaGetDeviceCount(&numDevices));
+            CUDA_CALL(hipGetDeviceCount(&numDevices));
             s_cachedDeviceProps.resize(numDevices);
             for (int i = 0; i < numDevices; i++)
-                CUDA_CALL(cudaGetDeviceProperties(&s_cachedDeviceProps[i], i));
+                CUDA_CALL(hipGetDeviceProperties(&s_cachedDeviceProps[i], i));
         });
        
         return s_cachedDeviceProps;
@@ -156,13 +156,13 @@ struct GridDim
     static size_t GetCurrentDeviceId()
     {
         int deviceId;
-        cudaGetDevice(&deviceId);
+        hipGetDevice(&deviceId);
         return (size_t)deviceId;
     }
 
 
     // get device properties of current device
-    static const cudaDeviceProp& GetDeviceProps()
+    static const hipDeviceProp_t& GetDeviceProps()
     {
         const auto& cachedDevicesProps = GetCachedDeviceProps();
         return cachedDevicesProps[GetCurrentDeviceId()];
@@ -171,12 +171,12 @@ struct GridDim
     // compute our location on the grid
     static __device__ CUDA_LONG GetLinearThreadId()
     {
-        return blockDim.x * blockIdx.x + threadIdx.x;
+        return hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     }
 
 private: 
     // TODO: drop call_once and co. and make cached devices a local static, once we're on VS2015.
-    static std::vector<cudaDeviceProp> s_cachedDeviceProps;
+    static std::vector<hipDeviceProp_t> s_cachedDeviceProps;
     static std::once_flag s_cachedDevicePropsInitFlag;
 };
 
@@ -384,7 +384,7 @@ __global__ void _setValue(
     const ElemType v,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     a[id] = v;
@@ -396,7 +396,7 @@ __global__ void _setValue(
     const ElemType* d_v,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     a[id] = d_v[0];
@@ -405,7 +405,7 @@ __global__ void _setValue(
 template <class ElemType>
 __global__ void _copyColumnsStrided(ElemType* dest, ElemType* src, CUDA_LONG N, CUDA_LONG numRows, CUDA_LONG destNumColsStride, CUDA_LONG srcNumColsStride)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -418,7 +418,7 @@ __global__ void _copyColumnsStrided(ElemType* dest, ElemType* src, CUDA_LONG N, 
 template <class ElemType>
 __global__ void _assignToRowSliceValuesOf(ElemType* dest, ElemType* src, const CUDA_LONG N, const CUDA_LONG startIndex, const CUDA_LONG destRows, const CUDA_LONG srcRows)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -431,7 +431,7 @@ __global__ void _assignToRowSliceValuesOf(ElemType* dest, ElemType* src, const C
 template <class ElemType>
 __global__ void _assignRowSliceValuesOf(ElemType* dest, ElemType* src, const CUDA_LONG N, const CUDA_LONG startIndex, const CUDA_LONG destRows, const CUDA_LONG srcRows)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -445,7 +445,7 @@ __global__ void _assignRowSliceValuesOf(ElemType* dest, ElemType* src, const CUD
 template <class ElemType>
 __global__ void _addToRowSliceValuesOf(ElemType* dest, ElemType* src, const CUDA_LONG N, const CUDA_LONG startIndex, const CUDA_LONG destRows, const CUDA_LONG srcRows)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -459,7 +459,7 @@ __global__ void _addToRowSliceValuesOf(ElemType* dest, ElemType* src, const CUDA
 template <class ElemType>
 __global__ void _addWithRowSliceValuesOf(ElemType* dest, ElemType* src, const CUDA_LONG N, const CUDA_LONG startIndex, const CUDA_LONG destRows, const CUDA_LONG srcRows)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -472,7 +472,7 @@ __global__ void _addWithRowSliceValuesOf(ElemType* dest, ElemType* src, const CU
 template <class ElemType>
 __global__ void _assignToDiagonalValuesOf(ElemType* dest, ElemType* src, const CUDA_LONG N, const CUDA_LONG srcCols)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -486,7 +486,7 @@ __global__ void _assignToDiagonalValuesOf(ElemType* dest, ElemType* src, const C
 template <class ElemType>
 __global__ void _assignRowStackValuesOf(ElemType* dest, ElemType** srces, size_t* startRowIndeces, const CUDA_LONG numSrces, const CUDA_LONG N, const CUDA_LONG destRows, const CUDA_LONG destCols)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -507,7 +507,7 @@ __global__ void _assignRowStackValuesOf(ElemType* dest, ElemType** srces, size_t
 template <class ElemType>
 __global__ void _assignRepeatOf(ElemType* dest, ElemType* src, const CUDA_LONG N, const CUDA_LONG srcRows, const CUDA_LONG srcCols, const CUDA_LONG destRows)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -523,7 +523,7 @@ __global__ void _assignRepeatOf(ElemType* dest, ElemType* src, const CUDA_LONG N
 template <class ElemType>
 __global__ void _addToRowRepeatValuesOf(ElemType* dest, ElemType* src, const CUDA_LONG N, const CUDA_LONG srcRows, const CUDA_LONG srcCols, const CUDA_LONG destRows)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -537,7 +537,7 @@ __global__ void _addToRowRepeatValuesOf(ElemType* dest, ElemType* src, const CUD
 template <class ElemType>
 __global__ void _assignPositiveAndShiftedNegSample(ElemType* dest, const ElemType* src, const CUDA_LONG N, const CUDA_LONG srcRows, const CUDA_LONG srcCols, const CUDA_LONG destRows, const CUDA_LONG posNumber, const CUDA_LONG shiftNumber)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -554,7 +554,7 @@ __global__ void _assignPositiveAndShiftedNegSample(ElemType* dest, const ElemTyp
 template <class ElemType>
 __global__ void _addFoldedPositiveAndShiftedNegSample(ElemType* folded, const ElemType* unfolded, const CUDA_LONG unfoldedN, const CUDA_LONG unfoldedRows, const CUDA_LONG unfoldedCols, const CUDA_LONG foldedRows, const CUDA_LONG posNumber, const CUDA_LONG shiftNumber)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= unfoldedN)
         return;
 
@@ -575,7 +575,7 @@ __global__ void _assignDifferenceOf1(
     const ElemType* a,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     us[id] = alpha - a[id];
@@ -588,7 +588,7 @@ __global__ void _assignDifferenceOf2(
     const ElemType* a,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     us[id] = a[id] - alpha;
@@ -603,7 +603,7 @@ __global__ void _scaleAndAddScalar(
     const ElemType* a,
     const ElemType* b)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     c[id] = alpha * a[0] + b[id];
@@ -613,7 +613,7 @@ template <class ElemType>
 __global__ void _multiply1x1AndWeightedAdd(
     ElemType alpha, const ElemType* a, const ElemType* b, ElemType beta, ElemType* c, CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     ElemType f = alpha * *a; // scalar matrix
@@ -629,7 +629,7 @@ __global__ void _addValue(
     const ElemType v,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     a[id] += v;
@@ -641,7 +641,7 @@ __global__ void _addValue(
     const ElemType* d_v,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     a[id] += d_v[0];
@@ -653,7 +653,7 @@ __global__ void _elemMul(
     const ElemType* b,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     a[id] *= b[id];
@@ -666,7 +666,7 @@ __global__ void _assignElementProductOf(
     const ElemType* b,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     us[id] = a[id] * b[id];
@@ -681,7 +681,7 @@ __global__ void _assignKhatriRaoProductOf(
     const CUDA_LONG rowsB,
     const CUDA_LONG cols)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
 
     const CUDA_LONG rows = rowsA * rowsB;
     const CUDA_LONG col = id / rows;
@@ -705,7 +705,7 @@ __global__ void _addColumnReshapeProductOf(
     const CUDA_LONG cols,
     const bool transposeAColumn)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
 
     const CUDA_LONG col = id / rowsC;
     if (col >= cols)
@@ -745,7 +745,7 @@ __global__ void _assignElementDivisionOf(
 {
     ElemType smallValue = EPS_IN_INVERSE;
 
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -766,7 +766,7 @@ __global__ void _elemInverse(
 {
     ElemType smallValue = EPS_IN_INVERSE;
 
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -784,32 +784,32 @@ __global__ void _logSoftMaxColWise(
     const CUDA_LONG m_numCols,
     const CUDA_LONG m_numRows) // ld
 {
-    int col_id = blockDim.x * blockIdx.x + threadIdx.x;
+    int col_id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (col_id >= m_numCols)
         return;
 
     __shared__ ElemType maxV[GridDim::maxThreadsPerBlock];
     __shared__ ElemType Sum[GridDim::maxThreadsPerBlock];
-    maxV[threadIdx.x] = a[IDX2C(0, col_id, m_numRows)];
-    Sum[threadIdx.x] = 0;
+    maxV[hipThreadIdx_x] = a[IDX2C(0, col_id, m_numRows)];
+    Sum[hipThreadIdx_x] = 0;
 
     for (CUDA_LONG i = 0; i < m_numRows; ++i)
     {
-        if (a[IDX2C(i, col_id, m_numRows)] > maxV[threadIdx.x])
+        if (a[IDX2C(i, col_id, m_numRows)] > maxV[hipThreadIdx_x])
         {
-            maxV[threadIdx.x] = a[IDX2C(i, col_id, m_numRows)];
+            maxV[hipThreadIdx_x] = a[IDX2C(i, col_id, m_numRows)];
         }
     }
 
     for (CUDA_LONG i = 0; i < m_numRows; ++i)
     {
-        ElemType tmp = a[IDX2C(i, col_id, m_numRows)] - maxV[threadIdx.x];
-        Sum[threadIdx.x] += (sizeof(ElemType) == sizeof(float) ? expf(tmp) : exp(tmp));
+        ElemType tmp = a[IDX2C(i, col_id, m_numRows)] - maxV[hipThreadIdx_x];
+        Sum[hipThreadIdx_x] += (sizeof(ElemType) == sizeof(float) ? expf(tmp) : exp(tmp));
     }
-    Sum[threadIdx.x] = maxV[threadIdx.x] + (sizeof(ElemType) == sizeof(float) ? logf(Sum[threadIdx.x]) : log(Sum[threadIdx.x]));
+    Sum[hipThreadIdx_x] = maxV[hipThreadIdx_x] + (sizeof(ElemType) == sizeof(float) ? logf(Sum[hipThreadIdx_x]) : log(Sum[hipThreadIdx_x]));
     for (CUDA_LONG i = 0; i < m_numRows; ++i)
     {
-        a[IDX2C(i, col_id, m_numRows)] -= Sum[threadIdx.x];
+        a[IDX2C(i, col_id, m_numRows)] -= Sum[hipThreadIdx_x];
     }
 }
 
@@ -820,20 +820,20 @@ __global__ void _logSoftMaxColWise(
 //    const CUDA_LONG m_numCols,
 //    const CUDA_LONG m_numRows) // thead per column
 //{
-//    int col_id = blockDim.x * blockIdx.x + threadIdx.x;
+//    int col_id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
 //    if (col_id>=m_numCols)
 //        return;
 //
 //    __shared__ ElemType maxV[GridDim::maxThreadsPerBlock];
 //    __shared__ ElemType Sum[GridDim::maxThreadsPerBlock];
-//    maxV[threadIdx.x]=a[IDX2C(0,col_id,m_numRows)];
-//    Sum[threadIdx.x]=0;
+//    maxV[hipThreadIdx_x]=a[IDX2C(0,col_id,m_numRows)];
+//    Sum[hipThreadIdx_x]=0;
 //
 //    for (CUDA_LONG i=0;i<m_numRows;++i)
 //    {
-//        if (a[IDX2C(i,col_id,m_numRows)]>maxV[threadIdx.x])
+//        if (a[IDX2C(i,col_id,m_numRows)]>maxV[hipThreadIdx_x])
 //        {
-//            maxV[threadIdx.x]=a[IDX2C(i,col_id,m_numRows)];
+//            maxV[hipThreadIdx_x]=a[IDX2C(i,col_id,m_numRows)];
 //        }
 //    }
 //
@@ -841,18 +841,18 @@ __global__ void _logSoftMaxColWise(
 //    {
 //        if (sizeof(ElemType)==sizeof(float))
 //        {
-//            us[IDX2C(i,col_id,m_numRows)] = expf(a[IDX2C(i,col_id,m_numRows)]-maxV[threadIdx.x]);
+//            us[IDX2C(i,col_id,m_numRows)] = expf(a[IDX2C(i,col_id,m_numRows)]-maxV[hipThreadIdx_x]);
 //        }
 //        else
 //        {
-//            us[IDX2C(i,col_id,m_numRows)] = exp(a[IDX2C(i,col_id,m_numRows)]-maxV[threadIdx.x]);
+//            us[IDX2C(i,col_id,m_numRows)] = exp(a[IDX2C(i,col_id,m_numRows)]-maxV[hipThreadIdx_x]);
 //        }
-//        Sum[threadIdx.x] +=  us[IDX2C(i,col_id,m_numRows)];
+//        Sum[hipThreadIdx_x] +=  us[IDX2C(i,col_id,m_numRows)];
 //    }
 //
 //    for (CUDA_LONG i=0;i<m_numRows;++i)
 //    {
-//        us[IDX2C(i,col_id,m_numRows)] /= Sum[threadIdx.x] ;
+//        us[IDX2C(i,col_id,m_numRows)] /= Sum[hipThreadIdx_x] ;
 //    }
 //}
 
@@ -866,126 +866,126 @@ __global__ void _assignColumnwiseLogSoftmaxOf512Threads(
 {
     // We first find max per column
     __shared__ ElemType partials[512];
-    partials[threadIdx.x] = -10000000;
+    partials[hipThreadIdx_x] = -10000000;
 
-    for (int i = threadIdx.x; i < m_numRows; i += 512)
+    for (int i = hipThreadIdx_x; i < m_numRows; i += 512)
     {
-        partials[threadIdx.x] = max(partials[threadIdx.x], a[IDX2C(i, blockIdx.x, m_numRows)]);
+        partials[hipThreadIdx_x] = max(partials[hipThreadIdx_x], a[IDX2C(i, hipBlockIdx_x, m_numRows)]);
     }
     __syncthreads();
 
-    if (threadIdx.x < 256)
+    if (hipThreadIdx_x < 256)
     {
-        partials[threadIdx.x] = max(partials[threadIdx.x + 256], partials[threadIdx.x]);
+        partials[hipThreadIdx_x] = max(partials[hipThreadIdx_x + 256], partials[hipThreadIdx_x]);
     }
     __syncthreads();
 
-    if (threadIdx.x < 128)
+    if (hipThreadIdx_x < 128)
     {
-        partials[threadIdx.x] = max(partials[threadIdx.x + 128], partials[threadIdx.x]);
+        partials[hipThreadIdx_x] = max(partials[hipThreadIdx_x + 128], partials[hipThreadIdx_x]);
     }
     __syncthreads();
 
-    if (threadIdx.x < 64)
+    if (hipThreadIdx_x < 64)
     {
-        partials[threadIdx.x] = max(partials[threadIdx.x + 64], partials[threadIdx.x]);
+        partials[hipThreadIdx_x] = max(partials[hipThreadIdx_x + 64], partials[hipThreadIdx_x]);
     }
     __syncthreads();
 
-    if (threadIdx.x < 32)
+    if (hipThreadIdx_x < 32)
     {
-        partials[threadIdx.x] = max(partials[threadIdx.x + 32], partials[threadIdx.x]);
+        partials[hipThreadIdx_x] = max(partials[hipThreadIdx_x + 32], partials[hipThreadIdx_x]);
     }
     __syncthreads();
 
-    if (threadIdx.x < 16)
+    if (hipThreadIdx_x < 16)
     {
-        partials[threadIdx.x] = max(partials[threadIdx.x + 16], partials[threadIdx.x]);
+        partials[hipThreadIdx_x] = max(partials[hipThreadIdx_x + 16], partials[hipThreadIdx_x]);
     }
     __syncthreads();
 
-    if (threadIdx.x < 8)
+    if (hipThreadIdx_x < 8)
     {
-        partials[threadIdx.x] = max(partials[threadIdx.x + 8], partials[threadIdx.x]);
+        partials[hipThreadIdx_x] = max(partials[hipThreadIdx_x + 8], partials[hipThreadIdx_x]);
     }
     __syncthreads();
 
-    if (threadIdx.x < 4)
+    if (hipThreadIdx_x < 4)
     {
-        partials[threadIdx.x] = max(partials[threadIdx.x + 4], partials[threadIdx.x]);
+        partials[hipThreadIdx_x] = max(partials[hipThreadIdx_x + 4], partials[hipThreadIdx_x]);
     }
     __syncthreads();
 
     __shared__ ElemType colMax[1];
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
         colMax[0] = max(max(partials[0], partials[1]), max(partials[2], partials[3]));
     }
     __syncthreads();
-    partials[threadIdx.x] = 0.0f;
+    partials[hipThreadIdx_x] = 0.0f;
 
     // Now start finding sums
-    for (int i = threadIdx.x; i < m_numRows; i += 512)
+    for (int i = hipThreadIdx_x; i < m_numRows; i += 512)
     {
-        ElemType tmp = a[IDX2C(i, blockIdx.x, m_numRows)] - colMax[0];
-        us[IDX2C(i, blockIdx.x, m_numRows)] = tmp;
-        partials[threadIdx.x] += (sizeof(ElemType) == sizeof(float)) ? expf(tmp) : exp(tmp);
+        ElemType tmp = a[IDX2C(i, hipBlockIdx_x, m_numRows)] - colMax[0];
+        us[IDX2C(i, hipBlockIdx_x, m_numRows)] = tmp;
+        partials[hipThreadIdx_x] += (sizeof(ElemType) == sizeof(float)) ? expf(tmp) : exp(tmp);
     }
     __syncthreads();
 
-    if (threadIdx.x < 256)
+    if (hipThreadIdx_x < 256)
     {
-        partials[threadIdx.x] += partials[threadIdx.x + 256];
+        partials[hipThreadIdx_x] += partials[hipThreadIdx_x + 256];
     }
     __syncthreads();
 
-    if (threadIdx.x < 128)
+    if (hipThreadIdx_x < 128)
     {
-        partials[threadIdx.x] += partials[threadIdx.x + 128];
+        partials[hipThreadIdx_x] += partials[hipThreadIdx_x + 128];
     }
     __syncthreads();
 
-    if (threadIdx.x < 64)
+    if (hipThreadIdx_x < 64)
     {
-        partials[threadIdx.x] += partials[threadIdx.x + 64];
+        partials[hipThreadIdx_x] += partials[hipThreadIdx_x + 64];
     }
     __syncthreads();
 
-    if (threadIdx.x < 32)
+    if (hipThreadIdx_x < 32)
     {
-        partials[threadIdx.x] += partials[threadIdx.x + 32];
+        partials[hipThreadIdx_x] += partials[hipThreadIdx_x + 32];
     }
     __syncthreads();
 
-    if (threadIdx.x < 16)
+    if (hipThreadIdx_x < 16)
     {
-        partials[threadIdx.x] += partials[threadIdx.x + 16];
+        partials[hipThreadIdx_x] += partials[hipThreadIdx_x + 16];
     }
     __syncthreads();
 
-    if (threadIdx.x < 8)
+    if (hipThreadIdx_x < 8)
     {
-        partials[threadIdx.x] += partials[threadIdx.x + 8];
+        partials[hipThreadIdx_x] += partials[hipThreadIdx_x + 8];
     }
     __syncthreads();
 
-    if (threadIdx.x < 4)
+    if (hipThreadIdx_x < 4)
     {
-        partials[threadIdx.x] += partials[threadIdx.x + 4];
+        partials[hipThreadIdx_x] += partials[hipThreadIdx_x + 4];
     }
     __syncthreads();
 
     __shared__ ElemType colSum[1];
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
         colSum[0] = partials[0] + partials[1] + partials[2] + partials[3];
         colSum[0] = (sizeof(ElemType) == sizeof(float)) ? logf(colSum[0]) : log(colSum[0]);
     }
     __syncthreads();
 
-    for (int i = threadIdx.x; i < m_numRows; i += 512)
+    for (int i = hipThreadIdx_x; i < m_numRows; i += 512)
     {
-        us[IDX2C(i, blockIdx.x, m_numRows)] -= colSum[0];
+        us[IDX2C(i, hipBlockIdx_x, m_numRows)] -= colSum[0];
     }
 }
 
@@ -995,32 +995,32 @@ __global__ void _logSoftMaxRowWise(
     const CUDA_LONG m_numCols,
     const CUDA_LONG m_numRows) // ld
 {
-    int row_id = blockDim.x * blockIdx.x + threadIdx.x;
+    int row_id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (row_id >= m_numRows)
         return;
 
     __shared__ ElemType maxV[GridDim::maxThreadsPerBlock];
     __shared__ ElemType Sum[GridDim::maxThreadsPerBlock];
-    maxV[threadIdx.x] = a[IDX2C(row_id, 0, m_numRows)];
-    Sum[threadIdx.x] = 0;
+    maxV[hipThreadIdx_x] = a[IDX2C(row_id, 0, m_numRows)];
+    Sum[hipThreadIdx_x] = 0;
 
     for (CUDA_LONG j = 0; j < m_numCols; ++j)
     {
-        if (a[IDX2C(row_id, j, m_numRows)] > maxV[threadIdx.x])
+        if (a[IDX2C(row_id, j, m_numRows)] > maxV[hipThreadIdx_x])
         {
-            maxV[threadIdx.x] = a[IDX2C(row_id, j, m_numRows)];
+            maxV[hipThreadIdx_x] = a[IDX2C(row_id, j, m_numRows)];
         }
     }
 
     for (CUDA_LONG j = 0; j < m_numCols; ++j)
     {
-        ElemType tmp = a[IDX2C(row_id, j, m_numRows)] - maxV[threadIdx.x];
-        Sum[threadIdx.x] += sizeof(ElemType) == sizeof(float) ? expf(tmp) : exp(tmp);
+        ElemType tmp = a[IDX2C(row_id, j, m_numRows)] - maxV[hipThreadIdx_x];
+        Sum[hipThreadIdx_x] += sizeof(ElemType) == sizeof(float) ? expf(tmp) : exp(tmp);
     }
-    Sum[threadIdx.x] = maxV[threadIdx.x] + (sizeof(ElemType) == sizeof(float) ? logf(Sum[threadIdx.x]) : log(Sum[threadIdx.x]));
+    Sum[hipThreadIdx_x] = maxV[hipThreadIdx_x] + (sizeof(ElemType) == sizeof(float) ? logf(Sum[hipThreadIdx_x]) : log(Sum[hipThreadIdx_x]));
     for (CUDA_LONG j = 0; j < m_numCols; ++j)
     {
-        a[IDX2C(row_id, j, m_numRows)] -= Sum[threadIdx.x];
+        a[IDX2C(row_id, j, m_numRows)] -= Sum[hipThreadIdx_x];
     }
 }
 
@@ -1035,29 +1035,29 @@ __global__ void _assignColumnwiseHardmaxOf512Threads(
     // We first find max per column
     __shared__ ElemType partials[512];
     __shared__ int colMaxI[512];
-    int row = threadIdx.x % m_numRows;
-    colMaxI[threadIdx.x] = row;
-    partials[threadIdx.x] = a[IDX2C(row, blockIdx.x, m_numRows)];
+    int row = hipThreadIdx_x % m_numRows;
+    colMaxI[hipThreadIdx_x] = row;
+    partials[hipThreadIdx_x] = a[IDX2C(row, hipBlockIdx_x, m_numRows)];
 
-    for (int i = threadIdx.x; i < m_numRows; i += 512)
+    for (int i = hipThreadIdx_x; i < m_numRows; i += 512)
     {
-        if (partials[threadIdx.x] < a[IDX2C(i, blockIdx.x, m_numRows)])
+        if (partials[hipThreadIdx_x] < a[IDX2C(i, hipBlockIdx_x, m_numRows)])
         {
-            partials[threadIdx.x] = a[IDX2C(i, blockIdx.x, m_numRows)];
-            colMaxI[threadIdx.x] = i;
+            partials[hipThreadIdx_x] = a[IDX2C(i, hipBlockIdx_x, m_numRows)];
+            colMaxI[hipThreadIdx_x] = i;
         }
     }
     __syncthreads();
 
     if (m_numRows > 256)
     {
-        if (threadIdx.x < 256)
+        if (hipThreadIdx_x < 256)
         {
-            int other = threadIdx.x + 256;
-            if (partials[threadIdx.x] < partials[other])
+            int other = hipThreadIdx_x + 256;
+            if (partials[hipThreadIdx_x] < partials[other])
             {
-                partials[threadIdx.x] = partials[other];
-                colMaxI[threadIdx.x] = colMaxI[other];
+                partials[hipThreadIdx_x] = partials[other];
+                colMaxI[hipThreadIdx_x] = colMaxI[other];
             }
         }
         __syncthreads();
@@ -1065,14 +1065,14 @@ __global__ void _assignColumnwiseHardmaxOf512Threads(
 
     if (m_numRows > 128)
     {
-        if (threadIdx.x < 128)
+        if (hipThreadIdx_x < 128)
         {
-            int other = threadIdx.x + 128;
+            int other = hipThreadIdx_x + 128;
 
-            if (partials[threadIdx.x] < partials[other])
+            if (partials[hipThreadIdx_x] < partials[other])
             {
-                partials[threadIdx.x] = partials[other];
-                colMaxI[threadIdx.x] = colMaxI[other];
+                partials[hipThreadIdx_x] = partials[other];
+                colMaxI[hipThreadIdx_x] = colMaxI[other];
             }
         }
         __syncthreads();
@@ -1080,13 +1080,13 @@ __global__ void _assignColumnwiseHardmaxOf512Threads(
 
     if (m_numRows > 64)
     {
-        if (threadIdx.x < 64)
+        if (hipThreadIdx_x < 64)
         {
-            int other = threadIdx.x + 64;
-            if (partials[threadIdx.x] < partials[other])
+            int other = hipThreadIdx_x + 64;
+            if (partials[hipThreadIdx_x] < partials[other])
             {
-                partials[threadIdx.x] = partials[other];
-                colMaxI[threadIdx.x] = colMaxI[other];
+                partials[hipThreadIdx_x] = partials[other];
+                colMaxI[hipThreadIdx_x] = colMaxI[other];
             }
         }
         __syncthreads();
@@ -1094,13 +1094,13 @@ __global__ void _assignColumnwiseHardmaxOf512Threads(
 
     if (m_numRows > 32)
     {
-        if (threadIdx.x < 32)
+        if (hipThreadIdx_x < 32)
         {
-            int other = threadIdx.x + 32;
-            if (partials[threadIdx.x] < partials[other])
+            int other = hipThreadIdx_x + 32;
+            if (partials[hipThreadIdx_x] < partials[other])
             {
-                partials[threadIdx.x] = partials[other];
-                colMaxI[threadIdx.x] = colMaxI[other];
+                partials[hipThreadIdx_x] = partials[other];
+                colMaxI[hipThreadIdx_x] = colMaxI[other];
             }
         }
         __syncthreads();
@@ -1108,13 +1108,13 @@ __global__ void _assignColumnwiseHardmaxOf512Threads(
 
     if (m_numRows > 16)
     {
-        if (threadIdx.x < 16)
+        if (hipThreadIdx_x < 16)
         {
-            int other = threadIdx.x + 16;
-            if (partials[threadIdx.x] < partials[other])
+            int other = hipThreadIdx_x + 16;
+            if (partials[hipThreadIdx_x] < partials[other])
             {
-                partials[threadIdx.x] = partials[other];
-                colMaxI[threadIdx.x] = colMaxI[other];
+                partials[hipThreadIdx_x] = partials[other];
+                colMaxI[hipThreadIdx_x] = colMaxI[other];
             }
         }
         __syncthreads();
@@ -1122,13 +1122,13 @@ __global__ void _assignColumnwiseHardmaxOf512Threads(
 
     if (m_numRows > 8)
     {
-        if (threadIdx.x < 8)
+        if (hipThreadIdx_x < 8)
         {
-            int other = threadIdx.x + 8;
-            if (partials[threadIdx.x] < partials[other])
+            int other = hipThreadIdx_x + 8;
+            if (partials[hipThreadIdx_x] < partials[other])
             {
-                partials[threadIdx.x] = partials[other];
-                colMaxI[threadIdx.x] = colMaxI[other];
+                partials[hipThreadIdx_x] = partials[other];
+                colMaxI[hipThreadIdx_x] = colMaxI[other];
             }
         }
         __syncthreads();
@@ -1136,19 +1136,19 @@ __global__ void _assignColumnwiseHardmaxOf512Threads(
 
     if (m_numRows > 4)
     {
-        if (threadIdx.x < 4)
+        if (hipThreadIdx_x < 4)
         {
-            int other = threadIdx.x + 4;
-            if (partials[threadIdx.x] < partials[other])
+            int other = hipThreadIdx_x + 4;
+            if (partials[hipThreadIdx_x] < partials[other])
             {
-                partials[threadIdx.x] = partials[other];
-                colMaxI[threadIdx.x] = colMaxI[other];
+                partials[hipThreadIdx_x] = partials[other];
+                colMaxI[hipThreadIdx_x] = colMaxI[other];
             }
         }
         __syncthreads();
     }
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
         for (int i = 1; i < 4 && i < m_numRows; i++)
         {
@@ -1161,9 +1161,9 @@ __global__ void _assignColumnwiseHardmaxOf512Threads(
     }
     __syncthreads();
 
-    for (int i = threadIdx.x; i < m_numRows; i += 512)
+    for (int i = hipThreadIdx_x; i < m_numRows; i += 512)
     {
-        us[IDX2C(i, blockIdx.x, m_numRows)] = (i == colMaxI[0]) ? 1 : 0;
+        us[IDX2C(i, hipBlockIdx_x, m_numRows)] = (i == colMaxI[0]) ? 1 : 0;
     }
 }
 
@@ -1195,7 +1195,7 @@ __global__ void _setToZeroIfAbsLessThan(
     const ElemType threshold,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     if (sizeof(ElemType) == sizeof(float))
@@ -1218,7 +1218,7 @@ __global__ void _areEqual(
     const ElemType threshold,
     long* d_res)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -1244,7 +1244,7 @@ __global__ void _tensorShuffleScaleAndAdd(
     ElemType keepWeight, const ElemType* pa, size_t D, size_t S, size_t M, size_t K, size_t T, ElemType scaleFactor, const ElemType* pb, ElemType* pc)
 {
     size_t N = D * S * M * K * T;
-    CUDA_LONG na = blockDim.x * blockIdx.x + threadIdx.x; // input tensor of dimension (D x S x M x K x T)
+    CUDA_LONG na = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x; // input tensor of dimension (D x S x M x K x T)
     if (na >= N)
         return;
     // recover the 5 indices from the loop counter
@@ -1273,7 +1273,7 @@ __global__ void _tensorShuffleScaleAndAddRowSparse(
     size_t D, size_t S, size_t M, size_t K, size_t T,
     size_t nz)
 {
-    CUDA_LONG N = blockDim.x * blockIdx.x + threadIdx.x; // input tensor of dimension (D x S x M x K x T)
+    CUDA_LONG N = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x; // input tensor of dimension (D x S x M x K x T)
     if (N < aColCSCIndex[0] || N >= aColCSCIndex[T])
         return;
 
@@ -1334,7 +1334,7 @@ __global__ void _hasElement(
     ElemType* d_res // [2x1] vector. The first is the value to be compared and the second is the 0/1 to return
     )
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -1351,7 +1351,7 @@ __global__ void _setDiagonalValue(
     const CUDA_LONG N,
     const CUDA_LONG ld)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     a[IDX2C(id, id, ld)] = v;
@@ -1363,7 +1363,7 @@ __global__ void _setDiagonalValueFromVector(
     const ElemType* b,
     const CUDA_LONG N)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     a[IDX2C(id, id, N)] = b[id];
@@ -1376,7 +1376,7 @@ __global__ void _adagrad(
     const CUDA_LONG N,
     ElemType* multipliers)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -1401,7 +1401,7 @@ __global__ void _adagrad4BlockSparse(
     const size_t len,  // major dim, numRows in colMajor and numcols in rowMajor
     const CUDA_LONG N) // total number of non-zero values
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -1424,8 +1424,8 @@ __global__ void _fsadagrad(CUDA_LONG size, ElemType* grad, ElemType* smoothAda, 
                            ElemType lr, ElemType mom, ElemType adaWeight, ElemType adaMul, bool unitGainMomentum)
 {
     const ElemType unitGainFactor = unitGainMomentum ? (1.0 - mom) : 1.0;
-    CUDA_LONG idx = blockIdx.x * blockDim.x + threadIdx.x;
-    CUDA_LONG stride = blockDim.x * gridDim.x;
+    CUDA_LONG idx = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+    CUDA_LONG stride = hipBlockDim_x * hipGridDim_x;
     for (; idx < size; idx += stride)
     {
         ElemType g = grad[idx];
@@ -1487,8 +1487,8 @@ __global__ void _fsadagrad4BlockSparseCol(CUDA_LONG size,
     ElemType lr, ElemType mom, ElemType adaWeight, ElemType adaMul, bool unitGainMomentum)
 {
     const ElemType unitGainFactor = unitGainMomentum ? (1.0 - mom) : 1.0;
-    CUDA_LONG idx = blockIdx.x * blockDim.x + threadIdx.x;
-    CUDA_LONG stride = blockDim.x * gridDim.x;
+    CUDA_LONG idx = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+    CUDA_LONG stride = hipBlockDim_x * hipGridDim_x;
     for (; idx < size; idx += stride)
     {
         ElemType g = _getvalue4BlockSparseCol(grad_bsc, colOrRow2blockId, len, idx);
@@ -1528,7 +1528,7 @@ __global__ void _rmsprop_init(
     ElemType* curr_grad,
     const CUDA_LONG N)
 {
-    CUDA_LONG i = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG i = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (i >= N)
         return;
 
@@ -1544,7 +1544,7 @@ __global__ void _rmsprop_init4BlockSparseCol(
     ElemType* curr_grad, const GPUSPARSE_INDEX_TYPE* colOrRow2blockId, const size_t len,
     const CUDA_LONG N)
 {
-    CUDA_LONG i = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG i = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (i >= N)
         return;
 
@@ -1565,7 +1565,7 @@ __global__ void _rmsprop(
     ElemType* upd_gpu,
     ElemType* multipliers)
 {
-    CUDA_LONG i = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG i = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (i >= N)
         return;
 
@@ -1618,7 +1618,7 @@ __global__ void _rmsprop4BlockSparseCol(
     ElemType* upd_gpu,
     ElemType* multipliers)
 {
-    CUDA_LONG i = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG i = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (i >= N)
         return;
 
@@ -1670,7 +1670,7 @@ __global__ void _rescaleToRange(
     const ElemType low,
     const ElemType high)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     a[id] = a[id] * (high - low) + low;
@@ -1683,7 +1683,7 @@ __global__ void _truncated_normal_transform(
     const ElemType mean,
     const ElemType sigma)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     const ElemType high = (ElemType)0.97724986805182079; // normcdf(2);
@@ -1698,7 +1698,7 @@ __global__ void _gumbelFromUniform(
     const ElemType loc,
     const ElemType scale)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     a[id] = loc - scale * log_(ElemType(1e-40) - log_(a[id])); //a[id] is uniform in (0,1] exactly opposite from every other rng implementation  
@@ -1711,7 +1711,7 @@ __global__ void _setMaskAndScale(
     const ElemType maskRate,
     const ElemType scaleValue)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     a[id] = a[id] <= maskRate ? 0 : scaleValue;
@@ -1725,7 +1725,7 @@ __global__ void _vectorSum(
     const CUDA_LONG m, // a.numCols
     const bool isColWise)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if ((isColWise && id >= m) || (!isColWise && id >= n))
         return;
 
@@ -1756,7 +1756,7 @@ __global__ void _vectorNorm1(
     const CUDA_LONG m, // a.numCols
     const bool isColWise)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if ((isColWise && id >= m) || (!isColWise && id >= n))
         return;
 
@@ -1802,7 +1802,7 @@ __global__ void _vectorNorm2(
     const CUDA_LONG M, // a.GetNumCols();
     const bool isColWise)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if ((isColWise && id >= M) || (!isColWise && id >= N))
         return;
 
@@ -1839,7 +1839,7 @@ __global__ void _convertInd2ValsAdjustInd(
     const CUDA_LONG m, // number of rows
     const bool isColWise)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if ((isColWise && id >= n) || (!isColWise && id >= m))
         return;
     inds[id]--;
@@ -1863,7 +1863,7 @@ __global__ void _assignPackedConvolutionInput(ElemType* packedMatrix, const Elem
     const CUDA_LONG inputHeightTimesChannel = inputHeight * inputChannels;
     const size_t inputDim = inputWidth * inputHeightTimesChannel;
 
-    const CUDA_LONG idall = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG idall = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     const CUDA_LONG sample = idall / inputDim;
     if (sample >= batchSize)
         return;
@@ -1929,7 +1929,7 @@ __global__ void _unpackConvolutionInput(const ElemType* packedMatrix, ElemType* 
     const CUDA_LONG inputHeightTimesChannel = inputHeight * inputChannels;
     const size_t inputDim = inputWidth * inputHeightTimesChannel;
 
-    const CUDA_LONG idall = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG idall = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     const CUDA_LONG sample = idall / inputDim;
     if (sample >= batchSize)
         return;
@@ -1992,7 +1992,7 @@ __global__ void _assignMaxPoolingResult(ElemType* outputBatch, const ElemType* i
                                         const CUDA_LONG outputWidth, const CUDA_LONG outputHeight, const CUDA_LONG outputSizePerSample,
                                         const CUDA_LONG windowWidth, const CUDA_LONG windowHeight, const CUDA_LONG horizontalSubsample, const CUDA_LONG verticalSubsample)
 {
-    const CUDA_LONG outputIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG outputIndex = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     const CUDA_LONG sample = outputIndex / outputSizePerSample;
     if (sample >= batchSize)
         return;
@@ -2035,7 +2035,7 @@ __global__ void _addMaxPoolingGradient(ElemType* inputGradientBatch, const ElemT
                                        const CUDA_LONG outputWidth, const CUDA_LONG outputHeight, const CUDA_LONG outputSizePerSample,
                                        const CUDA_LONG windowWidth, const CUDA_LONG windowHeight, const CUDA_LONG horizontalSubsample, const CUDA_LONG verticalSubsample)
 {
-    const CUDA_LONG inputIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG inputIndex = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     const CUDA_LONG sample = inputIndex / inputSizePerSample;
     if (sample >= batchSize)
         return;
@@ -2082,7 +2082,7 @@ __global__ void _assignAveragePoolingResult(ElemType* outputBatch, const ElemTyp
                                             const CUDA_LONG outputWidth, const CUDA_LONG outputHeight, const CUDA_LONG outputSizePerSample,
                                             const CUDA_LONG windowWidth, const CUDA_LONG windowHeight, const CUDA_LONG horizontalSubsample, const CUDA_LONG verticalSubsample)
 {
-    const CUDA_LONG outputIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG outputIndex = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     const CUDA_LONG sample = outputIndex / outputSizePerSample;
     if (sample >= batchSize)
         return;
@@ -2126,7 +2126,7 @@ __global__ void _addAveragePoolingGradient(ElemType* inputGradientBatch, const E
                                            const CUDA_LONG outputWidth, const CUDA_LONG outputHeight, const CUDA_LONG outputSizePerSample,
                                            const CUDA_LONG windowWidth, const CUDA_LONG windowHeight, const CUDA_LONG horizontalSubsample, const CUDA_LONG verticalSubsample)
 {
-    const CUDA_LONG inputIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG inputIndex = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     const CUDA_LONG sample = inputIndex / inputSizePerSample;
     if (sample >= batchSize)
         return;
@@ -2173,7 +2173,7 @@ __global__ void _addMaxPoolingGradientLoopOut(ElemType* inputGradientBatch, cons
                                               const CUDA_LONG outputWidth, const CUDA_LONG outputHeight, const CUDA_LONG outputSizePerSample,
                                               const CUDA_LONG windowWidth, const CUDA_LONG windowHeight, const CUDA_LONG horizontalSubsample, const CUDA_LONG verticalSubsample)
 {
-    const CUDA_LONG outputIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG outputIndex = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     const CUDA_LONG sample = outputIndex / outputSizePerSample;
     if (sample >= batchSize)
         return;
@@ -2212,7 +2212,7 @@ __global__ void _addElementProductOf(
     const ElemType* b,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     us[id] += (a[id] * b[id]);
@@ -2225,12 +2225,12 @@ __global__ void _columnElementMultiplyWith(
     const CUDA_LONG N, // a.GetNumRows();
     const CUDA_LONG M) // us.GetNumCols();
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
     // __shared__ ElemType _a[GridDim::maxThreadsPerBlock];
-    // _a[threadIdx.x]=a[id];
+    // _a[hipThreadIdx_x]=a[id];
     ElemType mul = a[id];
     for (CUDA_LONG j = 0; j < M; ++j)
     {
@@ -2245,12 +2245,12 @@ __global__ void _rowElementMultiplyWith(
     const CUDA_LONG N, // us.GetNumRows();
     const CUDA_LONG M) // a.GetNumCols();
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= M)
         return;
 
     // __shared__ ElemType _a[GridDim::maxThreadsPerBlock];
-    // _a[threadIdx.x]=a[id];
+    // _a[hipThreadIdx_x]=a[id];
     ElemType mul = a[id];
     for (CUDA_LONG i = 0; i < N; ++i)
     {
@@ -2265,12 +2265,12 @@ __global__ void _rowElementDivideBy(
     const CUDA_LONG N, // us.GetNumRows();
     const CUDA_LONG M) // a.GetNumCols();
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= M)
         return;
 
     // __shared__ ElemType _a[GridDim::maxThreadsPerBlock];
-    // _a[threadIdx.x]=a[id];
+    // _a[hipThreadIdx_x]=a[id];
     ElemType v = a[id];
     if (v >= 0 && v < EPS_IN_INVERSE)
         v = EPS_IN_INVERSE;
@@ -2290,14 +2290,14 @@ __global__ void _ColumnElementDivideBy(
     const CUDA_LONG N, // a.GetNumRows();
     const CUDA_LONG M) // us.GetNumCols();
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
     ElemType smallValue = EPS_IN_INVERSE;
 
     // __shared__ ElemType _a[GridDim::maxThreadsPerBlock];
-    // _a[threadIdx.x]=a[id];
+    // _a[hipThreadIdx_x]=a[id];
     ElemType v = a[id];
     for (CUDA_LONG j = 0; j < M; ++j)
     {
@@ -2319,7 +2319,7 @@ __global__ void _innerProduct(
     const CUDA_LONG M, // a.GetNumCols();
     const bool isColWise)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if ((isColWise && id >= M) || (!isColWise && id >= N))
         return;
 
@@ -2356,7 +2356,7 @@ __global__ void _innerProduct4SparseCSC(
     const CUDA_LONG N, // a.GetNumCols();
     const bool isColWise)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if ((isColWise && id >= N) || (!isColWise && id >= M))
         return;
 
@@ -2396,7 +2396,7 @@ __global__ void _assignSignOf(
     const ElemType* b,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     ElemType v = b[id];
@@ -2409,7 +2409,7 @@ __global__ void _addSignOf(
     const ElemType* b,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     ElemType v = b[id];
@@ -2430,95 +2430,95 @@ __global__ void _vectorMaxMinReduce512Threads(
     __shared__ int partialsInd[512];
     if (IsMax)
     {
-        partials[threadIdx.x] = -10000000;
+        partials[hipThreadIdx_x] = -10000000;
     }
     else
     {
-        partials[threadIdx.x] = 10000000;
+        partials[hipThreadIdx_x] = 10000000;
     }
-    partialsInd[threadIdx.x] = -1;
+    partialsInd[hipThreadIdx_x] = -1;
 
-    for (int i = threadIdx.x; i < numRows; i += 512)
+    for (int i = hipThreadIdx_x; i < numRows; i += 512)
     {
-        if ((IsMax ? (us[IDX2C(i, blockIdx.x, numRows)] > partials[threadIdx.x]) : (us[IDX2C(i, blockIdx.x, numRows)] < partials[threadIdx.x])) || (partialsInd[threadIdx.x] == -1))
+        if ((IsMax ? (us[IDX2C(i, hipBlockIdx_x, numRows)] > partials[hipThreadIdx_x]) : (us[IDX2C(i, hipBlockIdx_x, numRows)] < partials[hipThreadIdx_x])) || (partialsInd[hipThreadIdx_x] == -1))
         {
-            partials[threadIdx.x] = us[IDX2C(i, blockIdx.x, numRows)];
-            partialsInd[threadIdx.x] = i;
+            partials[hipThreadIdx_x] = us[IDX2C(i, hipBlockIdx_x, numRows)];
+            partialsInd[hipThreadIdx_x] = i;
         }
     }
     __syncthreads();
 
-    if (threadIdx.x < 256)
+    if (hipThreadIdx_x < 256)
     {
-        if ((IsMax ? (partials[threadIdx.x + 256] > partials[threadIdx.x]) : (partials[threadIdx.x + 256] < partials[threadIdx.x])) || (partialsInd[threadIdx.x] == -1))
+        if ((IsMax ? (partials[hipThreadIdx_x + 256] > partials[hipThreadIdx_x]) : (partials[hipThreadIdx_x + 256] < partials[hipThreadIdx_x])) || (partialsInd[hipThreadIdx_x] == -1))
         {
-            partials[threadIdx.x] = partials[threadIdx.x + 256];
-            partialsInd[threadIdx.x] = partialsInd[threadIdx.x + 256];
+            partials[hipThreadIdx_x] = partials[hipThreadIdx_x + 256];
+            partialsInd[hipThreadIdx_x] = partialsInd[hipThreadIdx_x + 256];
         }
     }
     __syncthreads();
 
-    if (threadIdx.x < 128)
+    if (hipThreadIdx_x < 128)
     {
-        if ((IsMax ? (partials[threadIdx.x + 128] > partials[threadIdx.x]) : (partials[threadIdx.x + 128] < partials[threadIdx.x])) || (partialsInd[threadIdx.x] == -1))
+        if ((IsMax ? (partials[hipThreadIdx_x + 128] > partials[hipThreadIdx_x]) : (partials[hipThreadIdx_x + 128] < partials[hipThreadIdx_x])) || (partialsInd[hipThreadIdx_x] == -1))
         {
-            partials[threadIdx.x] = partials[threadIdx.x + 128];
-            partialsInd[threadIdx.x] = partialsInd[threadIdx.x + 128];
+            partials[hipThreadIdx_x] = partials[hipThreadIdx_x + 128];
+            partialsInd[hipThreadIdx_x] = partialsInd[hipThreadIdx_x + 128];
         }
     }
     __syncthreads();
 
-    if (threadIdx.x < 64)
+    if (hipThreadIdx_x < 64)
     {
-        if ((IsMax ? (partials[threadIdx.x + 64] > partials[threadIdx.x]) : (partials[threadIdx.x + 64] < partials[threadIdx.x])) || (partialsInd[threadIdx.x] == -1))
+        if ((IsMax ? (partials[hipThreadIdx_x + 64] > partials[hipThreadIdx_x]) : (partials[hipThreadIdx_x + 64] < partials[hipThreadIdx_x])) || (partialsInd[hipThreadIdx_x] == -1))
         {
-            partials[threadIdx.x] = partials[threadIdx.x + 64];
-            partialsInd[threadIdx.x] = partialsInd[threadIdx.x + 64];
+            partials[hipThreadIdx_x] = partials[hipThreadIdx_x + 64];
+            partialsInd[hipThreadIdx_x] = partialsInd[hipThreadIdx_x + 64];
         }
     }
     __syncthreads();
 
-    if (threadIdx.x < 32)
+    if (hipThreadIdx_x < 32)
     {
-        if ((IsMax ? (partials[threadIdx.x + 32] > partials[threadIdx.x]) : (partials[threadIdx.x + 32] < partials[threadIdx.x])) || (partialsInd[threadIdx.x] == -1))
+        if ((IsMax ? (partials[hipThreadIdx_x + 32] > partials[hipThreadIdx_x]) : (partials[hipThreadIdx_x + 32] < partials[hipThreadIdx_x])) || (partialsInd[hipThreadIdx_x] == -1))
         {
-            partials[threadIdx.x] = partials[threadIdx.x + 32];
-            partialsInd[threadIdx.x] = partialsInd[threadIdx.x + 32];
+            partials[hipThreadIdx_x] = partials[hipThreadIdx_x + 32];
+            partialsInd[hipThreadIdx_x] = partialsInd[hipThreadIdx_x + 32];
         }
     }
     __syncthreads();
 
-    if (threadIdx.x < 16)
+    if (hipThreadIdx_x < 16)
     {
-        if ((IsMax ? (partials[threadIdx.x + 16] > partials[threadIdx.x]) : (partials[threadIdx.x + 16] < partials[threadIdx.x])) || (partialsInd[threadIdx.x] == -1))
+        if ((IsMax ? (partials[hipThreadIdx_x + 16] > partials[hipThreadIdx_x]) : (partials[hipThreadIdx_x + 16] < partials[hipThreadIdx_x])) || (partialsInd[hipThreadIdx_x] == -1))
         {
-            partials[threadIdx.x] = partials[threadIdx.x + 16];
-            partialsInd[threadIdx.x] = partialsInd[threadIdx.x + 16];
+            partials[hipThreadIdx_x] = partials[hipThreadIdx_x + 16];
+            partialsInd[hipThreadIdx_x] = partialsInd[hipThreadIdx_x + 16];
         }
     }
     __syncthreads();
 
-    if (threadIdx.x < 8)
+    if (hipThreadIdx_x < 8)
     {
-        if ((IsMax ? (partials[threadIdx.x + 8] > partials[threadIdx.x]) : (partials[threadIdx.x + 8] < partials[threadIdx.x])) || (partialsInd[threadIdx.x] == -1))
+        if ((IsMax ? (partials[hipThreadIdx_x + 8] > partials[hipThreadIdx_x]) : (partials[hipThreadIdx_x + 8] < partials[hipThreadIdx_x])) || (partialsInd[hipThreadIdx_x] == -1))
         {
-            partials[threadIdx.x] = partials[threadIdx.x + 8];
-            partialsInd[threadIdx.x] = partialsInd[threadIdx.x + 8];
+            partials[hipThreadIdx_x] = partials[hipThreadIdx_x + 8];
+            partialsInd[hipThreadIdx_x] = partialsInd[hipThreadIdx_x + 8];
         }
     }
     __syncthreads();
 
-    if (threadIdx.x < 4)
+    if (hipThreadIdx_x < 4)
     {
-        if ((IsMax ? (partials[threadIdx.x + 4] > partials[threadIdx.x]) : (partials[threadIdx.x + 4] < partials[threadIdx.x])) || (partialsInd[threadIdx.x] == -1))
+        if ((IsMax ? (partials[hipThreadIdx_x + 4] > partials[hipThreadIdx_x]) : (partials[hipThreadIdx_x + 4] < partials[hipThreadIdx_x])) || (partialsInd[hipThreadIdx_x] == -1))
         {
-            partials[threadIdx.x] = partials[threadIdx.x + 4];
-            partialsInd[threadIdx.x] = partialsInd[threadIdx.x + 4];
+            partials[hipThreadIdx_x] = partials[hipThreadIdx_x + 4];
+            partialsInd[hipThreadIdx_x] = partialsInd[hipThreadIdx_x + 4];
         }
     }
     __syncthreads();
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
         ElemType mx = partials[0];
         int ind = partialsInd[0];
@@ -2537,8 +2537,8 @@ __global__ void _vectorMaxMinReduce512Threads(
             mx = partials[3];
             ind = partialsInd[3];
         }
-        Values[blockIdx.x] = mx;
-        Indexes[blockIdx.x] = ind;
+        Values[hipBlockIdx_x] = mx;
+        Indexes[hipBlockIdx_x] = ind;
     }
 }
 
@@ -2551,7 +2551,7 @@ __global__ void _vectorMax(
     const CUDA_LONG n, // number of cols
     const bool isColWise)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     CUDA_LONG maxInd = -1;
     ElemType maxVal = -100000;
 
@@ -2596,7 +2596,7 @@ __global__ void _vectorMin(
     const CUDA_LONG n, // number of cols
     const bool isColWise)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     CUDA_LONG minInd = -1;
     ElemType minVal = -100000;
 
@@ -2689,7 +2689,7 @@ __global__ void _matrixVectorColumnWiseAddWithThreadPerRow(
     const CUDA_LONG n) // number of cols
 {
 #ifdef VALIDATION
-    if (blockDim.x * blockIdx.x + threadIdx.x == 0)
+    if (hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x == 0)
     {
         printf("** _matrixVectorColumnWiseAdd on device:\na = %p, us = %p, alpha = %f, m = %ld, n = %ld\n",
                a, us, alpha, m, n);
@@ -2697,7 +2697,7 @@ __global__ void _matrixVectorColumnWiseAddWithThreadPerRow(
         printf("a[0] = %f\n", a[0]);
     }
 #endif
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= m)
         return;
     ElemType tmp = a[id];
@@ -2720,17 +2720,17 @@ __global__ void _matrixVectorColumnWiseAddBlockPerRow(
 {
     ElemType tmp;
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
-        tmp = a[blockIdx.x];
+        tmp = a[hipBlockIdx_x];
     }
     __syncthreads();
 
-    int loadPerThread = n / blockDim.x;
+    int loadPerThread = n / hipBlockDim_x;
 
-    for (int i = threadIdx.x * loadPerThread; i < (threadIdx.x == blockDim.x - 1 ? n : (threadIdx.x + 1) * loadPerThread); ++i)
+    for (int i = hipThreadIdx_x * loadPerThread; i < (hipThreadIdx_x == hipBlockDim_x - 1 ? n : (hipThreadIdx_x + 1) * loadPerThread); ++i)
     {
-        us[m * blockIdx.x + i] += alpha * tmp;
+        us[m * hipBlockIdx_x + i] += alpha * tmp;
     }
 }
 
@@ -2742,7 +2742,7 @@ __global__ void _addScaledDifference(
     ElemType* c,
     CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     c[id] = c[id] + (a[id] - b[id]) * (alpha);
@@ -2756,7 +2756,7 @@ __global__ void _assignScaledDifference(
     ElemType* c,
     CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     c[id] = (a[id] - b[id]) * (alpha);
@@ -2770,7 +2770,7 @@ __global__ void _addScaledDifference(
     ElemType* c,
     CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     c[id] = c[id] + (a[id] - b[id]) * alpha[0];
@@ -2784,7 +2784,7 @@ __global__ void _assignScaledDifference(
     ElemType* c,
     CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     c[id] = (a[id] - b[id]) * alpha[0];
@@ -2796,7 +2796,7 @@ __global__ void _addElementToElement(
     const ElemType* a, CUDA_LONG indexA,
     ElemType* c, CUDA_LONG indexC)
 {
-    //CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;  // only one thread launched
+    //CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;  // only one thread launched
     //if (id > 0)
     //    return;
     ElemType us = beta ? beta * c[indexC] : 0; // do not multiply if beta is 0, could be a NaN
@@ -2812,72 +2812,72 @@ __global__ void _assignNumOfDiff1024Threads(
     CUDA_LONG N)
 {
     __shared__ ElemType partialSums[1024];
-    partialSums[threadIdx.x] = 0;
-    // int id = blockDim.x * blockIdx.x + threadIdx.x;
-    CUDA_LONG loadPerThread = N / blockDim.x;
-    for (CUDA_LONG i = threadIdx.x * loadPerThread; i < (threadIdx.x == blockDim.x - 1 ? N : (threadIdx.x + 1) * loadPerThread); ++i)
+    partialSums[hipThreadIdx_x] = 0;
+    // int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    CUDA_LONG loadPerThread = N / hipBlockDim_x;
+    for (CUDA_LONG i = hipThreadIdx_x * loadPerThread; i < (hipThreadIdx_x == hipBlockDim_x - 1 ? N : (hipThreadIdx_x + 1) * loadPerThread); ++i)
     {
-        partialSums[threadIdx.x] += (a[i] != b[i]);
+        partialSums[hipThreadIdx_x] += (a[i] != b[i]);
     }
     __syncthreads();
 
     // 512
-    if (threadIdx.x < 512)
+    if (hipThreadIdx_x < 512)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 512];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 512];
     }
     __syncthreads();
 
     // 256
-    if (threadIdx.x < 256)
+    if (hipThreadIdx_x < 256)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 256];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 256];
     }
     __syncthreads();
 
     // 128
-    if (threadIdx.x < 128)
+    if (hipThreadIdx_x < 128)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 128];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 128];
     }
     __syncthreads();
 
     // 64
-    if (threadIdx.x < 64)
+    if (hipThreadIdx_x < 64)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 64];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 64];
     }
     __syncthreads();
 
     // 32
-    if (threadIdx.x < 32)
+    if (hipThreadIdx_x < 32)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 32];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 32];
     }
     __syncthreads();
 
     // 16
-    if (threadIdx.x < 16)
+    if (hipThreadIdx_x < 16)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 16];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 16];
     }
     __syncthreads();
 
     // 8
-    if (threadIdx.x < 8)
+    if (hipThreadIdx_x < 8)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 8];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 8];
     }
     __syncthreads();
 
     // 4
-    if (threadIdx.x < 4)
+    if (hipThreadIdx_x < 4)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 4];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 4];
     }
     __syncthreads();
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
         c[0] = partialSums[0] + partialSums[1] + partialSums[2] + partialSums[3];
     }
@@ -2893,10 +2893,10 @@ CUDA_LONG N)
 //TO DO: replace atomic operation with reduction
 
 __shared__ int totalSum;
-if (threadIdx.x == 0) totalSum = 0;
+if (hipThreadIdx_x == 0) totalSum = 0;
 __syncthreads();
 
-int id = blockDim.x * blockIdx.x + threadIdx.x;
+int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
 if (id>=N)
 return;
 
@@ -2913,7 +2913,7 @@ __global__ void _scaleArray(
     ElemType* us,
     CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     us[id] = us[id] * alpha;
@@ -2928,7 +2928,7 @@ __global__ void _sparseCSRPlusDense(
     ElemType* pArrayDev,
     CUDA_LONG M)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= M)
         return;
     int start = m_dRow[id];
@@ -2949,7 +2949,7 @@ __global__ void _sparseCSRElemMulDense(
     ElemType* c,
     CUDA_LONG M)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= M)
         return;
     int start = m_dRow[id];
@@ -2970,7 +2970,7 @@ __global__ void _isValid(
     const int nz,
     long* d_res)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= cols || d_res[0] <= 0)
         return;
 
@@ -3033,7 +3033,7 @@ __global__ void _shiftColCSCIndexFromSliceViewToAbsolute(
     const int cols,
     const int nz)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= cols)
         return;
 
@@ -3064,7 +3064,7 @@ __global__ void _dense1DConvMultSparseCSCAndWeightedAddToDense(
     ElemType* c // dense target
     )
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= m * numSteps * n)
         return;
 
@@ -3125,7 +3125,7 @@ __global__ void _dense1DConvMultSparseCSCTransposeAndAddToDense(
     ElemType* c // dense target
     )
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= m * numSteps)
         return;
 
@@ -3173,7 +3173,7 @@ __global__ void _columnwiseScaleAndWeightedAdd(
     ElemType* cData,
     int m, int n)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= m * n)
         return;
 
@@ -3194,7 +3194,7 @@ __global__ void _columnwiseScaleAndWeightedAdd4CSC(
     ElemType* cData,
     int m, int n)
 {
-    CUDA_LONG col = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG col = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (col >= n)
         return;
 
@@ -3225,7 +3225,7 @@ __global__ void _reshape(
     GPUSPARSE_INDEX_TYPE* newColumnIndex        // new column index array
     )
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= newNumCols)
         return;
 
@@ -3280,7 +3280,7 @@ template <class ElemType>
 __global__ void _findColsWithValues(
     const GPUSPARSE_INDEX_TYPE* rowIndexes, GPUSPARSE_INDEX_TYPE* col2BlockIds, const size_t nnz)
 {
-    const size_t nzIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t nzIndex = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (nzIndex >= nnz)
         return;
 
@@ -3299,7 +3299,7 @@ template <class ElemType>
 __global__ void _determineBlockIds(
     GPUSPARSE_INDEX_TYPE* blockId2Col, GPUSPARSE_INDEX_TYPE* col2BlockId, size_t numCols, size_t* blockSize)
 {
-    const size_t col = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t col = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (col >= numCols)
         return;
 
@@ -3326,7 +3326,7 @@ __global__ void _denseMulSparseCSCTransposeToSparseBlockCol2(
     const GPUSPARSE_INDEX_TYPE* col2blockIds,
     ElemType* resultValues)
 {
-    const CUDA_LONG index = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     const CUDA_LONG lhsCol = index / numRowsLhs; // rhsCol == lhsCol
     if (lhsCol >= numColsRhs)
         return;
@@ -3366,7 +3366,7 @@ __global__ void _denseMulSparseCSCTransposeToSparseBlockCol(
     GPUSPARSE_INDEX_TYPE* blockId2Col       // Maps block-ids to column of the result matrix.
     )
 {
-    const CUDA_LONG index = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     const CUDA_LONG lhsCol = index / numRowsLhs; // rhsCol == lhsCol
     if (lhsCol >= numColsRhs)
         return;
@@ -3402,7 +3402,7 @@ __global__ void _scaleSparseBlockAndAddToDense(
     const GPUSPARSE_INDEX_TYPE* blockIds,
     ElemType* rhs)
 {
-    const CUDA_LONG index = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     CUDA_LONG row, col;
     if (blockCol)
     {
@@ -3446,17 +3446,17 @@ __global__ void _computePrediction(
     int offset = -1;
     for (int i = 1; i < labelSize; i++)
     {
-        if (blockIdx.x < block2Id[i])
+        if (hipBlockIdx_x < block2Id[i])
         {
             id = i - 1;
-            offset = blockIdx.x - block2Id[i - 1];
+            offset = hipBlockIdx_x - block2Id[i - 1];
             break;
         }
     }
     if (id == -1)
     {
         id = labelSize - 1;
-        offset = blockIdx.x - block2Id[labelSize - 1];
+        offset = hipBlockIdx_x - block2Id[labelSize - 1];
     }
 
     int t = labelRow[id];
@@ -3476,8 +3476,8 @@ __global__ void _computePrediction(
     int i = iStt + offset;
     int j = id / 2;
 
-    int loadPerThread = (numrows + blockDim.x - 1) / blockDim.x;
-    int tStart = loadPerThread * threadIdx.x;
+    int loadPerThread = (numrows + hipBlockDim_x - 1) / hipBlockDim_x;
+    int tStart = loadPerThread * hipThreadIdx_x;
     int tEnd = min((int) numrows, loadPerThread + tStart);
 
     ElemType v = 0.0;
@@ -3485,14 +3485,14 @@ __global__ void _computePrediction(
     {
         v += weight[IDX2C(i, h, nrs)] * a[IDX2C(h, j, numrows)];
     }
-    atomicAdd(&val[blockIdx.x], v);
-    row[blockIdx.x] = i;
+    atomicAdd(&val[hipBlockIdx_x], v);
+    row[hipBlockIdx_x] = i;
 
-    if (blockIdx.x == 0 && threadIdx.x == 0)
+    if (hipBlockIdx_x == 0 && hipThreadIdx_x == 0)
         pb[0] = 0;
 
-    if ((threadIdx.x == 0) && (i == iEnd - 1) && (i >= nv))
-        pb[j + 1] = blockIdx.x + 1;
+    if ((hipThreadIdx_x == 0) && (i == iEnd - 1) && (i >= nv))
+        pb[j + 1] = hipBlockIdx_x + 1;
 }
 
 // normalize predictions in cross entropy node
@@ -3507,9 +3507,9 @@ __global__ void _normalizePrediction(
     ElemType* entropyScore)
 {
     __shared__ ElemType partials[512];
-    partials[threadIdx.x] = 0;
+    partials[hipThreadIdx_x] = 0;
 
-    int p = blockIdx.x;
+    int p = hipBlockIdx_x;
     int t = labelRow[p];
     int start = block2Id[p];
     int end;
@@ -3523,26 +3523,26 @@ __global__ void _normalizePrediction(
     }
     int len = end - start;
 
-    int loadPerThread = (len + blockDim.x - 1) / blockDim.x;
-    int tStart = loadPerThread * threadIdx.x;
+    int loadPerThread = (len + hipBlockDim_x - 1) / hipBlockDim_x;
+    int tStart = loadPerThread * hipThreadIdx_x;
     int tLen = min((int) len, loadPerThread + tStart);
 
     for (int i = start + tStart; i < start + tLen; i++)
     {
-        partials[threadIdx.x] += exp(val[i]);
+        partials[hipThreadIdx_x] += exp(val[i]);
     }
 
     __syncthreads();
 
     // now sum up the objective function
-    int nTotalThreads = blockDim.x;
+    int nTotalThreads = hipBlockDim_x;
 
     while (nTotalThreads > 1)
     {
         int halfPoint = (nTotalThreads >> 1);
 
-        if (threadIdx.x < halfPoint)
-            partials[threadIdx.x] += partials[threadIdx.x + halfPoint];
+        if (hipThreadIdx_x < halfPoint)
+            partials[hipThreadIdx_x] += partials[hipThreadIdx_x + halfPoint];
 
         __syncthreads();
 
@@ -3566,7 +3566,7 @@ __global__ void _computePredictionError(
     ElemType* val,
     int N)
 {
-    int p = blockDim.x * blockIdx.x + threadIdx.x;
+    int p = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (p >= N)
         return;
 
@@ -3587,16 +3587,16 @@ __global__ void _computeGradientOfInput(
     ElemType* grd,
     size_t numrows)
 {
-    int h = blockIdx.x % numrows;
-    int j = blockIdx.x / numrows;
+    int h = hipBlockIdx_x % numrows;
+    int j = hipBlockIdx_x / numrows;
 
     int start = pb[j];
     int end = pb[j + 1];
     int len = end - start;
 
-    int load = (len + blockDim.x - 1) / blockDim.x;
-    int pStart = start + load * threadIdx.x;
-    int pEnd = start + min(len, load * (threadIdx.x + 1));
+    int load = (len + hipBlockDim_x - 1) / hipBlockDim_x;
+    int pStart = start + load * hipThreadIdx_x;
+    int pEnd = start + min(len, load * (hipThreadIdx_x + 1));
 
     ElemType sum = 0;
     for (int p = pStart; p < pEnd; p++)
@@ -3631,45 +3631,45 @@ __global__ void computeNCEForwardProp512Threads(
 
     // follow the convention, this kernel must be run on 512 threads per block
     __shared__ ElemType partials[512];
-    partials[threadIdx.x] = 0;
+    partials[hipThreadIdx_x] = 0;
 
     // determine the elements to be handled by this block
     int total = numRows * sampleCount;
-    int loadPerBlock = (total + gridDim.x - 1) / gridDim.x;
+    int loadPerBlock = (total + hipGridDim_x - 1) / hipGridDim_x;
 
-    int start = loadPerBlock * blockIdx.x;
-    int end = min(total, loadPerBlock * (blockIdx.x + 1));
+    int start = loadPerBlock * hipBlockIdx_x;
+    int end = min(total, loadPerBlock * (hipBlockIdx_x + 1));
 
     for (int i = start; i < end; i++)
     {
         int colIndex = col[i];
         int rowIndex = i / sampleCount;
 
-        int loadPerThread = (numCols_a + blockDim.x - 1) / blockDim.x;
-        int tstart = loadPerThread * threadIdx.x;
-        int tend = min(numCols_a, loadPerThread * (threadIdx.x + 1));
+        int loadPerThread = (numCols_a + hipBlockDim_x - 1) / hipBlockDim_x;
+        int tstart = loadPerThread * hipThreadIdx_x;
+        int tend = min(numCols_a, loadPerThread * (hipThreadIdx_x + 1));
 
         for (int j = tstart; j < tend; j++)
-            partials[threadIdx.x] = a[IDX2C(rowIndex, j, numRows)] * b[IDX2C(j, colIndex, numCols_a)];
+            partials[hipThreadIdx_x] = a[IDX2C(rowIndex, j, numRows)] * b[IDX2C(j, colIndex, numCols_a)];
 
         __syncthreads();
 
         // sum up
-        int nTotalThreads = blockDim.x;
+        int nTotalThreads = hipBlockDim_x;
 
         while (nTotalThreads > 1)
         {
             int halfPoint = (nTotalThreads >> 1);
 
-            if (threadIdx.x < halfPoint)
-                partials[threadIdx.x] += partials[threadIdx.x + halfPoint];
+            if (hipThreadIdx_x < halfPoint)
+                partials[hipThreadIdx_x] += partials[hipThreadIdx_x + halfPoint];
 
             __syncthreads();
 
             nTotalThreads = (nTotalThreads >> 1);
         }
 
-        if (threadIdx.x == 0)
+        if (hipThreadIdx_x == 0)
             res[i] = partials[0];
     }
 }
@@ -3696,50 +3696,50 @@ __global__ void _computeNceOutputMax512Threads(
 
     // follow the convention, this kernel must be run on 512 threads per block
     __shared__ ElemType partials[512];
-    partials[threadIdx.x] = 0;
+    partials[hipThreadIdx_x] = 0;
 
-    // threadIdx.x range from[0 ~ 512)
-    // blockIdx.x range from[0 ~ nnz)
-    // blockDim.x equal to 512
-    // gridDim.x equal to nnz
+    // hipThreadIdx_x range from[0 ~ 512)
+    // hipBlockIdx_x range from[0 ~ nnz)
+    // hipBlockDim_x equal to 512
+    // hipGridDim_x equal to nnz
 
     // determine the elements to be handled by this block
     int total = numRows * sampleCount;
-    int loadPerBlock = (total + gridDim.x - 1) / gridDim.x;
+    int loadPerBlock = (total + hipGridDim_x - 1) / hipGridDim_x;
 
-    int start = loadPerBlock * blockIdx.x;
-    int end = min(total, loadPerBlock * (blockIdx.x + 1));
+    int start = loadPerBlock * hipBlockIdx_x;
+    int end = min(total, loadPerBlock * (hipBlockIdx_x + 1));
 
     for (int i = start; i < end; i++)
     {
         int wid = (int) col[2 * i];
         int batchid = i / sampleCount;
 
-        int loadPerThread = (numCols_a + blockDim.x - 1) / blockDim.x;
-        int tstart = loadPerThread * threadIdx.x;
-        int tend = min(numCols_a, loadPerThread * (threadIdx.x + 1));
+        int loadPerThread = (numCols_a + hipBlockDim_x - 1) / hipBlockDim_x;
+        int tstart = loadPerThread * hipThreadIdx_x;
+        int tend = min(numCols_a, loadPerThread * (hipThreadIdx_x + 1));
 
         for (int j = tstart; j < tend; j++)
-            partials[threadIdx.x] = a[IDX2C(j, batchid, numCols_a)] * b[IDX2C(j, wid, numCols_a)];
+            partials[hipThreadIdx_x] = a[IDX2C(j, batchid, numCols_a)] * b[IDX2C(j, wid, numCols_a)];
 
         __syncthreads();
 
         // sum up
-        int nTotalThreads = blockDim.x;
+        int nTotalThreads = hipBlockDim_x;
 
         while (nTotalThreads > 1)
         {
             int halfPoint = (nTotalThreads >> 1);
 
-            if (threadIdx.x < halfPoint)
-                partials[threadIdx.x] += partials[threadIdx.x + halfPoint];
+            if (hipThreadIdx_x < halfPoint)
+                partials[hipThreadIdx_x] += partials[hipThreadIdx_x + halfPoint];
 
             __syncthreads();
 
             nTotalThreads = (nTotalThreads >> 1);
         }
 
-        if (threadIdx.x == 0)
+        if (hipThreadIdx_x == 0)
             res[i] = partials[0] + bias[wid];
     }
 }
@@ -3761,38 +3761,38 @@ __global__ void _assignSoftmaxSumMax512Threads(
     // c is the matrix to store objective
 
     __shared__ ElemType partials[512];
-    partials[threadIdx.x] = 0;
+    partials[hipThreadIdx_x] = 0;
 
     int total = sampleCount;
-    int loadPerThread = (total + blockDim.x - 1) / blockDim.x;
+    int loadPerThread = (total + hipBlockDim_x - 1) / hipBlockDim_x;
 
     // find out the items this thread is responsible for
-    int start = loadPerThread * threadIdx.x;
-    int end = min(total, loadPerThread * (threadIdx.x + 1));
+    int start = loadPerThread * hipThreadIdx_x;
+    int end = min(total, loadPerThread * (hipThreadIdx_x + 1));
     for (int i = start; i < end; i++)
     {
         int wid = (int) a[i];
-        partials[threadIdx.x] += softmax[IDX2C(i, wid, sampleCount)];
+        partials[hipThreadIdx_x] += softmax[IDX2C(i, wid, sampleCount)];
     }
 
     __syncthreads();
 
     // now sum up the objective function
-    int nTotalThreads = blockDim.x;
+    int nTotalThreads = hipBlockDim_x;
 
     while (nTotalThreads > 1)
     {
         int halfPoint = (nTotalThreads >> 1);
 
-        if (threadIdx.x < halfPoint)
-            partials[threadIdx.x] += partials[threadIdx.x + halfPoint];
+        if (hipThreadIdx_x < halfPoint)
+            partials[hipThreadIdx_x] += partials[hipThreadIdx_x + halfPoint];
 
         __syncthreads();
 
         nTotalThreads = (nTotalThreads >> 1);
     }
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
         c[0] = -partials[0];
 }
 
@@ -3817,14 +3817,14 @@ __global__ void _assignNoiseContrastiveEstimationMax512Threads(
     // c is the matrix to store objective
 
     __shared__ ElemType partials[512];
-    partials[threadIdx.x] = 0;
+    partials[hipThreadIdx_x] = 0;
 
     int total = numRows * sampleCount;
-    int loadPerThread = (total + blockDim.x - 1) / blockDim.x;
+    int loadPerThread = (total + hipBlockDim_x - 1) / hipBlockDim_x;
 
     // find out the items this thread is responsible for
-    int start = loadPerThread * threadIdx.x;
-    int end = min(total, loadPerThread * (threadIdx.x + 1));
+    int start = loadPerThread * hipThreadIdx_x;
+    int end = min(total, loadPerThread * (hipThreadIdx_x + 1));
 
     ElemType log_num_noise_samples = log((ElemType)(sampleCount - 1));
     for (int i = start; i < end; i++)
@@ -3841,29 +3841,29 @@ __global__ void _assignNoiseContrastiveEstimationMax512Threads(
         if (positive)
             tmp[i] += 1;
         if (positive)
-            partials[threadIdx.x] += logprob;
+            partials[hipThreadIdx_x] += logprob;
         else
-            partials[threadIdx.x] += logprob_noise;
+            partials[hipThreadIdx_x] += logprob_noise;
     }
 
     __syncthreads();
 
     // now sum up the objective function
-    int nTotalThreads = blockDim.x;
+    int nTotalThreads = hipBlockDim_x;
 
     while (nTotalThreads > 1)
     {
         int halfPoint = (nTotalThreads >> 1);
 
-        if (threadIdx.x < halfPoint)
-            partials[threadIdx.x] += partials[threadIdx.x + halfPoint];
+        if (hipThreadIdx_x < halfPoint)
+            partials[hipThreadIdx_x] += partials[hipThreadIdx_x + halfPoint];
 
         __syncthreads();
 
         nTotalThreads = (nTotalThreads >> 1);
     }
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
         c[0] = -partials[0];
 }
 
@@ -3889,11 +3889,11 @@ __global__ void _assignNceDerivative(
     // c is the output matrix to store calculated gradients
 
     int total = numRows * sampleCount;
-    int loadPerBlock = (total + gridDim.x - 1) / gridDim.x;
+    int loadPerBlock = (total + hipGridDim_x - 1) / hipGridDim_x;
 
     // find out the items this block is responsible for
-    int start = loadPerBlock * blockIdx.x;
-    int end = min(total, loadPerBlock * (blockIdx.x + 1));
+    int start = loadPerBlock * hipBlockIdx_x;
+    int end = min(total, loadPerBlock * (hipBlockIdx_x + 1));
 
     for (int i = start; i < end; i++)
     {
@@ -3903,9 +3903,9 @@ __global__ void _assignNceDerivative(
         ElemType er = tmp[i]; // precalculated error for this output node
 
         // calculate gradients
-        int loadPerThread = (width + blockDim.x - 1) / blockDim.x;
-        int tstart = loadPerThread * threadIdx.x;
-        int tend = min(width, loadPerThread * (threadIdx.x + 1));
+        int loadPerThread = (width + hipBlockDim_x - 1) / hipBlockDim_x;
+        int tstart = loadPerThread * hipThreadIdx_x;
+        int tend = min(width, loadPerThread * (hipThreadIdx_x + 1));
 
         if (inputIndex == 1) // hidden layer output
         {
@@ -3957,7 +3957,7 @@ __global__ void _assignNceDerivativeNew(
     // c is the output matrix to store calculated gradients
 
     // logical single index for this thread
-    int n = threadIdx.x + blockDim.x * blockIdx.x;
+    int n = hipThreadIdx_x + hipBlockDim_x * hipBlockIdx_x;
 
     int batchId = n / sampleCount;
     int total = numRows * sampleCount;
@@ -4007,7 +4007,7 @@ __global__ void _computeGradientOfWeight(
     ElemType* blockVal,
     GPUSPARSE_INDEX_TYPE* blockIds)
 {
-    int p = blockIdx.x;
+    int p = hipBlockIdx_x;
     ElemType v = val[p];
     int i = row[p];
     int j = -1;
@@ -4040,8 +4040,8 @@ __global__ void _computeGradientOfWeight(
     int offset = i - iStt;
     int ii = labelBlock2UniqId[bId] + offset;
 
-    int load = (nrs + blockDim.x - 1) / blockDim.x;
-    int pStart = load * threadIdx.x;
+    int load = (nrs + hipBlockDim_x - 1) / hipBlockDim_x;
+    int pStart = load * hipThreadIdx_x;
     int pEnd = min((int) nrs, load + pStart);
 
     for (int h = pStart; h < pEnd; h++)
@@ -4079,7 +4079,7 @@ __global__ void _inplaceSoftThreshold(
     const ElemType threshold,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -4108,7 +4108,7 @@ __global__ void _normalGradForSparseBlock(
     bool unitGainMomentum)
 {
     const ElemType unitGainFactor = unitGainMomentum ? (1.0 - momentum) : 1.0;
-    const CUDA_LONG index = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     CUDA_LONG row, col;
     if (blockCol)
     {
@@ -4140,72 +4140,72 @@ __global__ void _reductionSum1024Threads(
 {
 
     __shared__ ElemType partialSums[1024];
-    partialSums[threadIdx.x] = 0;
-    // int id = blockDim.x * blockIdx.x + threadIdx.x;
-    CUDA_LONG loadPerThread = N / blockDim.x;
-    for (CUDA_LONG i = threadIdx.x * loadPerThread; i < (threadIdx.x == blockDim.x - 1 ? N : (threadIdx.x + 1) * loadPerThread); ++i)
+    partialSums[hipThreadIdx_x] = 0;
+    // int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    CUDA_LONG loadPerThread = N / hipBlockDim_x;
+    for (CUDA_LONG i = hipThreadIdx_x * loadPerThread; i < (hipThreadIdx_x == hipBlockDim_x - 1 ? N : (hipThreadIdx_x + 1) * loadPerThread); ++i)
     {
-        partialSums[threadIdx.x] += data[i];
+        partialSums[hipThreadIdx_x] += data[i];
     }
     __syncthreads();
 
     // 512
-    if (threadIdx.x < 512)
+    if (hipThreadIdx_x < 512)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 512];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 512];
     }
     __syncthreads();
 
     // 256
-    if (threadIdx.x < 256)
+    if (hipThreadIdx_x < 256)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 256];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 256];
     }
     __syncthreads();
 
     // 128
-    if (threadIdx.x < 128)
+    if (hipThreadIdx_x < 128)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 128];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 128];
     }
     __syncthreads();
 
     // 64
-    if (threadIdx.x < 64)
+    if (hipThreadIdx_x < 64)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 64];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 64];
     }
     __syncthreads();
 
     // 32
-    if (threadIdx.x < 32)
+    if (hipThreadIdx_x < 32)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 32];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 32];
     }
     __syncthreads();
 
     // 16
-    if (threadIdx.x < 16)
+    if (hipThreadIdx_x < 16)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 16];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 16];
     }
     __syncthreads();
 
     // 8
-    if (threadIdx.x < 8)
+    if (hipThreadIdx_x < 8)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 8];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 8];
     }
     __syncthreads();
 
     // 4
-    if (threadIdx.x < 4)
+    if (hipThreadIdx_x < 4)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 4];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 4];
     }
     __syncthreads();
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
         sum[0] = partialSums[0] + partialSums[1] + partialSums[2] + partialSums[3];
     }
@@ -4222,72 +4222,72 @@ __global__ void _reductionSumAndAssign1024Threads(
 {
     __shared__ ElemType partialSums[1024];
     __shared__ ElemType res;
-    partialSums[threadIdx.x] = 0;
-    // int id = blockDim.x * blockIdx.x + threadIdx.x;
-    CUDA_LONG loadPerThread = N / blockDim.x;
-    for (CUDA_LONG i = threadIdx.x * loadPerThread; i < (threadIdx.x == blockDim.x - 1 ? N : (threadIdx.x + 1) * loadPerThread); ++i)
+    partialSums[hipThreadIdx_x] = 0;
+    // int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    CUDA_LONG loadPerThread = N / hipBlockDim_x;
+    for (CUDA_LONG i = hipThreadIdx_x * loadPerThread; i < (hipThreadIdx_x == hipBlockDim_x - 1 ? N : (hipThreadIdx_x + 1) * loadPerThread); ++i)
     {
-        partialSums[threadIdx.x] += data[i];
+        partialSums[hipThreadIdx_x] += data[i];
     }
     __syncthreads();
 
     // 512
-    if (threadIdx.x < 512)
+    if (hipThreadIdx_x < 512)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 512];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 512];
     }
     __syncthreads();
 
     // 256
-    if (threadIdx.x < 256)
+    if (hipThreadIdx_x < 256)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 256];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 256];
     }
     __syncthreads();
 
     // 128
-    if (threadIdx.x < 128)
+    if (hipThreadIdx_x < 128)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 128];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 128];
     }
     __syncthreads();
 
     // 64
-    if (threadIdx.x < 64)
+    if (hipThreadIdx_x < 64)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 64];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 64];
     }
     __syncthreads();
 
     // 32
-    if (threadIdx.x < 32)
+    if (hipThreadIdx_x < 32)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 32];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 32];
     }
     __syncthreads();
 
     // 16
-    if (threadIdx.x < 16)
+    if (hipThreadIdx_x < 16)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 16];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 16];
     }
     __syncthreads();
 
     // 8
-    if (threadIdx.x < 8)
+    if (hipThreadIdx_x < 8)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 8];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 8];
     }
     __syncthreads();
 
     // 4
-    if (threadIdx.x < 4)
+    if (hipThreadIdx_x < 4)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 4];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 4];
     }
     __syncthreads();
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
         res = partialSums[0] + partialSums[1] + partialSums[2] + partialSums[3];
         for (CUDA_LONG i = 0; i < M; ++i)
@@ -4306,73 +4306,73 @@ __global__ void _reductionSum21024Threads(
 {
 
     __shared__ ElemType partialSums[1024];
-    partialSums[threadIdx.x] = 0;
-    // int id = blockDim.x * blockIdx.x + threadIdx.x;
-    CUDA_LONG loadPerThread = N / blockDim.x;
-    for (CUDA_LONG i = threadIdx.x * loadPerThread; i < (threadIdx.x == blockDim.x - 1 ? N : (threadIdx.x + 1) * loadPerThread); ++i)
-    // for (int i= threadIdx.x*loadPerThread; i<(threadIdx.x+1)*loadPerThread;++i)
+    partialSums[hipThreadIdx_x] = 0;
+    // int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    CUDA_LONG loadPerThread = N / hipBlockDim_x;
+    for (CUDA_LONG i = hipThreadIdx_x * loadPerThread; i < (hipThreadIdx_x == hipBlockDim_x - 1 ? N : (hipThreadIdx_x + 1) * loadPerThread); ++i)
+    // for (int i= hipThreadIdx_x*loadPerThread; i<(hipThreadIdx_x+1)*loadPerThread;++i)
     {
-        partialSums[threadIdx.x] += (data[i] * data[i]);
+        partialSums[hipThreadIdx_x] += (data[i] * data[i]);
     }
     __syncthreads();
 
     // 512
-    if (threadIdx.x < 512)
+    if (hipThreadIdx_x < 512)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 512];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 512];
     }
     __syncthreads();
 
     // 256
-    if (threadIdx.x < 256)
+    if (hipThreadIdx_x < 256)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 256];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 256];
     }
     __syncthreads();
 
     // 128
-    if (threadIdx.x < 128)
+    if (hipThreadIdx_x < 128)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 128];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 128];
     }
     __syncthreads();
 
     // 64
-    if (threadIdx.x < 64)
+    if (hipThreadIdx_x < 64)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 64];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 64];
     }
     __syncthreads();
 
     // 32
-    if (threadIdx.x < 32)
+    if (hipThreadIdx_x < 32)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 32];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 32];
     }
     __syncthreads();
 
     // 16
-    if (threadIdx.x < 16)
+    if (hipThreadIdx_x < 16)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 16];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 16];
     }
     __syncthreads();
 
     // 8
-    if (threadIdx.x < 8)
+    if (hipThreadIdx_x < 8)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 8];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 8];
     }
     __syncthreads();
 
     // 4
-    if (threadIdx.x < 4)
+    if (hipThreadIdx_x < 4)
     {
-        partialSums[threadIdx.x] += partialSums[threadIdx.x + 4];
+        partialSums[hipThreadIdx_x] += partialSums[hipThreadIdx_x + 4];
     }
     __syncthreads();
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
         sum[0] = partialSums[0] + partialSums[1] + partialSums[2] + partialSums[3];
         if (takeSqrt)
@@ -4395,79 +4395,79 @@ __global__ void _reductionMatrixNormInf1024Threads(
 {
 
     __shared__ ElemType partialSums[1024];
-    partialSums[threadIdx.x] = 0;
-    // int id = blockDim.x * blockIdx.x + threadIdx.x;
-    int loadPerThread = N / blockDim.x;
-    for (int i = threadIdx.x * loadPerThread; i < (threadIdx.x == blockDim.x - 1 ? N : (threadIdx.x + 1) * loadPerThread); ++i)
+    partialSums[hipThreadIdx_x] = 0;
+    // int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    int loadPerThread = N / hipBlockDim_x;
+    for (int i = hipThreadIdx_x * loadPerThread; i < (hipThreadIdx_x == hipBlockDim_x - 1 ? N : (hipThreadIdx_x + 1) * loadPerThread); ++i)
     {
         if (sizeof(ElemType) == sizeof(float))
         {
-            partialSums[threadIdx.x] = max(fabsf(data[i]), partialSums[threadIdx.x]);
+            partialSums[hipThreadIdx_x] = max(fabsf(data[i]), partialSums[hipThreadIdx_x]);
         }
         else
         {
-            partialSums[threadIdx.x] = max(fabs(data[i]), partialSums[threadIdx.x]);
+            partialSums[hipThreadIdx_x] = max(fabs(data[i]), partialSums[hipThreadIdx_x]);
         }
     }
     __syncthreads();
 
     // 512
-    if (threadIdx.x < 512)
+    if (hipThreadIdx_x < 512)
     {
-        partialSums[threadIdx.x] = max(partialSums[threadIdx.x + 512], partialSums[threadIdx.x]);
+        partialSums[hipThreadIdx_x] = max(partialSums[hipThreadIdx_x + 512], partialSums[hipThreadIdx_x]);
     }
     __syncthreads();
 
     // 256
-    if (threadIdx.x < 256)
+    if (hipThreadIdx_x < 256)
     {
-        partialSums[threadIdx.x] = max(partialSums[threadIdx.x + 256], partialSums[threadIdx.x]);
+        partialSums[hipThreadIdx_x] = max(partialSums[hipThreadIdx_x + 256], partialSums[hipThreadIdx_x]);
     }
     __syncthreads();
 
     // 128
-    if (threadIdx.x < 128)
+    if (hipThreadIdx_x < 128)
     {
-        partialSums[threadIdx.x] = max(partialSums[threadIdx.x + 128], partialSums[threadIdx.x]);
+        partialSums[hipThreadIdx_x] = max(partialSums[hipThreadIdx_x + 128], partialSums[hipThreadIdx_x]);
     }
     __syncthreads();
 
     // 64
-    if (threadIdx.x < 64)
+    if (hipThreadIdx_x < 64)
     {
-        partialSums[threadIdx.x] = max(partialSums[threadIdx.x + 64], partialSums[threadIdx.x]);
+        partialSums[hipThreadIdx_x] = max(partialSums[hipThreadIdx_x + 64], partialSums[hipThreadIdx_x]);
     }
     __syncthreads();
 
     // 32
-    if (threadIdx.x < 32)
+    if (hipThreadIdx_x < 32)
     {
-        partialSums[threadIdx.x] = max(partialSums[threadIdx.x + 32], partialSums[threadIdx.x]);
+        partialSums[hipThreadIdx_x] = max(partialSums[hipThreadIdx_x + 32], partialSums[hipThreadIdx_x]);
     }
     __syncthreads();
 
     // 16
-    if (threadIdx.x < 16)
+    if (hipThreadIdx_x < 16)
     {
-        partialSums[threadIdx.x] = max(partialSums[threadIdx.x + 16], partialSums[threadIdx.x]);
+        partialSums[hipThreadIdx_x] = max(partialSums[hipThreadIdx_x + 16], partialSums[hipThreadIdx_x]);
     }
     __syncthreads();
 
     // 8
-    if (threadIdx.x < 8)
+    if (hipThreadIdx_x < 8)
     {
-        partialSums[threadIdx.x] = max(partialSums[threadIdx.x + 8], partialSums[threadIdx.x]);
+        partialSums[hipThreadIdx_x] = max(partialSums[hipThreadIdx_x + 8], partialSums[hipThreadIdx_x]);
     }
     __syncthreads();
 
     // 4
-    if (threadIdx.x < 4)
+    if (hipThreadIdx_x < 4)
     {
-        partialSums[threadIdx.x] = max(partialSums[threadIdx.x + 4], partialSums[threadIdx.x]);
+        partialSums[hipThreadIdx_x] = max(partialSums[hipThreadIdx_x + 4], partialSums[hipThreadIdx_x]);
     }
     __syncthreads();
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
         maxAbs[0] = max(max(partialSums[0], partialSums[1]), max(partialSums[2], partialSums[3]));
     }
@@ -4483,73 +4483,73 @@ __global__ void _reductionMatrixNorm01024Threads(
 {
 
     __shared__ ElemType partialSums[1024];
-    partialSums[threadIdx.x] = 0;
-    // int id = blockDim.x * blockIdx.x + threadIdx.x;
-    CUDA_LONG loadPerThread = N / blockDim.x;
-    for (CUDA_LONG i = threadIdx.x * loadPerThread; i < (threadIdx.x == blockDim.x - 1 ? N : (threadIdx.x + 1) * loadPerThread); ++i)
+    partialSums[hipThreadIdx_x] = 0;
+    // int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    CUDA_LONG loadPerThread = N / hipBlockDim_x;
+    for (CUDA_LONG i = hipThreadIdx_x * loadPerThread; i < (hipThreadIdx_x == hipBlockDim_x - 1 ? N : (hipThreadIdx_x + 1) * loadPerThread); ++i)
     {
         if (data[i] != 0)
-            ++partialSums[threadIdx.x];
+            ++partialSums[hipThreadIdx_x];
     }
     __syncthreads();
 
     // 512
-    if (threadIdx.x < 512)
+    if (hipThreadIdx_x < 512)
     {
-        partialSums[threadIdx.x] = partialSums[threadIdx.x + 512] + partialSums[threadIdx.x];
+        partialSums[hipThreadIdx_x] = partialSums[hipThreadIdx_x + 512] + partialSums[hipThreadIdx_x];
     }
     __syncthreads();
 
     // 256
-    if (threadIdx.x < 256)
+    if (hipThreadIdx_x < 256)
     {
-        partialSums[threadIdx.x] = partialSums[threadIdx.x + 256] + partialSums[threadIdx.x];
+        partialSums[hipThreadIdx_x] = partialSums[hipThreadIdx_x + 256] + partialSums[hipThreadIdx_x];
     }
     __syncthreads();
 
     // 128
-    if (threadIdx.x < 128)
+    if (hipThreadIdx_x < 128)
     {
-        partialSums[threadIdx.x] = partialSums[threadIdx.x + 128] + partialSums[threadIdx.x];
+        partialSums[hipThreadIdx_x] = partialSums[hipThreadIdx_x + 128] + partialSums[hipThreadIdx_x];
     }
     __syncthreads();
 
     // 64
-    if (threadIdx.x < 64)
+    if (hipThreadIdx_x < 64)
     {
-        partialSums[threadIdx.x] = partialSums[threadIdx.x + 64] + partialSums[threadIdx.x];
+        partialSums[hipThreadIdx_x] = partialSums[hipThreadIdx_x + 64] + partialSums[hipThreadIdx_x];
     }
     __syncthreads();
 
     // 32
-    if (threadIdx.x < 32)
+    if (hipThreadIdx_x < 32)
     {
-        partialSums[threadIdx.x] = partialSums[threadIdx.x + 32] + partialSums[threadIdx.x];
+        partialSums[hipThreadIdx_x] = partialSums[hipThreadIdx_x + 32] + partialSums[hipThreadIdx_x];
     }
     __syncthreads();
 
     // 16
-    if (threadIdx.x < 16)
+    if (hipThreadIdx_x < 16)
     {
-        partialSums[threadIdx.x] = partialSums[threadIdx.x + 16] + partialSums[threadIdx.x];
+        partialSums[hipThreadIdx_x] = partialSums[hipThreadIdx_x + 16] + partialSums[hipThreadIdx_x];
     }
     __syncthreads();
 
     // 8
-    if (threadIdx.x < 8)
+    if (hipThreadIdx_x < 8)
     {
-        partialSums[threadIdx.x] = partialSums[threadIdx.x + 8] + partialSums[threadIdx.x];
+        partialSums[hipThreadIdx_x] = partialSums[hipThreadIdx_x + 8] + partialSums[hipThreadIdx_x];
     }
     __syncthreads();
 
     // 4
-    if (threadIdx.x < 4)
+    if (hipThreadIdx_x < 4)
     {
-        partialSums[threadIdx.x] = partialSums[threadIdx.x + 4] + partialSums[threadIdx.x];
+        partialSums[hipThreadIdx_x] = partialSums[hipThreadIdx_x + 4] + partialSums[hipThreadIdx_x];
     }
     __syncthreads();
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
         nz[0] = partialSums[0] + partialSums[1] + partialSums[2] + partialSums[3];
     }
@@ -4563,7 +4563,7 @@ __global__ void _getSparseVectorRepresntationForCSCMatrix(
     const CUDA_LONG M,
     const CUDA_LONG N)
 {
-    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    int i = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (i >= M)
         return;
     int start = m_dRow[i];
@@ -4584,84 +4584,84 @@ __global__ void _lrHelper512Threads(
 {
     __shared__ ElemType partialSums1[512];
     __shared__ ElemType partialSums2[512];
-    partialSums1[threadIdx.x] = 0;
-    partialSums2[threadIdx.x] = 0;
+    partialSums1[hipThreadIdx_x] = 0;
+    partialSums2[hipThreadIdx_x] = 0;
 
-    // int id = blockDim.x * blockIdx.x + threadIdx.x;
-    int loadPerThread = N / blockDim.x;
-    for (int i = threadIdx.x * loadPerThread; i < (threadIdx.x == blockDim.x - 1 ? N : (threadIdx.x + 1) * loadPerThread); ++i)
+    // int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    int loadPerThread = N / hipBlockDim_x;
+    for (int i = hipThreadIdx_x * loadPerThread; i < (hipThreadIdx_x == hipBlockDim_x - 1 ? N : (hipThreadIdx_x + 1) * loadPerThread); ++i)
     {
-        partialSums1[threadIdx.x] += (data1[i] * data1[i]);
-        partialSums2[threadIdx.x] += (data2[i] * data2[i]);
+        partialSums1[hipThreadIdx_x] += (data1[i] * data1[i]);
+        partialSums2[hipThreadIdx_x] += (data2[i] * data2[i]);
     }
     __syncthreads();
 
     /*
     // 512
-    if (threadIdx.x<512)
+    if (hipThreadIdx_x<512)
     {
-    partialSums1[threadIdx.x]+=partialSums1[threadIdx.x+512];
-    partialSums2[threadIdx.x]+=partialSums2[threadIdx.x+512];
+    partialSums1[hipThreadIdx_x]+=partialSums1[hipThreadIdx_x+512];
+    partialSums2[hipThreadIdx_x]+=partialSums2[hipThreadIdx_x+512];
     }
     __syncthreads();*/
 
     // 256
-    if (threadIdx.x < 256)
+    if (hipThreadIdx_x < 256)
     {
-        partialSums1[threadIdx.x] += partialSums1[threadIdx.x + 256];
-        partialSums2[threadIdx.x] += partialSums2[threadIdx.x + 256];
+        partialSums1[hipThreadIdx_x] += partialSums1[hipThreadIdx_x + 256];
+        partialSums2[hipThreadIdx_x] += partialSums2[hipThreadIdx_x + 256];
     }
     __syncthreads();
 
     // 128
-    if (threadIdx.x < 128)
+    if (hipThreadIdx_x < 128)
     {
-        partialSums1[threadIdx.x] += partialSums1[threadIdx.x + 128];
-        partialSums2[threadIdx.x] += partialSums2[threadIdx.x + 128];
+        partialSums1[hipThreadIdx_x] += partialSums1[hipThreadIdx_x + 128];
+        partialSums2[hipThreadIdx_x] += partialSums2[hipThreadIdx_x + 128];
     }
     __syncthreads();
 
     // 64
-    if (threadIdx.x < 64)
+    if (hipThreadIdx_x < 64)
     {
-        partialSums1[threadIdx.x] += partialSums1[threadIdx.x + 64];
-        partialSums2[threadIdx.x] += partialSums2[threadIdx.x + 64];
+        partialSums1[hipThreadIdx_x] += partialSums1[hipThreadIdx_x + 64];
+        partialSums2[hipThreadIdx_x] += partialSums2[hipThreadIdx_x + 64];
     }
     __syncthreads();
 
     // 32
-    if (threadIdx.x < 32)
+    if (hipThreadIdx_x < 32)
     {
-        partialSums1[threadIdx.x] += partialSums1[threadIdx.x + 32];
-        partialSums2[threadIdx.x] += partialSums2[threadIdx.x + 32];
+        partialSums1[hipThreadIdx_x] += partialSums1[hipThreadIdx_x + 32];
+        partialSums2[hipThreadIdx_x] += partialSums2[hipThreadIdx_x + 32];
     }
     __syncthreads();
 
     // 16
-    if (threadIdx.x < 16)
+    if (hipThreadIdx_x < 16)
     {
-        partialSums1[threadIdx.x] += partialSums1[threadIdx.x + 16];
-        partialSums2[threadIdx.x] += partialSums2[threadIdx.x + 16];
+        partialSums1[hipThreadIdx_x] += partialSums1[hipThreadIdx_x + 16];
+        partialSums2[hipThreadIdx_x] += partialSums2[hipThreadIdx_x + 16];
     }
     __syncthreads();
 
     // 8
-    if (threadIdx.x < 8)
+    if (hipThreadIdx_x < 8)
     {
-        partialSums1[threadIdx.x] += partialSums1[threadIdx.x + 8];
-        partialSums2[threadIdx.x] += partialSums2[threadIdx.x + 8];
+        partialSums1[hipThreadIdx_x] += partialSums1[hipThreadIdx_x + 8];
+        partialSums2[hipThreadIdx_x] += partialSums2[hipThreadIdx_x + 8];
     }
     __syncthreads();
 
     // 4
-    if (threadIdx.x < 4)
+    if (hipThreadIdx_x < 4)
     {
-        partialSums1[threadIdx.x] += partialSums1[threadIdx.x + 4];
-        partialSums2[threadIdx.x] += partialSums2[threadIdx.x + 4];
+        partialSums1[hipThreadIdx_x] += partialSums1[hipThreadIdx_x + 4];
+        partialSums2[hipThreadIdx_x] += partialSums2[hipThreadIdx_x + 4];
     }
     __syncthreads();
 
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
     {
         ElemType fns1 = partialSums1[0] + partialSums1[1] + partialSums1[2] + partialSums1[3];
         ElemType fns2 = partialSums2[0] + partialSums2[1] + partialSums2[2] + partialSums2[3];
@@ -4701,8 +4701,8 @@ __global__ void _assignElementProductOfWithShiftNeg(
     const int NTPlusOne,
     const int BS)
 {
-    CUDA_LONG idx = blockDim.x * blockIdx.x + threadIdx.x;
-    CUDA_LONG idy = blockDim.y * blockIdx.y + threadIdx.y;
+    CUDA_LONG idx = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    CUDA_LONG idy = hipBlockDim_y * hipBlockIdx_y + hipThreadIdx_y;
 
     if (idx >= NTPlusOne || idy >= BS)
         return;
@@ -4730,8 +4730,8 @@ __global__ void _innerProductWithShiftNeg(
     const CUDA_LONG shift,
     const CUDA_LONG NTPlusOne)
 {
-    CUDA_LONG idx = blockDim.x * blockIdx.x + threadIdx.x;
-    CUDA_LONG idy = blockDim.y * blockIdx.y + threadIdx.y;
+    CUDA_LONG idx = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    CUDA_LONG idy = hipBlockDim_y * hipBlockIdx_y + hipThreadIdx_y;
 
     if (idx >= NTPlusOne || idy >= M)
         return;
@@ -4776,7 +4776,7 @@ __global__ void _getARowByIndex(
     const int m  // the m-th row of a
     )
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= P)
         return;
     //    us[id] = a[id] * b[id];
@@ -4793,8 +4793,8 @@ __global__ void _conductRowElementMultiplyWithShift(
     const int shift,
     const bool isafixed)
 {
-    CUDA_LONG idx = blockDim.x * blockIdx.x + threadIdx.x;
-    CUDA_LONG idy = blockDim.y * blockIdx.y + threadIdx.y;
+    CUDA_LONG idx = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    CUDA_LONG idy = hipBlockDim_y * hipBlockIdx_y + hipThreadIdx_y;
 
     if (idx >= O || idy >= P)
         return;
@@ -4820,7 +4820,7 @@ __global__ void _assignElementProductOfWithShift(
     const int shift,
     const CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
 
@@ -4835,7 +4835,7 @@ __global__ void _minusOneAt(
     CUDA_LONG position,
     CUDA_LONG N)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     if (id == position)
@@ -4855,9 +4855,9 @@ __global__ void _rcrfBackwardComputeMax1024Labels(
     const ElemType* gpair_scores, // column slice at current time t
     const size_t iNumLab, const int shift)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
 
-    extern __shared__ double sh_alpha_and_beta[]; // [id] or [id + iNumLab] or [id + 2 * iNumLab)]
+    HIP_DYNAMIC_SHARED( double, sh_alpha_and_beta) // [id] or [id + iNumLab] or [id + 2 * iNumLab)]
     // need byte size = (iNumPos * iNumLab * 2 + iNumLab * iNumLab) * sizeof(ElemType)
 
     ElemType* alpha = (ElemType*) (sh_alpha_and_beta);
@@ -4906,9 +4906,9 @@ __global__ void _rcrfBackwardComputeZetaMax1024Labels(
     const ElemType* gpair_scores,
     const size_t iNumLab, const int shift)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
 
-    extern __shared__ double sh_alpha_and_beta[]; // [id]
+    HIP_DYNAMIC_SHARED( double, sh_alpha_and_beta) // [id]
     // need byte size = (iNumPos * iNumLab * 2 + iNumLab * iNumLab) * sizeof(ElemType)
 
     ElemType* alpha = (ElemType*) (sh_alpha_and_beta);
@@ -4950,9 +4950,9 @@ __global__ void _rcrfTransGrdComputeZetaMax1024Labels(
     const size_t start_lbl,
     const int shift)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
 
-    extern __shared__ double sh_alpha_and_beta[]; // [id]
+    HIP_DYNAMIC_SHARED( double, sh_alpha_and_beta) // [id]
     // need byte size = (iNumPos * iNumLab * 2 + iNumLab * iNumLab) * sizeof(ElemType)
 
     ElemType* alpha = (ElemType*) (sh_alpha_and_beta);
@@ -5005,9 +5005,9 @@ __global__ void _rcrfTransGrdComputeMax1024Labels(
     const size_t iNumLab,
     const int shift)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
 
-    extern __shared__ double sh_alpha_and_beta[]; // [id]
+    HIP_DYNAMIC_SHARED( double, sh_alpha_and_beta) // [id]
     // need byte size = (iNumPos * iNumLab * 2 + iNumLab * iNumLab) * sizeof(ElemType)
 
     ElemType* alpha = (ElemType*) (sh_alpha_and_beta);
@@ -5071,8 +5071,8 @@ __global__ void _reductionLogAddSum(
 
     __shared__ ElemType partialLogAddSum[GridDim::maxThreadsPerBlock];
 
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
-    int tid = threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    int tid = hipThreadIdx_x;
 
     if (id < N)
         partialLogAddSum[tid] = data[id];
@@ -5111,7 +5111,7 @@ __global__ void _DropFrame(
     const long m_numCols,
     const long m_numRows) // ld
 {
-    int col_id = blockDim.x * blockIdx.x + threadIdx.x;
+    int col_id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (col_id >= m_numCols)
         return;
     bool dropframe = false;
@@ -5143,7 +5143,7 @@ template <class ElemType>
 __global__ void _AssignSequenceError(const ElemType hsmoothingWeight, ElemType* error, const ElemType* label,
                                      const ElemType* dnnoutput, const ElemType* gamma, ElemType alpha, const long N)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= N)
         return;
     error[id] -= alpha * (label[id] - (1.0 - hsmoothingWeight) * dnnoutput[id] - hsmoothingWeight * gamma[id]);
@@ -5155,7 +5155,7 @@ template <class ElemType>
 __global__ void _copyTopKResults(const uint64_t* indexes, const ElemType* values, ElemType* maxIndexes, ElemType* maxValues,
                                  CUDA_LONG crow, CUDA_LONG ccol, int topK)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= topK * ccol)
         return;
     CUDA_LONG irow = id % topK;
@@ -5167,11 +5167,11 @@ __global__ void _copyTopKResults(const uint64_t* indexes, const ElemType* values
 template <int BlockSize, class ElemType>
 __global__ void _assignNumOfDiffCol(const ElemType* a, const ElemType* b, ElemType* c, CUDA_LONG crowB, CUDA_LONG ccol)
 {
-    assert(gridDim.x == 1 && gridDim.y == 1 && gridDim.z == 1);
+    assert(hipGridDim_x == 1 && hipGridDim_y == 1 && hipGridDim_z == 1);
 
     int cur = 0;
-    CUDA_LONG icol = threadIdx.x;
-    for (; icol < ccol; icol += blockDim.x)
+    CUDA_LONG icol = hipThreadIdx_x;
+    for (; icol < ccol; icol += hipBlockDim_x)
     {
         ElemType key = a[icol];
         CUDA_LONG idxB = icol * crowB;
@@ -5189,14 +5189,14 @@ __global__ void _assignNumOfDiffCol(const ElemType* a, const ElemType* b, ElemTy
     __shared__ typename BlockReduceT::TempStorage tmp;
 
     int res = BlockReduceT(tmp).Sum(cur);
-    if (threadIdx.x == 0)
+    if (hipThreadIdx_x == 0)
         *c = res;
 }
 
 template <class ElemType>
 __global__ void _maskColumnsValue(ElemType* a, const char* columnsMask, CUDA_LONG numCols, CUDA_LONG numRows, ElemType val, CUDA_LONG numColsPerMaskEntry)
 {
-    CUDA_LONG maskColIdx = blockIdx.x;
+    CUDA_LONG maskColIdx = hipBlockIdx_x;
     CUDA_LONG matrixStartColIdx = maskColIdx * numColsPerMaskEntry;
 
     for (CUDA_LONG k = 0; k < numColsPerMaskEntry; ++k)
@@ -5208,8 +5208,8 @@ __global__ void _maskColumnsValue(ElemType* a, const char* columnsMask, CUDA_LON
         if (columnsMask[IDX2C(0, maskColIdx, 1)] == 1)
             return;
 
-        CUDA_LONG rowIdx = threadIdx.x;
-        for (; rowIdx < numRows; rowIdx += blockDim.x)
+        CUDA_LONG rowIdx = hipThreadIdx_x;
+        for (; rowIdx < numRows; rowIdx += hipBlockDim_x)
         {
             a[IDX2C(rowIdx, colIdx, numRows)] = val;
         }
@@ -5221,8 +5221,8 @@ __global__ void _adam(CUDA_LONG size, ElemType* grad, ElemType* smoothAda, ElemT
     ElemType lr, ElemType mom, ElemType adaWeight, ElemType adaMul, ElemType epsilon, bool unitGainMomentum, bool adamax)
 {
     const ElemType unitGainFactor = unitGainMomentum ? (1.0 - mom) : 1.0;
-    CUDA_LONG idx = blockIdx.x * blockDim.x + threadIdx.x;
-    CUDA_LONG stride = blockDim.x * gridDim.x;
+    CUDA_LONG idx = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+    CUDA_LONG stride = hipBlockDim_x * hipGridDim_x;
     for (; idx < size; idx += stride)
     {
         ElemType g = grad[idx];
@@ -5269,8 +5269,8 @@ __global__ void _adam4BlockSparseCol(CUDA_LONG size,
     ElemType lr, ElemType mom, ElemType adaWeight, ElemType adaMul, ElemType epsilon, bool unitGainMomentum, bool adamax)
 {
     const ElemType unitGainFactor = unitGainMomentum ? (1.0 - mom) : 1.0;
-    CUDA_LONG idx = blockIdx.x * blockDim.x + threadIdx.x;
-    CUDA_LONG stride = blockDim.x * gridDim.x;
+    CUDA_LONG idx = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+    CUDA_LONG stride = hipBlockDim_x * hipGridDim_x;
     for (; idx < size; idx += stride)
     {
         ElemType g = _getvalue4BlockSparseCol(grad_bsc, colOrRow2blockId, len, idx);
@@ -5315,8 +5315,8 @@ template <class ElemType>
 __global__ void _adadelta(CUDA_LONG size, ElemType* grad, ElemType* smoothAda, ElemType* smoothX2, ElemType* val,
     ElemType learningRate, ElemType rho, ElemType epsilon)
 {
-    CUDA_LONG idx = blockIdx.x * blockDim.x + threadIdx.x;
-    CUDA_LONG stride = blockDim.x * gridDim.x;
+    CUDA_LONG idx = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+    CUDA_LONG stride = hipBlockDim_x * hipGridDim_x;
     for (; idx < size; idx += stride)
     {
         ElemType g = grad[idx];
@@ -5344,8 +5344,8 @@ __global__ void _adadelta4BlockSparseCol(CUDA_LONG size,
     ElemType* smoothAda, ElemType* smoothX2, ElemType* val,
     ElemType learningRate, ElemType rho, ElemType epsilon)
 {
-    CUDA_LONG idx = blockIdx.x * blockDim.x + threadIdx.x;
-    CUDA_LONG stride = blockDim.x * gridDim.x;
+    CUDA_LONG idx = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+    CUDA_LONG stride = hipBlockDim_x * hipGridDim_x;
     for (; idx < size; idx += stride)
     {
         ElemType g = _getvalue4BlockSparseCol(grad_bsc, colOrRow2blockId, len, idx);
@@ -5405,9 +5405,9 @@ __global__ void _assignAlphaScore(
     const size_t blankTokenId,
     const int delayConstraint)
 {
-    LONG64 uttId = blockDim.x * blockIdx.x + threadIdx.x;
+    LONG64 uttId = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     // Index of the label in the sequence
-    LONG64 phoneSeqId = blockDim.y * blockIdx.y + threadIdx.y;
+    LONG64 phoneSeqId = hipBlockDim_y * hipBlockIdx_y + hipThreadIdx_y;
 
     // Number of phones and frames in this utterance
     LONG64 phoneNum = uttPhoneNum[uttId]; 
@@ -5511,9 +5511,9 @@ __global__ void _assignBetaScore(
     const size_t blankTokenId,
     const int delayConstraint)
 {
-    LONG64 uttId = blockDim.x * blockIdx.x + threadIdx.x;
+    LONG64 uttId = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     // Index of the label in the sequence
-    LONG64 phoneSeqId = blockDim.y * blockIdx.y + threadIdx.y;
+    LONG64 phoneSeqId = hipBlockDim_y * hipBlockIdx_y + hipThreadIdx_y;
     LONG64 phoneNum = uttPhoneNum[uttId];
     LONG64 frameNum = uttFrameNum[uttId];
 
@@ -5599,8 +5599,8 @@ __global__ void _assignCTCScore(
     const long maxPhoneNum,
     const long totalPhoneNum)
 {
-    LONG64 uttId = blockDim.x * blockIdx.x + threadIdx.x;
-    LONG64 t = blockDim.y * blockIdx.y + threadIdx.y;
+    LONG64 uttId = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    LONG64 t = hipBlockDim_y * hipBlockIdx_y + hipThreadIdx_y;
 
     if (uttId < uttNum && t < uttFrameNum[uttId])
     {
@@ -5644,7 +5644,7 @@ __global__ void _assignTotalScore(ElemType *betaScore,
     const size_t numChannels,
     const size_t maxPhoneNum)
 {
-    LONG64 uttId = blockIdx.x;
+    LONG64 uttId = hipBlockIdx_x;
     if (uttId < uttNum)
     {
         LONG64 alphaId_0 = (uttBeginFrame[uttId] * numChannels + uttToChanInd[uttId]) * maxPhoneNum;
@@ -5662,7 +5662,7 @@ __global__ void _assignOneHot(ElemType *indices,
                                   size_t num_item,
                                   size_t num_element)
 {
-    const CUDA_LONG index = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (index < num_element)
     {
         if (indices[index] >= 0 && indices[index] < num_class)
@@ -5682,7 +5682,7 @@ __global__ void _gatherFromTarget(ElemType *indices,
                                   size_t num_indices,
                                   CUDA_LONG num_elements)
 {
-    const CUDA_LONG index = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (index < num_elements)
     {
         size_t indices_index = index / num_row_elements;
@@ -5699,7 +5699,7 @@ __global__ void _scatterToIndices(ElemType *indices,
                                   size_t num_indices,
                                   CUDA_LONG num_elements)
 {
-    const CUDA_LONG index = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (index < num_elements)
     {
         size_t indices_index = index / num_row_elements;
@@ -5720,7 +5720,7 @@ __global__ void _assignOneHotAsSparse(ElemType *indices,
                                       int num_item,
                                       size_t num_elements)
 {
-    const CUDA_LONG index = blockIdx.x * blockDim.x + threadIdx.x;
+    const CUDA_LONG index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (index < num_elements)
     {
         int block_id = index / num_item;

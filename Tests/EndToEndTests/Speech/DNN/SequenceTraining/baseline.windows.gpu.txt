@@ -201,7 +201,7 @@ configparameters: cntk_sequence.cntk:truncated=false
 12/16/2016 06:06:46: 
 Creating virgin network.
 NDLBuilder Using GPU 0
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
 reading script file C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161216060627.127385\Speech\DNN_SequenceTraining@release_gpu\TestData/glob_0000.scp ... 948 entries
 total 132 state names in state list C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161216060627.127385\Speech\DNN_SequenceTraining@release_gpu\TestData/state.list
 htkmlfreader: reading MLF file C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161216060627.127385\Speech\DNN_SequenceTraining@release_gpu\TestData/glob_0000.mlf ... total 948 entries

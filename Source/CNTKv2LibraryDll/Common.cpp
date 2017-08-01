@@ -646,7 +646,7 @@ namespace CNTK
                         (unsigned int)gpuData.deviceId, 
                         gpuData.versionMajor,
                         gpuData.versionMinor,
-                        gpuData.cudaCores,
+                        gpuData.hipCores,
                         gpuData.name,
                         gpuData.totalMemory,
                     });
@@ -914,7 +914,7 @@ namespace CNTK
             for (const GpuData& data : gpusData)
             {
                 LOGPRINTF(stderr, "\t\tDevice[%d]: cores = %d; computeCapability = %d.%d; type = \"%s\"; total memory = %lu MB; free memory = %lu MB\n",
-                    data.deviceId, data.cudaCores, data.versionMajor, data.versionMinor, data.name.c_str(), (unsigned long)data.totalMemory, (unsigned long)data.freeMemory);
+                    data.deviceId, data.hipCores, data.versionMajor, data.versionMinor, data.name.c_str(), (unsigned long)data.totalMemory, (unsigned long)data.freeMemory);
             }
             LOGPRINTF(stderr, "-------------------------------------------------------------------\n");
 #endif

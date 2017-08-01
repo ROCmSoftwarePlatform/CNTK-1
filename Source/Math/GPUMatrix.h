@@ -19,7 +19,7 @@
 #include <iostream> // for cout/cerr
 #include <memory>   // for unique_ptr
 #include <limits.h> // for ULONG_MAX
-
+#include "hip/hip_runtime_api.h"
 //#include "CPUMatrix.h"
 //#include "CPUSparseMatrix.h"
 //#include "GPUSparseMatrix.h"
@@ -28,11 +28,12 @@
 #include <unistd.h>
 #endif
 
-// predeclare cublasHandle_t
+// predeclare hipblasHandle_t
 struct cublasContext;
 typedef struct cublasContext* cublasHandle_t;
+typedef cublasHandle_t hipblasHandle_t;
 struct CUstream_st;
-typedef struct CUstream_st* cudaStream_t;
+typedef struct CUstream_st* hipStream_t;
 
 #ifdef _WIN32
 #ifndef MATH_API
@@ -56,8 +57,8 @@ typedef struct CUstream_st* cudaStream_t;
 #endif
 
 // Stream management functions
-void MATH_API SetStream(cudaStream_t stream);
-cudaStream_t MATH_API GetStream();
+void MATH_API SetStream(hipStream_t stream);
+hipStream_t MATH_API GetStream();
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -74,7 +75,7 @@ private:
 
     bool m_forceSync;
 #ifndef CPUONLY
-    cudaEvent_t m_done;
+    hipEvent_t m_done;
 #endif
 
 public:
@@ -163,8 +164,8 @@ public:
     static const int MaxGpus = MAX_GPUS;
 
 private:
-    static cublasHandle_t s_cuHandle[MaxGpus];
-    static void* s_curandGenerator;
+    static hipblasHandle_t s_cuHandle[MaxGpus];
+    static void* s_hiprngGenerator;
 
 // Have to use disable the warning to avoid issues with __declspec(dllexport) on Windows (C4251).
 // Also, NVCC FE corresponding warning has to be disabled, see MathCUDA.vcxproj.
@@ -199,7 +200,7 @@ public:
     static void SetDevice(DEVICEID_TYPE deviceId);
     DEVICEID_TYPE PrepareDevice(DEVICEID_TYPE deviceId = -1) const;
 
-    static cublasHandle_t GetCublasHandle(int computeDevice = -1);
+    static hipblasHandle_t GetCublasHandle(int computeDevice = -1);
     ElemType* CopyToArray() const;                                              // allocated by the callee but need to be deleted by the caller
     size_t CopyToArray(ElemType*& arrayCopyTo, size_t& currentArraySize) const; // allocated by the callee but need to be deleted by the caller
     void CopySection(size_t numRows, size_t numCols, ElemType* dst, size_t colStride) const;
@@ -654,7 +655,7 @@ typedef GPUMatrix<float> GPUSingleMatrix;
 
 #ifndef CPUONLY
 
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 // -----------------------------------------------------------------------
 // Error handling
@@ -677,7 +678,7 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
                 strcpy(hostname, "?");
 #endif
             int currentCudaDevice;
-            cudaGetDevice(&currentCudaDevice);
+            hipGetDevice(&currentCudaDevice);
             Microsoft::MSR::CNTK::RuntimeError("%s failure %d: %s ; GPU=%d ; hostname=%s ; expr=%s%s", libName, (int)retCode, CudaErrString(retCode), currentCudaDevice, hostname ? hostname : "?", exprString, msg);
         }
         catch (const std::exception& e) // catch, log, and rethrow since CUDA code sometimes hangs in destruction, so we'd never get to see the error
@@ -688,10 +689,10 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
     }
 }
 
-#define CUDA_CALL(expr)     (CudaCall((expr), #expr, "CUDA",     cudaSuccess))
-#define CUBLAS_CALL(expr)   (CudaCall((expr), #expr, "CUBLAS",   CUBLAS_STATUS_SUCCESS))
+#define CUDA_CALL(expr)     (CudaCall((expr), #expr, "CUDA",     hipSuccess))
+#define HIPBLAS_CALL(expr)   (CudaCall((expr), #expr, "HIPBLAS",   HIPBLAS_STATUS_SUCCESS))
 #define CUSPARSE_CALL(expr) (CudaCall((expr), #expr, "CUSPARSE", CUSPARSE_STATUS_SUCCESS))
-#define CURAND_CALL(expr)   (CudaCall((expr), #expr, "CURAND",   CURAND_STATUS_SUCCESS))
+#define HIPRNG_CALL(expr)   (CudaCall((expr), #expr, "HIPRNG",   HIPRNG_STATUS_SUCCESS))
 #define CUDNN_CALL(expr)    (CudaCall((expr), #expr, "cuDNN",    CUDNN_STATUS_SUCCESS))
 #define CUDNN_CALL2(expr,m) (CudaCall((expr), #expr, "cuDNN",    CUDNN_STATUS_SUCCESS, m))
 

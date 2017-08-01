@@ -148,33 +148,33 @@ CudaTimer::~CudaTimer()
 {
     // TODO: Should not throw if std::uncaught_exception()
     if (m_start != nullptr)
-        CUDA_CALL(cudaEventDestroy(reinterpret_cast<cudaEvent_t>(m_start)));
+        CUDA_CALL(hipEventDestroy(reinterpret_cast<hipEvent_t>(m_start)));
     if (m_stop != nullptr)
-        CUDA_CALL(cudaEventDestroy(reinterpret_cast<cudaEvent_t>(m_stop)));
+        CUDA_CALL(hipEventDestroy(reinterpret_cast<hipEvent_t>(m_stop)));
 }
 void CudaTimer::Start()
 {
-    cudaEvent_t start;
-    cudaEvent_t stop;
+    hipEvent_t start;
+    hipEvent_t stop;
     if (m_start != nullptr)
-        CUDA_CALL(cudaEventDestroy(reinterpret_cast<cudaEvent_t>(m_start)));
+        CUDA_CALL(hipEventDestroy(reinterpret_cast<hipEvent_t>(m_start)));
     if (m_stop != nullptr)
-        CUDA_CALL(cudaEventDestroy(reinterpret_cast<cudaEvent_t>(m_stop)));
-    CUDA_CALL(cudaEventCreate(&start));
-    CUDA_CALL(cudaEventCreate(&stop));
+        CUDA_CALL(hipEventDestroy(reinterpret_cast<hipEvent_t>(m_stop)));
+    CUDA_CALL(hipEventCreate(&start));
+    CUDA_CALL(hipEventCreate(&stop));
     m_start = start;
     m_stop = stop;
-    CUDA_CALL(cudaEventRecord(start, GetStream()));
+    CUDA_CALL(hipEventRecord(start, GetStream()));
 }
 void CudaTimer::Stop()
 {
-    CUDA_CALL(cudaEventRecord(reinterpret_cast<cudaEvent_t>(m_stop), GetStream()));
-    CUDA_CALL(cudaEventSynchronize(reinterpret_cast<cudaEvent_t>(m_stop)));
+    CUDA_CALL(hipEventRecord(reinterpret_cast<hipEvent_t>(m_stop), GetStream()));
+    CUDA_CALL(hipEventSynchronize(reinterpret_cast<hipEvent_t>(m_stop)));
 }
 float CudaTimer::Elapsed()
 {
     float ms;
-    CUDA_CALL(cudaEventElapsedTime(&ms, reinterpret_cast<cudaEvent_t>(m_start), reinterpret_cast<cudaEvent_t>(m_stop)));
+    CUDA_CALL(hipEventElapsedTime(&ms, reinterpret_cast<hipEvent_t>(m_start), reinterpret_cast<hipEvent_t>(m_stop)));
     return ms;
 }
 

@@ -294,7 +294,7 @@ configparameters: rnnlu.ndl.cntk:traceLevel=1
 12/15/2016 08:37:22: 
 Creating virgin network.
 NDLBuilder Using GPU 0
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==8
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==8
 BatchLUSequenceReader: Input file is C:\jenkins\workspace\CNTK-Test-Windows-W1\Tests\EndToEndTests\Text\SLU/atis.train.apos.pred.pos.head.IOB.simple
 BatchLUSequenceReader: Input file is C:\jenkins\workspace\CNTK-Test-Windows-W1\Tests\EndToEndTests\Text\SLU/atis.dev.IOB.simple
 12/15/2016 08:37:22: 

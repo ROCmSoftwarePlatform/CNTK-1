@@ -436,7 +436,7 @@ MPI Rank 0:
 MPI Rank 0: 08/16/2016 03:20:03: Creating virgin network.
 MPI Rank 0: Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 363] <- 0.000000.
 MPI Rank 0: Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 363] <- uniform(seed=1, range=0.050000*1.000000, onCPU=false).
-MPI Rank 0: Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==8
+MPI Rank 0: Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==8
 MPI Rank 0: Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 MPI Rank 0: Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 MPI Rank 0: Node 'W1' (LearnableParameter operation): Initializing Parameter[512 x 512] <- 0.000000.
@@ -1177,7 +1177,7 @@ MPI Rank 1:
 MPI Rank 1: 08/16/2016 03:20:03: Creating virgin network.
 MPI Rank 1: Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 363] <- 0.000000.
 MPI Rank 1: Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 363] <- uniform(seed=1, range=0.050000*1.000000, onCPU=false).
-MPI Rank 1: Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==8
+MPI Rank 1: Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==8
 MPI Rank 1: Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 MPI Rank 1: Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 MPI Rank 1: Node 'W1' (LearnableParameter operation): Initializing Parameter[512 x 512] <- 0.000000.

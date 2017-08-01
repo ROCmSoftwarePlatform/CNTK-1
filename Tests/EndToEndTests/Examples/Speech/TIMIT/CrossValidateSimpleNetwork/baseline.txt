@@ -262,7 +262,7 @@ minibatchutterancesource: 3696 utterances grouped into 13 chunks, av. chunk size
 08/16/2016 10:11:35: Creating virgin network.
 Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 792] <- 0.000000.
 Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 792] <- uniform(seed=1, range=0.050000*1.000000, onCPU=false).
-SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
+SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
 Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 Node 'W1' (LearnableParameter operation): Initializing Parameter[512 x 512] <- 0.000000.

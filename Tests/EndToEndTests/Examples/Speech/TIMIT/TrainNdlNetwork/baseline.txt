@@ -258,7 +258,7 @@ Node 'CE.BFF.B' (LearnableParameter operation): Initializing Parameter[183] <- 0
 Node 'CE.BFF.W' (LearnableParameter operation): Initializing Parameter[183 x 512] <- 0.000000.
 Node 'L1.BFF.B' (LearnableParameter operation): Initializing Parameter[512] <- 0.000000.
 Node 'L1.BFF.W' (LearnableParameter operation): Initializing Parameter[512 x 792] <- uniform(seed=1, range=0.050000*1.000000, onCPU=false).
-SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
+SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
 Node 'L2.BFF.B' (LearnableParameter operation): Initializing Parameter[512] <- 0.000000.
 Node 'L2.BFF.W' (LearnableParameter operation): Initializing Parameter[512 x 512] <- uniform(seed=2, range=0.050000*1.000000, onCPU=false).
 Node 'L3.BFF.B' (LearnableParameter operation): Initializing Parameter[512] <- 0.000000.

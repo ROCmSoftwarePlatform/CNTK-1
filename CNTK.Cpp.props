@@ -96,17 +96,17 @@
   <PropertyGroup Condition="'$(CudaVersion)' == '8.0'">
     <CudaPath>$(CUDA_PATH_V8_0)</CudaPath>
     <CudaRuntimeDll>cudart64_80.dll</CudaRuntimeDll>
-    <CudaDlls>cublas64_80.dll;cusparse64_80.dll;curand64_80.dll;$(CudaRuntimeDll)</CudaDlls>
+    <CudaDlls>hipblas64_80.dll;cusparse64_80.dll;hiprng64_80.dll;$(CudaRuntimeDll)</CudaDlls>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(CudaVersion)' == '7.5'">
     <CudaPath>$(CUDA_PATH_V7_5)</CudaPath>
     <CudaRuntimeDll>cudart64_75.dll</CudaRuntimeDll>
-    <CudaDlls>cublas64_75.dll;cusparse64_75.dll;curand64_75.dll;$(CudaRuntimeDll)</CudaDlls>
+    <CudaDlls>hipblas64_75.dll;cusparse64_75.dll;hiprng64_75.dll;$(CudaRuntimeDll)</CudaDlls>
   </PropertyGroup>
 
   <PropertyGroup>
-    <CudaLibs>cudart.lib;cublas.lib;cusparse.lib;curand.lib</CudaLibs>
+    <CudaLibs>cudart.lib;hipblas.lib;cusparse.lib;hiprng.lib</CudaLibs>
     <CudaInclude>$(CudaPath)\include</CudaInclude>
     <CudaLibPath>$(CudaPath)\lib\$(Platform)</CudaLibPath>
   </PropertyGroup>

@@ -162,7 +162,7 @@ Node 'featOffs' (LearnableParameter operation): Initializing Parameter[1 x 1] <-
 Node 'featOffs' (LearnableParameter operation): Initializing Parameter[1 x 1] <- 128.000000.
 Node 'featOffs' (LearnableParameter operation): Initializing Parameter[1 x 1] <- 128.000000.
 Node 'conv1.c.W' (LearnableParameter operation): Initializing Parameter[32 x 75] <- gaussian(seed=1, init dims=[32 x 75], range=0.023094*0.004300, onCPU=false).
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
 Node 'conv1.c.c.b' (LearnableParameter operation): Initializing Parameter[32 x 1] <- 0.000000.
 Node 'conv1.c.c.sc' (LearnableParameter operation): Initializing Parameter[32 x 1] <- 1.000000.
 Node 'conv1.c.c.m' (LearnableParameter operation): Initializing Parameter[32 x 1] <- 0.000000.

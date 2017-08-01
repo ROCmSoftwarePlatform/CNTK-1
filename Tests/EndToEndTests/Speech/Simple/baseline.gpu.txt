@@ -118,7 +118,7 @@ configparameters: cntk.cntk:traceLevel=1
 12/16/2016 06:10:45: 
 Creating virgin network.
 SimpleNetworkBuilder Using GPU 0
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
 12/16/2016 06:10:46: 
 Model has 25 nodes. Using GPU 0.
 

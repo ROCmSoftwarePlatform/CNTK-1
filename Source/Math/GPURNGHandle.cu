@@ -16,21 +16,21 @@ GPURNGHandle::GPURNGHandle(int deviceId, uint64_t seed, uint64_t offset)
     unsigned long long cudaSeed = seed;
     if (GetMathLibTraceLevel() > 0)
     {
-        fprintf(stderr, "(GPU): creating curand object with seed %llu\n", cudaSeed);
+        fprintf(stderr, "(GPU): creating hiprng object with seed %llu\n", cudaSeed);
     }
 
-    CURAND_CALL(curandCreateGenerator(&m_generator, CURAND_RNG_PSEUDO_XORWOW));
-    CURAND_CALL(curandSetPseudoRandomGeneratorSeed(m_generator, cudaSeed));
-    CURAND_CALL(curandSetGeneratorOrdering(m_generator, CURAND_ORDERING_PSEUDO_SEEDED));
-    CURAND_CALL(curandSetGeneratorOffset(m_generator, offset));
+    HIPRNG_CALL(hiprngCreateGenerator(&m_generator, HIPRNG_RNG_PSEUDO_XORWOW));
+    HIPRNG_CALL(hiprngSetPseudoRandomGeneratorSeed(m_generator, cudaSeed));
+    //HIPRNG_CALL(hiprngSetGeneratorOrdering(m_generator, HIPRNG_ORDERING_PSEUDO_SEEDED));
+    HIPRNG_CALL(hiprngSetGeneratorOffset(m_generator, offset));
 }
 
 /*virtual*/ GPURNGHandle::~GPURNGHandle()
 {
     if (std::uncaught_exception())
-        curandDestroyGenerator(m_generator);
+        hiprngDestroyGenerator(m_generator);
     else
-        CURAND_CALL(curandDestroyGenerator(m_generator));
+        HIPRNG_CALL(hiprngDestroyGenerator(m_generator));
 }
 
 }}}

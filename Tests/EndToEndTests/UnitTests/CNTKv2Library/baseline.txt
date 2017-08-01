@@ -161,7 +161,7 @@ parallelTrain option is not enabled. ParallelTrain config will be ignored.
 06/19/2017 22:09:44: 
 Creating virgin network.
 SimpleNetworkBuilder Using GPU 0
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
 reading script file C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Speech\AN4\Data/glob_0000.scp ... 948 entries
 total 132 state names in state list C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Speech\AN4\Data/state.list
 htkmlfreader: reading MLF file C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Speech\AN4\Data/glob_0000.mlf ... total 948 entries

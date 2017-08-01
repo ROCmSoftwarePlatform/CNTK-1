@@ -181,7 +181,7 @@ namespace CNTK
         unsigned int deviceId;
         int versionMajor;
         int versionMinor;
-        int cudaCores;
+        int hipCores;
         std::string name;
         size_t totalMemory;
     };

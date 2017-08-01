@@ -15,7 +15,7 @@
 #include <type_traits>
 
 // Forward declare CUDA stuff
-typedef struct CUstream_st* cudaStream_t;
+typedef struct CUstream_st* hipStream_t;
 typedef struct ncclComm* ncclComm_t;
 
 namespace Microsoft { namespace MSR { namespace CNTK {
@@ -27,7 +27,7 @@ private:
     enum class DataType : int {FLOAT, DOUBLE};
     void AllReduceImpl(void* inputbuffer, void* outputbuffer, size_t count, DataType dtype);
     void BroadcastImpl(void* buffer, size_t count, MPI_Datatype dtype, int root);
-    cudaStream_t m_stream;
+    hipStream_t m_stream;
     ncclComm_t m_ncclComm;
 #endif
 

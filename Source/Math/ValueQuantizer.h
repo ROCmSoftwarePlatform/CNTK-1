@@ -5,9 +5,9 @@
 #include "Basics.h"
 #include "BestGpu.h" // for CPUONLY
 #ifndef CPUONLY
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cuda_runtime_api.h>
+//#include <cuda.h>
+#include <hip/hip_runtime.h>
+#include <hip/hip_runtime_api.h>
 #include <device_launch_parameters.h>
 #endif // !CPUONLY
 

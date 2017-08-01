@@ -175,7 +175,7 @@ parallelTrain option is not enabled. ParallelTrain config will be ignored.
 04/14/2017 03:09:24: 
 Creating virgin network.
 NDLBuilder Using GPU 0
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
 Node 'h2.W' (LearnableParameter operation): Initializating Parameter[4096 x 0] as gaussian later when dimensions are fully known.
 Node 'OutputNodes.W' (LearnableParameter operation): Initializating Parameter[1000 x 0] as gaussian later when dimensions are fully known.
 Node 'h2.W' (LearnableParameter operation) operation: Tensor shape was inferred as [4096 x 4096].

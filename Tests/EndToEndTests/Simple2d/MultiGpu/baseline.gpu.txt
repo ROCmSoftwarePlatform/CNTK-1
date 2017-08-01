@@ -379,7 +379,7 @@ SimpleNetworkBuilder Using GPU 0
 08/16/2016 03:19:53: Creating virgin network.
 Node 'W0' (LearnableParameter operation): Initializing Parameter[50 x 2] <- 0.000000.
 Node 'W0' (LearnableParameter operation): Initializing Parameter[50 x 2] <- uniform(seed=1, range=0.050000*1.000000, onCPU=false).
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
 Node 'B0' (LearnableParameter operation): Initializing Parameter[50 x 1] <- 0.000000.
 Node 'B0' (LearnableParameter operation): Initializing Parameter[50 x 1] <- 0.000000.
 Node 'W1' (LearnableParameter operation): Initializing Parameter[50 x 50] <- 0.000000.

@@ -448,8 +448,8 @@ Setting dropout rate to 0.5.
 05/08/2017 19:45:47: Starting Epoch 1: learning rate per sample = 0.001563  effective momentum = 0.000000  momentum as time constant = 0.0 samples
 
 05/08/2017 19:45:47: Starting minibatch loop.
-(GPU): creating curand object with seed 0
-(GPU): creating curand object with seed 1
+(GPU): creating hiprng object with seed 0
+(GPU): creating hiprng object with seed 1
 05/08/2017 19:45:50:  Epoch[ 1 of 3]-Minibatch[   1-  16, 25.00%]: ce = 2.29859829 * 1024; errs = 88.867% * 1024; time = 3.4698s; samplesPerSecond = 295.1
 05/08/2017 19:45:51:  Epoch[ 1 of 3]-Minibatch[  17-  32, 50.00%]: ce = 2.29957533 * 1024; errs = 87.402% * 1024; time = 0.7139s; samplesPerSecond = 1434.4
 05/08/2017 19:45:52:  Epoch[ 1 of 3]-Minibatch[  33-  48, 75.00%]: ce = 2.28886795 * 1024; errs = 86.719% * 1024; time = 0.7142s; samplesPerSecond = 1433.8
@@ -460,8 +460,8 @@ Setting dropout rate to 0.5.
 05/08/2017 19:45:53: Starting Epoch 2: learning rate per sample = 0.001563  effective momentum = 0.000000  momentum as time constant = 0.0 samples
 
 05/08/2017 19:45:53: Starting minibatch loop.
-(GPU): creating curand object with seed 2
-(GPU): creating curand object with seed 3
+(GPU): creating hiprng object with seed 2
+(GPU): creating hiprng object with seed 3
 05/08/2017 19:45:53:  Epoch[ 2 of 3]-Minibatch[   1-  16, 25.00%]: ce = 2.21036029 * 1024; errs = 83.789% * 1024; time = 0.7465s; samplesPerSecond = 1371.7
 05/08/2017 19:45:54:  Epoch[ 2 of 3]-Minibatch[  17-  32, 50.00%]: ce = 2.16653085 * 1024; errs = 82.715% * 1024; time = 0.7154s; samplesPerSecond = 1431.5
 05/08/2017 19:45:55:  Epoch[ 2 of 3]-Minibatch[  33-  48, 75.00%]: ce = 2.15736771 * 1024; errs = 81.836% * 1024; time = 0.7206s; samplesPerSecond = 1421.1
@@ -472,8 +472,8 @@ Setting dropout rate to 0.5.
 05/08/2017 19:45:56: Starting Epoch 3: learning rate per sample = 0.001563  effective momentum = 0.000000  momentum as time constant = 0.0 samples
 
 05/08/2017 19:45:56: Starting minibatch loop.
-(GPU): creating curand object with seed 4
-(GPU): creating curand object with seed 5
+(GPU): creating hiprng object with seed 4
+(GPU): creating hiprng object with seed 5
 05/08/2017 19:45:56:  Epoch[ 3 of 3]-Minibatch[   1-  16, 25.00%]: ce = 2.11107063 * 1024; errs = 78.320% * 1024; time = 0.7465s; samplesPerSecond = 1371.7
 05/08/2017 19:45:57:  Epoch[ 3 of 3]-Minibatch[  17-  32, 50.00%]: ce = 2.11705589 * 1024; errs = 79.004% * 1024; time = 0.7137s; samplesPerSecond = 1434.9
 05/08/2017 19:45:58:  Epoch[ 3 of 3]-Minibatch[  33-  48, 75.00%]: ce = 2.09411049 * 1024; errs = 78.027% * 1024; time = 0.7141s; samplesPerSecond = 1434.0

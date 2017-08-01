@@ -605,7 +605,7 @@ void TestCheckpointing(const DeviceDescriptor& device)
 
     if (device.Type() == DeviceKind::GPU)
     {
-        // TODO: instead of cloning here, reset curand generator to make sure that parameters are initialized to the same state.
+        // TODO: instead of cloning here, reset hiprng generator to make sure that parameters are initialized to the same state.
         for (auto& p : net1_1->Parameters())
         {
             // make sure all parameters are initialized
@@ -631,7 +631,7 @@ void TestCheckpointing(const DeviceDescriptor& device)
 
     if (device.Type() == DeviceKind::GPU)
     {
-        // TODO: instead of cloning here, reset curand generator to make sure that parameters are initialized to the same state.
+        // TODO: instead of cloning here, reset hiprng generator to make sure that parameters are initialized to the same state.
         for (auto& p : net2_1->Parameters())
         {
             // make sure all parameters are initialized

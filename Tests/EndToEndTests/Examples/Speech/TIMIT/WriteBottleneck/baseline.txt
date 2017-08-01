@@ -224,7 +224,7 @@ minibatchutterancesource: 3696 utterances grouped into 13 chunks, av. chunk size
 minibatchutterancesource: 3696 utterances grouped into 13 chunks, av. chunk size: 284.3 utterances, 86524.8 frames
 
 05/03/2016 21:42:53: Creating virgin network.
-SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
+SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
 
 Post-processing network...
 

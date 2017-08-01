@@ -92,9 +92,9 @@ CuDnn::ptr_t CuDnn::Instance()
     auto createNew = []()
     {
         int deviceId;
-        CUDA_CALL(cudaGetDevice(&deviceId));
-        cudaDeviceProp props = {0};
-        if (cudaGetDeviceProperties(&props, deviceId) != cudaSuccess || props.major < 3)
+        CUDA_CALL(hipGetDevice(&deviceId));
+        hipDeviceProp_t props = {0};
+        if (hipGetDeviceProperties(&props, deviceId) != hipSuccess || props.major < 3)
             RuntimeError("cuDNN requires device with compute capability 3.0 or higher.");
         cudnnHandle_t* cudnn = new cudnnHandle_t;
         CUDNN_CALL(cudnnCreate(cudnn));

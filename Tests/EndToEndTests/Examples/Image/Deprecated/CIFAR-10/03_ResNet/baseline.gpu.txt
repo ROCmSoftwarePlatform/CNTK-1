@@ -138,7 +138,7 @@ parallelTrain option is not enabled. ParallelTrain config will be ignored.
 12/15/2016 08:29:14: 
 Creating virgin network.
 NDLBuilder Using GPU 0
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
 
 OutputNodes.t Times operation: For legacy compatibility, the sample layout of left input (OutputNodes.W LearnableParameter operation) was patched to [10 x 1 x 1 x 64] (from [10 x 64])
 conv1.c.c.c: using cuDNN convolution engine for geometry: Input: 32 x 32 x 3, Output: 32 x 32 x 16, Kernel: 3 x 3 x 3, Map: 1 x 1 x 16, Stride: 1 x 1 x 3, Sharing: (1), AutoPad: (1), LowerPad: 0, UpperPad: 0.

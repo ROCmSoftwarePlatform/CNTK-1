@@ -111,7 +111,7 @@ configparameters: 05_ConvLocal_ndl_deprecated.cntk:Train=[
 09/29/2016 21:58:44: 
 Creating virgin network.
 NDLBuilder Using GPU 0
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
 conv1.c: using cuDNN convolution engine for geometry: Input: 32 x 32 x 3, Output: 32 x 32 x 64, Kernel: 5 x 5 x 3, Map: 1 x 1 x 64, Stride: 1 x 1 x 3, Sharing: (1), AutoPad: (1), LowerPad: 0, UpperPad: 0.
 pool1: using cuDNN convolution engine for geometry: Input: 32 x 32 x 64, Output: 15 x 15 x 64, Kernel: 3 x 3 x 1, Map: 1, Stride: 2 x 2 x 1, Sharing: (1), AutoPad: (0), LowerPad: 0, UpperPad: 0.
 conv2.c: using cuDNN convolution engine for geometry: Input: 15 x 15 x 64, Output: 15 x 15 x 64, Kernel: 5 x 5 x 64, Map: 1 x 1 x 64, Stride: 1 x 1 x 64, Sharing: (1), AutoPad: (1), LowerPad: 0, UpperPad: 0.

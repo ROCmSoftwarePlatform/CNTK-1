@@ -27,7 +27,7 @@ public:
         CUDNN_CALL(cudnnDropoutGetStatesSize(*m_cudnn, &stateSize));
 
         // bugbug: possible leak. Does CuDnn release this for us?
-        CUDA_CALL(cudaMalloc(&states, stateSize));
+        CUDA_CALL(hipMalloc(&states, stateSize));
 
         CUDNN_CALL(cudnnSetDropoutDescriptor(m_dropoutDesc,
             *m_cudnn,
