@@ -28,12 +28,19 @@
 #include <unistd.h>
 #endif
 
+#ifdef __HIP_PLATFORM_NVCC__
 // predeclare hipblasHandle_t
 struct cublasContext;
 typedef struct cublasContext* cublasHandle_t;
 typedef cublasHandle_t hipblasHandle_t;
 struct CUstream_st;
 typedef struct CUstream_st* hipStream_t;
+#endif
+
+#ifdef __HIP_PLATFORM_HCC__
+typedef struct Hcblaslibrary *hcblasHandle_t;
+typedef hcblasHandle_t hipblasHandle_t;
+#endif
 
 #ifdef _WIN32
 #ifndef MATH_API
@@ -691,7 +698,7 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
 
 #define CUDA_CALL(expr)     (CudaCall((expr), #expr, "CUDA",     hipSuccess))
 #define HIPBLAS_CALL(expr)   (CudaCall((expr), #expr, "HIPBLAS",   HIPBLAS_STATUS_SUCCESS))
-#define CUSPARSE_CALL(expr) (CudaCall((expr), #expr, "CUSPARSE", CUSPARSE_STATUS_SUCCESS))
+#define HIPSPARSE_CALL(expr) (CudaCall((expr), #expr, "HIPSPARSE", HIPSPARSE_STATUS_SUCCESS))
 #define HIPRNG_CALL(expr)   (CudaCall((expr), #expr, "HIPRNG",   HIPRNG_STATUS_SUCCESS))
 #define CUDNN_CALL(expr)    (CudaCall((expr), #expr, "cuDNN",    CUDNN_STATUS_SUCCESS))
 #define CUDNN_CALL2(expr,m) (CudaCall((expr), #expr, "cuDNN",    CUDNN_STATUS_SUCCESS, m))
