@@ -2,7 +2,7 @@
 
 #ifndef CPUONLY
 #include <hip/hip_runtime_api.h>
-#include <cuda.h>
+//TODO:#include <cuda.h>
 #endif // !CPUONLY
 
 #include "Basics.h"

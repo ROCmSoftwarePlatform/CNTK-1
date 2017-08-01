@@ -300,6 +300,11 @@ ifeq ($(HIP_PLATFORM), nvcc)
 GENCODE_SM30 := -gencode arch=compute_30,code=sm_30
 GENCODE_SM35 := -gencode arch=compute_35,code=sm_35
 GENCODE_SM50 := -gencode arch=compute_50,code=sm_50
+GENCODE := $(GENCODE_SM30) $(GENCODE_SM35) $(GENCODE_SM50)
+endif
+
+ifeq ($(HIP_PLATFORM), hcc)
+GENCODE := -Wno-deprecated-register
 endif
 
 # Should we relocate *.gcno and *.gcda files using -fprofile-dir option?
@@ -317,26 +322,36 @@ ifeq ("$(BUILDTYPE)","debug")
   ifdef CNTK_CUDA_CODEGEN_DEBUG
     GENCODE_FLAGS := $(CNTK_CUDA_CODEGEN_DEBUG)
   else
-    GENCODE_FLAGS := $(GENCODE_SM30)
+    ifeq ($(HIP_PLATFORM), nvcc)
+      GENCODE_FLAGS := $(GENCODE_SM30)
+      CUFLAGS += -use_fast_math
+    endif
+
+    ifeq ($(HIP_PLATFORM), hcc)
+      GENCODE_FLAGS := $(GENCODE)                                                                  
+    endif
   endif
 
   CXXFLAGS += -g
   LDFLAGS += -rdynamic
   COMMON_FLAGS += -D_DEBUG -DNO_SYNC
-  CUFLAGS += -O0 -g -use_fast_math  -lineinfo  $(GENCODE_FLAGS)
+  CUFLAGS += -O0 -g -lineinfo  $(GENCODE_FLAGS)
 endif
 
 ifeq ("$(BUILDTYPE)","release")
   ifdef CNTK_CUDA_CODEGEN_RELEASE
     GENCODE_FLAGS := $(CNTK_CUDA_CODEGEN_RELEASE)
   else
-    GENCODE_FLAGS := $(GENCODE_SM30) $(GENCODE_SM35) $(GENCODE_SM50)
+    GENCODE_FLAGS := $(GENCODE)
   endif
 
   CXXFLAGS += -g -O4
   LDFLAGS += -rdynamic
   COMMON_FLAGS += -DNDEBUG -DNO_SYNC
-  CUFLAGS += -O3 -g -use_fast_math $(GENCODE_FLAGS)
+  CUFLAGS += -O3 -g $(GENCODE_FLAGS)
+  ifeq ($(HIP_PLATFORM), nvcc)
+    CUFLAGS += -use_fast_math
+  endif	
 endif
 
 ifdef CNTK_CUDA_DEVICE_DEBUGINFO
