@@ -132,7 +132,12 @@ SRC:=
 all : buildall
 
 # Set up basic nvcc options and add CUDA targets from above
-CUFLAGS = -m 64
+ifeq ($(HIP_PLATFORM), nvcc)
+        CUFLAGS = -m 64
+endif
+ifeq ($(HIP_PLATFORM), hcc)
+        CUFLAGS =
+endif
 
 #ifdef CUDA_PATH
 #  ifndef GDK_INCLUDE_PATH
@@ -216,6 +221,10 @@ ifeq ($(HIP_PLATFORM), nvcc)
     LIBS_LIST += nccl
     COMMON_FLAGS += -DUSE_NCCL
   endif
+endif
+
+ifeq ($(HIP_PLATFORM), hcc)
+  LIBS_LIST += hipblas_hcc hip_hcc hiprng_hcc hipsparse_hcc
 endif
 
   ifndef CUB_PATH
