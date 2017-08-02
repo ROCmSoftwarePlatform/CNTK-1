@@ -1,4 +1,4 @@
-// cudalib.cpp -- all CUDA calls (but not hipblas) are encapsulated here
+// hiplib.cpp -- all CUDA calls (but not hipblas) are encapsulated here
 // All actual CUDA API calls go here, to keep the header out of our other headers.
 //
 // F. Seide, V-hansu
@@ -6,8 +6,10 @@
 #define _CRT_SECURE_NO_WARNINGS 1 // so we can use getenv()...
 
 #include "Basics.h"
-#include <cuda_runtime_api.h> // for CUDA API
+#include <hip/hip_runtime_api.h> // for CUDA API
+#ifdef __HIP_PLATFORM_NVCc__
 #include <cuda.h>             // for device API
+#endif
 #include "cudalib.h"
 #include "cudadevice.h"
 #include <string>
@@ -17,31 +19,31 @@
 #undef NOMULTIDEVICE // define this to disable any context/driver stuff
 
 #ifndef NOMULTIDEVICE
-#pragma comment(lib, "cuda.lib") // link CUDA device API
+#pragma comment(lib, "hip.lib") // link CUDA device API
 #endif
-#pragma comment(lib, "cudart.lib") // link CUDA runtime
+#pragma comment(lib, "hiprt.lib") // link CUDA runtime
 #pragma comment(lib, "hipblas.lib")
 
-namespace msra { namespace cuda {
+namespace msra { namespace hip {
 
 static int devicesallocated = -1; // -1 means not initialized
 
-// allows to write cudaFunction() || "error"   (CUDA runtime)
-static void operator||(cudaError_t rc, const char *msg)
+// allows to write hipFunction() || "error"   (CUDA runtime)
+static void operator||(hipError_t rc, const char *msg)
 {
-    if (rc != cudaSuccess)
-        RuntimeError("%s: %s (cuda error %d)", msg, cudaGetErrorString(rc), (int) rc);
+    if (rc != hipSuccess)
+        RuntimeError("%s: %s (hip error %d)", msg, hipGetErrorString(rc), (int) rc);
 }
 
-cudaStream_t GetCurrentStream()
+hipStream_t GetCurrentStream()
 {
-    return cudaStreamDefault;
+    return hipStreamDefault;
 }
 
 // synchronize with ongoing thread
 void join()
 {
-    cudaDeviceSynchronize() || "cudaDeviceSynchronize failed";
+    hipDeviceSynchronize() || "hipDeviceSynchronize failed";
 }
 
 // allocate a stack to store the devices that have been pushed
@@ -58,7 +60,7 @@ void *mallocbytes(size_t nelem, size_t sz)
         {
             // fprintf (stderr, "mallocbytes: allocating %d elements of size %d, %d bytes\n", (int) nelem, (int) sz, (int) (nelem * sz));        // comment out by [v-hansu] to get rid out annoying output
             void *p;
-            cudaMalloc(&p, nelem * sz) || "cudaMalloc failed";
+            hipMalloc(&p, nelem * sz) || "hipMalloc failed";
             return p;
         }
         catch (const std::exception &e)
@@ -72,17 +74,17 @@ void *mallocbytes(size_t nelem, size_t sz)
 
 void freebytes(void *p)
 {
-    cudaFree(p) || "cudaFree failed";
+    hipFree(p) || "hipFree failed";
 }
 
 void memcpyh2d(void *dst, size_t byteoffset, const void *src, size_t nbytes)
 {
-    cudaMemcpy(byteoffset + (char *) dst, src, nbytes, cudaMemcpyHostToDevice) || "cudaMemcpy failed";
+    hipMemcpy(byteoffset + (char *) dst, src, nbytes, hipMemcpyHostToDevice) || "hipMemcpy failed";
 }
 
 void memcpyd2h(void *dst, const void *src, size_t byteoffset, size_t nbytes)
 {
-    cudaMemcpy(dst, byteoffset + (const char *) src, nbytes, cudaMemcpyDeviceToHost) || "cudaMemcpy failed";
+    hipMemcpy(dst, byteoffset + (const char *) src, nbytes, hipMemcpyDeviceToHost) || "hipMemcpy failed";
 }
 };
 };

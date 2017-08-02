@@ -19,10 +19,12 @@
 #include "Config.h" // for ConfigParameters
 #include "ScriptableObjects.h"
 #ifndef CPUONLY
-#pragma comment(lib, "cudart.lib")
-#include <cuda_runtime.h>
+#include <hip/hip_runtime_api.h>
+#ifdef __HIP_PLATFORM_NVCC__
+#pragma comment(lib, "hiprt.lib")
 #include <nvml.h>                // note: expected at "c:\Program Files\NVIDIA Corporation\GDK\gdk_win7_amd64_release\nvml\include" (Windows) and /the path you installed deployment kit/usr/include/nvidia/gdk (Linux)
 #pragma comment(lib, "nvml.lib") // note: expected at "c:\Program Files\NVIDIA Corporation\GDK\gdk_win7_amd64_release\nvml\lib" (Windows) and /the path you installed deployment kit/usr/include/nvidia/gdk (Linux)
+#endif
 #include <vector>
 #else
 int bestGPUDummy = 42; // put something into this CPP, as to avoid a linker warning
@@ -32,7 +34,7 @@ int bestGPUDummy = 42; // put something into this CPP, as to avoid a linker warn
 #ifndef CPUONLY // #define this to disable GPUs
 
 // CUDA-C includes
-#include <cuda.h>
+#include <hip/hip_runtime_api.h>
 #ifdef __WINDOWS__
 #define NOMINMAX
 #include "Windows.h"
@@ -58,11 +60,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 struct ProcessorData
 {
     int cores;
+    #ifdef __HIP_PLATFORM_NVCC__
     nvmlMemory_t memory;
     nvmlUtilization_t utilization;
-    cudaDeviceProp deviceProp;
+    #endif
+    hipDeviceProp_t deviceProp;
     bool mlAppsFound;
-    int deviceId; // the deviceId (cuda side) for this processor
+    int deviceId; // the deviceId (hip side) for this processor
 };
 
 enum BestGpuFlags
@@ -83,7 +87,7 @@ class BestGpu
 private:
     bool m_initialized;       // initialized
     bool m_nvmlData;          // nvml Data is valid
-    bool m_cudaData;          // cuda Data is valid
+    bool m_hipData;          // hip Data is valid
     int m_deviceCount;        // how many devices are available?
     int m_queryCount;         // how many times have we queried the usage counters?
     BestGpuFlags m_lastFlags; // flag state at last query
@@ -91,13 +95,15 @@ private:
     std::vector<ProcessorData*> m_procData;
     int m_allowedDevices; // bitfield of allowed devices
     bool m_disallowCPUDevice;
-    void GetCudaProperties();
+    void GetHipProperties();
+    #ifdef __HIP_PLATFORM_NVCC__
     void GetNvmlData();
     void QueryNvmlData();
+    #endif
 
 public:
     BestGpu()
-        : m_initialized(false), m_nvmlData(false), m_cudaData(false), m_deviceCount(0), m_queryCount(0), m_lastFlags(bestGpuNormal), m_lastCount(0), m_allowedDevices(-1), m_disallowCPUDevice(false)
+        : m_initialized(false), m_nvmlData(false), m_hipData(false), m_deviceCount(0), m_queryCount(0), m_lastFlags(bestGpuNormal), m_lastCount(0), m_allowedDevices(-1), m_disallowCPUDevice(false)
     {
         Init();
     }
@@ -288,7 +294,7 @@ DEVICEID_TYPE DeviceFromConfig(const ConfigParameters& config)
     else                           return SelectDevice((int)val, bLockGPU, excludedDevices);
 }
 
-// !!!!This is from helper_cuda.h which comes with CUDA samples!!!! Consider if it is beneficial to just include all helper_cuda.h
+// !!!!This is from helper_hip.h which comes with CUDA samples!!!! Consider if it is beneficial to just include all helper_hip.h
 // TODO: This is duplicated in GPUMatrix.cu
 // Beginning of GPU Architecture definitions
 inline int _ConvertSMVer2Cores(int major, int minor)
@@ -327,9 +333,9 @@ inline int _ConvertSMVer2Cores(int major, int minor)
     return nGpuArchCoresPerSM[7].Cores;
 }
 
-void BestGpu::GetCudaProperties()
+void BestGpu::GetHipProperties()
 {
-    if (m_cudaData)
+    if (m_hipData)
         return;
 
     int dev = 0;
@@ -337,11 +343,11 @@ void BestGpu::GetCudaProperties()
     for (ProcessorData* pd : m_procData)
     {
         pd->deviceId = dev;
-        cudaGetDeviceProperties(&pd->deviceProp, dev);
+        hipGetDeviceProperties(&pd->deviceProp, dev);
         pd->cores = _ConvertSMVer2Cores(pd->deviceProp.major, pd->deviceProp.minor) * pd->deviceProp.multiProcessorCount;
         dev++;
     }
-    m_cudaData = m_procData.size() > 0;
+    m_hipData = m_procData.size() > 0;
 }
 
 void BestGpu::Init()
@@ -350,11 +356,11 @@ void BestGpu::Init()
         return;
 
     // get the count of objects
-    cudaError_t err = cudaGetDeviceCount(&m_deviceCount);
-    if (err != cudaSuccess)
+    hipError_t err = hipGetDeviceCount(&m_deviceCount);
+    if (err != hipSuccess)
     {
         if (GetMathLibTraceLevel() > 0)
-            fprintf(stderr, "BestGpu::Init() cudaGetDeviceCount failed with the error code %d.\n", (int)err);
+            fprintf(stderr, "BestGpu::Init() hipGetDeviceCount failed with the error code %d.\n", (int)err);
 
         m_deviceCount = 0; // if this fails, we have no GPUs
     }
@@ -369,8 +375,10 @@ void BestGpu::Init()
 
     if (m_deviceCount > 0)
     {
-        GetCudaProperties();
+        GetHipProperties();
+	#ifdef __HIP_PLATFORM_NVCC__
         GetNvmlData();
+	#endif
     }
     m_initialized = true;
 }
@@ -383,6 +391,7 @@ BestGpu::~BestGpu()
     }
     m_procData.clear();
 
+    #ifdef __HIP_PLATFORM_NVCC__
     if (m_nvmlData)
     {
         nvmlReturn_t r = nvmlShutdown();
@@ -391,13 +400,15 @@ BestGpu::~BestGpu()
             RuntimeError("BestGPU Destructor: failed to shut down NVML. \n");
         }
     }
+    #endif
 }
 
 // GetNvmlData - Get data from the Nvidia Management Library
+#ifdef __HIP_PLATFORM_NVCC__
 void BestGpu::GetNvmlData()
 {
     // if we already did this, or we couldn't initialize the CUDA data, skip it
-    if (m_nvmlData || !m_cudaData)
+    if (m_nvmlData || !m_hipData)
         return;
 
     // First initialize NVML library
@@ -409,6 +420,7 @@ void BestGpu::GetNvmlData()
 
     QueryNvmlData();
 }
+#endif
 
 // GetDevice - Determine the best device ID to use
 // bestFlags - flags that modify how the score is calculated
@@ -498,7 +510,9 @@ std::vector<int> BestGpu::GetDevices(int number, BestGpuFlags p_bestFlags)
     }
 
     // get latest data
+    #ifdef __HIP_PLATFORM_NVCC__
     QueryNvmlData();
+    #endif
 
     double utilGpuW = 0.15;
     double utilMemW = 0.1;
@@ -537,10 +551,12 @@ std::vector<int> BestGpu::GetDevices(int number, BestGpuFlags p_bestFlags)
             continue;
 
         // GPU utilization score
+	#ifdef __HIP_PLATFORM_NVCC__
         score = (1.0 - pd->utilization.gpu / 75.0f) * utilGpuW;
         score += (1.0 - pd->utilization.memory / 60.0f) * utilMemW;
         score += pd->cores / 1000.0f * speedW;
-        double mem = pd->memory.total > 0 ? pd->memory.free / (double) pd->memory.total : 1; // I saw this to be 0 when remoted in
+	#endif
+        double mem = 0.0;//TODO:pd->memory.total > 0 ? pd->memory.free / (double) pd->memory.total : 1; // I saw this to be 0 when remoted in
         score += mem * freeMemW;
         score += (pd->mlAppsFound ? 0 : 1) * mlAppRunningW;
         for (int i = 0; i < best.size(); i++)
@@ -640,7 +656,7 @@ GpuData GetGpuData(DEVICEID_TYPE deviceId)
     return GpuData(0, 0, deviceId, 0, GpuValidity::UnknownDevice, "", 0, 0);
 }
 
-// populate a vector with data (id, major/minor version, cuda cores, name and memory) for each gpu device in the machine
+// populate a vector with data (id, major/minor version, hip cores, name and memory) for each gpu device in the machine
 std::vector<GpuData> GetAllGpusData()
 {
     std::vector<GpuData> data;
@@ -660,7 +676,7 @@ std::vector<GpuData> GetAllGpusData()
             validity = GpuValidity::Valid;
 
         size_t totalMemory = pd->deviceProp.totalGlobalMem/(1024*1024); // From bytes to MBytes
-        size_t freeMemory = pd->memory.free / (1024 * 1024); // From bytes to MBytes
+        size_t freeMemory = 0;//TODO:pd->memory.free / (1024 * 1024); // From bytes to MBytes
         GpuData gpuData = GpuData(pd->deviceProp.major, pd->deviceProp.minor, pd->deviceId, pd->cores, validity, string(pd->deviceProp.name), totalMemory, freeMemory);
         data.push_back(gpuData);
     }
@@ -675,9 +691,10 @@ std::vector<ProcessorData*> BestGpu::GetProcessorData()
 
 // QueryNvmlData - Query data from the Nvidia Management Library, and accumulate counters,
 // In case failure, this function simply backs out without filling in the data structure and without setting m_nvmlData.
+#ifdef __HIP_PLATFORM_NVCC__
 void BestGpu::QueryNvmlData()
 {
-    if (!m_cudaData)
+    if (!m_hipData)
         return;
 
     for (int i = 0; i < m_deviceCount; i++)
@@ -774,6 +791,7 @@ void BestGpu::QueryNvmlData()
     m_nvmlData = true;
     return;
 }
+#endif
 
 bool BestGpu::LockDevice(int deviceId, bool trial)
 {
