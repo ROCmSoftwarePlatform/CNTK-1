@@ -7,7 +7,7 @@ ndlMacros = [
     ImageC = 3
     LabelDim = 1000
 
-    features = ImageInput(ImageW, ImageH, ImageC, tag = feature, imageLayout = "cudnn")
+    features = ImageInput(ImageW, ImageH, ImageC, tag = feature, imageLayout = "hipdnn")
     labels = Input(LabelDim, tag = label)
     
     conv1WScale = 0.95
@@ -43,7 +43,7 @@ DNN=[
     pool1H = 3
     pool1hStride = 2
     pool1vStride = 2
-    pool1 = MaxPooling(conv1, pool1W, pool1H, pool1hStride, pool1vStride, imageLayout = "cudnn")
+    pool1 = MaxPooling(conv1, pool1W, pool1H, pool1hStride, pool1vStride, imageLayout = "hipdnn")
 
     # conv2
     kW2 = 5
@@ -59,7 +59,7 @@ DNN=[
     pool2H = 3
     pool2hStride = 2
     pool2vStride = 2
-    pool2 = MaxPooling(conv2, pool2W, pool2H, pool2hStride, pool2vStride, imageLayout = "cudnn")
+    pool2 = MaxPooling(conv2, pool2W, pool2H, pool2hStride, pool2vStride, imageLayout = "hipdnn")
 
     # conv3
     kW3 = 3
@@ -93,7 +93,7 @@ DNN=[
     pool3H = 3
     pool3hStride = 2
     pool3vStride = 2
-    pool3 = MaxPooling(conv5, pool3W, pool3H, pool3hStride, pool3vStride, imageLayout = "cudnn")
+    pool3 = MaxPooling(conv5, pool3W, pool3H, pool3hStride, pool3vStride, imageLayout = "hipdnn")
 
     hiddenDim = 4096
     h1 = DNNImageReLULayer(6, 6, 256, hiddenDim, pool3, fc1WScale, fc1BValue)

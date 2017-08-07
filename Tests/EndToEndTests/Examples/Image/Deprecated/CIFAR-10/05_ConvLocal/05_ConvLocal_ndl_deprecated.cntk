@@ -13,7 +13,7 @@ ndlMacros = "$ConfigDir$/../Macros.ndl"
 
 precision = "float"
 deviceId = 0
-imageLayout = "cudnn"
+imageLayout = "hipdnn"
 # override the above as follows when running on CPU:
 # deviceId = -1
 

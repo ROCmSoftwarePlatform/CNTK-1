@@ -173,7 +173,7 @@ private:
 #pragma warning(push)
 #pragma warning(disable : 4251)
     mutable std::unique_ptr<conc_stack<std::unique_ptr<GPUMatrix<ElemType>>>> m_workspace;
-    mutable std::shared_ptr<CuDnnRNNExecutor<ElemType>> m_rnnExecutor; // for cudnn5 RNN
+    mutable std::shared_ptr<CuDnnRNNExecutor<ElemType>> m_rnnExecutor; // for hipdnn5 RNN
 #pragma warning(pop)
 
 private:
@@ -693,7 +693,7 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
 #define HIPBLAS_CALL(expr)   (CudaCall((expr), #expr, "HIPBLAS",   HIPBLAS_STATUS_SUCCESS))
 #define CUSPARSE_CALL(expr) (CudaCall((expr), #expr, "CUSPARSE", CUSPARSE_STATUS_SUCCESS))
 #define HIPRNG_CALL(expr)   (CudaCall((expr), #expr, "HIPRNG",   HIPRNG_STATUS_SUCCESS))
-#define CUDNN_CALL(expr)    (CudaCall((expr), #expr, "cuDNN",    CUDNN_STATUS_SUCCESS))
-#define CUDNN_CALL2(expr,m) (CudaCall((expr), #expr, "cuDNN",    CUDNN_STATUS_SUCCESS, m))
+#define HIPDNN_CALL(expr)    (CudaCall((expr), #expr, "cuDNN",    HIPDNN_STATUS_SUCCESS))
+#define HIPDNN_CALL2(expr,m) (CudaCall((expr), #expr, "cuDNN",    HIPDNN_STATUS_SUCCESS, m))
 
 #endif // CPUONLY

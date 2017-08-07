@@ -409,7 +409,7 @@ def Convolution(filter_shape,     # shape of receptive field, e.g. (3,3)
     # So we emulate those dimensions on this level. TODO: Once this is suppored by the C++ code, remove the emulation here.
     emulating_output_depth = num_filters == ()
     emulating_input_depth  = reduction_rank == 0
-    # 1D convolution is not supported by cudnn, so we also add a fake dimension.
+    # 1D convolution is not supported by hipdnn, so we also add a fake dimension.
     emulating_1D = False   # len(filter_shape) < 2 # TODO: 1D no longer needs emulation. Remove all related code once it passes Jenkins.
 
     actual_output_channels_shape = num_filters                if not emulating_output_depth else (1,)
@@ -1207,7 +1207,7 @@ def BatchNormalization(map_rank=default_override_or(None),  # if given then norm
     def batch_normalize(x):
         return batch_normalization(x, scale, bias, run_mean, run_variance, running_count=run_count,
                                    spatial=map_rank == 1, normalization_time_constant=normalization_time_constant, blend_time_constant=blend_time_constant, epsilon=epsilon,
-                                   use_cudnn_engine=not use_cntk_engine)
+                                   use_hipdnn_engine=not use_cntk_engine)
 
     return batch_normalize
 

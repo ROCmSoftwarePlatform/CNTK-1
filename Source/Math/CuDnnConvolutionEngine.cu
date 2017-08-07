@@ -12,16 +12,16 @@
 #include "CuDnnCommon.h"
 
 template <>
-const char* CudaErrString<cudnnStatus_t>(cudnnStatus_t x)
+const char* CudaErrString<hipdnnStatus_t>(hipdnnStatus_t x)
 {
-    return cudnnGetErrorString(x);
+    return (const char*)0;//TODO:__add__ hipdnnGetErrorString(x);
 }
 
 // A note on the formats: CNTK originally used NHWC for input/output tensors and CHWN for kernels.
 // Such formats have very limited support in cuDNN and not used in other frameworks.
 // CNTK with cuDNN by default uses NCHW formats for both inputs/outputs and kernels.
-#define TENSOR_FORMAT CUDNN_TENSOR_NCHW
-#define FILTER_FORMAT CUDNN_TENSOR_NCHW
+#define TENSOR_FORMAT HIPDNN_TENSOR_NCHW
+#define FILTER_FORMAT HIPDNN_TENSOR_NCHW
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -33,10 +33,10 @@ static bool IsGpu(DEVICEID_TYPE deviceId)
 class CuDnnKernel
 {
 public:
-    CuDnnKernel(const ConvolveGeometry& geometry, cudnnDataType_t dataType)
+    CuDnnKernel(const ConvolveGeometry& geometry, hipdnnDataType_t dataType)
         : m_kernel(nullptr)
     {
-        CUDNN_CALL(cudnnCreateFilterDescriptor(&m_kernel));
+        HIPDNN_CALL(hipdnnCreateFilterDescriptor(&m_kernel));
         // Set cuDNN kernel dimensions. cuDNN uses row-major format while TensorShape - column-major
         // so conversion is required.
         const auto& filt = geometry.KernelShape();
@@ -53,19 +53,19 @@ public:
         // Set map count(aka K) dimension.
         dims[0] = (int)mapCount;
         dims[1] = (int)filt[filt_size - 1];
-        CUDNN_CALL(cudnnSetFilterNdDescriptor(m_kernel, dataType, FILTER_FORMAT, (int)dim_size, dims.data()));
+        //TODO: __add__ HIPDNN_CALL(hipdnnSetFilterNdDescriptor(m_kernel, dataType, FILTER_FORMAT, (int)dim_size, dims.data()));
     }
 
     ~CuDnnKernel()
     {
         if (m_kernel != nullptr)
         {
-            cudnnDestroyFilterDescriptor(m_kernel);
+            //TODO: __add__ hipdnnDestroyFilterDescriptor(m_kernel);
             m_kernel = nullptr;
         }
     }
 
-    operator cudnnFilterDescriptor_t() const
+    operator hipdnnFilterDescriptor_t() const
     {
         return m_kernel;
     }
@@ -73,16 +73,16 @@ public:
     DISABLE_COPY_AND_MOVE(CuDnnKernel);
 
 private:
-    cudnnFilterDescriptor_t m_kernel;
+    hipdnnFilterDescriptor_t m_kernel;
 };
 
 class CuDnnConv
 {
 public:
-    CuDnnConv(const ConvolveGeometry& geometry, cudnnDataType_t dataType)
+    CuDnnConv(const ConvolveGeometry& geometry, hipdnnDataType_t dataType)
         : m_conv(nullptr)
     {
-        CUDNN_CALL(cudnnCreateConvolutionDescriptor(&m_conv));
+        HIPDNN_CALL(hipdnnCreateConvolutionDescriptor(&m_conv));
         // Set cuDNN convolution parameters. cuDNN uses row-major format while TensorShape - column-major
         // so conversion is required. Also, for 2D convolutions (which have 3D tensor shapes)
         // cuDNN uses 2D descriptors while for 3D convolutions - 3D so we need to ignore
@@ -98,21 +98,21 @@ public:
             pad[dim_size - 1 - i] = geometry.GetLowerPad(i);
         }
         SmallVector<int> upscale(dim_size, 1);
-        CUDNN_CALL(cudnnSetConvolutionNdDescriptor(m_conv, (int)dim_size, pad.data(),
+        /*TODO: __add__ HIPDNN_CALL(hipdnnSetConvolutionNdDescriptor(m_conv, (int)dim_size, pad.data(),
                                                    stride.data(), upscale.data(),
-                                                   CUDNN_CROSS_CORRELATION, dataType));
+                                                   HIPDNN_CROSS_CORRELATION, dataType));*/
     }
 
     ~CuDnnConv()
     {
         if (m_conv != nullptr)
         {
-            cudnnDestroyConvolutionDescriptor(m_conv);
+            hipdnnDestroyConvolutionDescriptor(m_conv);
             m_conv = nullptr;
         }
     }
 
-    operator cudnnConvolutionDescriptor_t() const
+    operator hipdnnConvolutionDescriptor_t() const
     {
         return m_conv;
     }
@@ -120,7 +120,7 @@ public:
     DISABLE_COPY_AND_MOVE(CuDnnConv);
 
 private:
-    cudnnConvolutionDescriptor_t m_conv;
+    hipdnnConvolutionDescriptor_t m_conv;
 };
 
 class CuDnnPool
@@ -131,7 +131,7 @@ public:
     {
         assert(kind == PoolKind::Max || kind == PoolKind::Average);
 
-        CUDNN_CALL(cudnnCreatePoolingDescriptor(&m_pool));
+        HIPDNN_CALL(hipdnnCreatePoolingDescriptor(&m_pool));
         // Set cuDNN pooling parameters. cuDNN uses row-major format while TensorShape - column-major
         // so conversion is required. Same as in convolution descriptor, cuDNN uses 2D descriptors
         // for 3D inputs.
@@ -148,28 +148,28 @@ public:
             stride[dim_size - 1 - i] = (int)geometry.GetStride(i);
             pad[dim_size - 1 - i] = geometry.GetLowerPad(i);
         }
-        cudnnPoolingMode_t poolMode = CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING;
+        hipdnnPoolingMode_t poolMode = HIPDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING;
         if (poolIncludePad)
-            poolMode = CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING;
+            poolMode = HIPDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING;
         // deterministic maxpool is not working when kernel size > stride size in cuDNN. We ignore this flag for now. 
         if (forceDeterministicAlgorithms) {}
-        // Must use CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING to get the same results as in reference engine.
-        CUDNN_CALL(cudnnSetPoolingNdDescriptor(m_pool,
-                                               kind == PoolKind::Max ? CUDNN_POOLING_MAX : poolMode,
-                                               CUDNN_PROPAGATE_NAN,
-                                               (int)dim_size, dims.data(), pad.data(), stride.data()));
+        // Must use HIPDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING to get the same results as in reference engine.
+        /*TODO: __add__ HIPDNN_CALL(hipdnnSetPoolingNdDescriptor(m_pool,
+                                               kind == PoolKind::Max ? HIPDNN_POOLING_MAX : poolMode,
+                                               HIPDNN_PROPAGATE_NAN,
+                                               (int)dim_size, dims.data(), pad.data(), stride.data()));*/
     }
 
     ~CuDnnPool()
     {
         if (m_pool != nullptr)
         {
-            cudnnDestroyPoolingDescriptor(m_pool);
+            hipdnnDestroyPoolingDescriptor(m_pool);
             m_pool = nullptr;
         }
     }
 
-    operator cudnnPoolingDescriptor_t() const
+    operator hipdnnPoolingDescriptor_t() const
     {
         return m_pool;
     }
@@ -177,7 +177,7 @@ public:
     DISABLE_COPY_AND_MOVE(CuDnnPool);
 
 private:
-    cudnnPoolingDescriptor_t m_pool;
+    hipdnnPoolingDescriptor_t m_pool;
 };
 
 enum class AutotuningState : int
@@ -198,7 +198,7 @@ public:
     CuDnnConvolutionEngine(ConvolveGeometryPtr geometry, DEVICEID_TYPE deviceId, ImageLayoutKind imageLayout,
                            size_t maxTempMemSizeInSamples, PoolKind poolKind, bool forceDeterministicAlgorithms, bool poolIncludePad)
         : Base(geometry, deviceId, imageLayout, maxTempMemSizeInSamples, poolKind, poolIncludePad),
-          m_cudnn(CuDnn::Instance()),
+          m_hipdnn(CuDnn::Instance()),
           m_dataType(CuDnnTensor::GetDataType<ElemType>()),
           m_forceDeterministicAlgorithms(forceDeterministicAlgorithms)
     {
@@ -234,7 +234,7 @@ protected:
     void EnsureCompatible() override
     {
         if (m_imageLayout != ImageLayoutKind::CHW)
-            RuntimeError("cuDNN convolution engine supports only CHW/cudnn layout.");
+            RuntimeError("cuDNN convolution engine supports only CHW/hipdnn layout.");
         if (!IsGpu(m_deviceId))
             RuntimeError("cuDNN convolution engine supports GPU devices only.");
     }
@@ -252,23 +252,23 @@ protected:
     {
         size_t batchSize = in.GetNumCols();
         // Find best algo and allocate temp buffer, if needed.
-        auto finder = [&,this](int& calgo, cudnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount]) -> cudnnStatus_t
+        auto finder = [&,this](int& calgo, hipdnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
-            return cudnnFindConvolutionForwardAlgorithmEx(*m_cudnn, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_outT, ptr(out), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+            return hipdnnFindConvolutionForwardAlgorithmEx(*m_hipdnn, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_outT, ptr(out), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
         };
-        // Find max Memory needed while running static finder. Workaround for cudnnFind fail. Number of algo is constant as in cudnn 5.1
-        auto staticFinder = [&,this](cudnnConvolutionFwdAlgo_t& algo, bool noMem) -> cudnnStatus_t
+        // Find max Memory needed while running static finder. Workaround for hipdnnFind fail. Number of algo is constant as in hipdnn 5.1
+        auto staticFinder = [&,this](hipdnnConvolutionFwdAlgo_t& algo, bool noMem) -> hipdnnStatus_t
         {
             if(!noMem)
-                return cudnnGetConvolutionForwardAlgorithm(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, CUDNN_CONVOLUTION_FWD_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
-            return cudnnGetConvolutionForwardAlgorithm(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, CUDNN_CONVOLUTION_FWD_NO_WORKSPACE, 0, &algo);
+                return hipdnnGetConvolutionForwardAlgorithm(*m_hipdnn, m_inT, *m_kernelT, *m_conv, m_outT, HIPDNN_CONVOLUTION_FWD_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
+            return hipdnnGetConvolutionForwardAlgorithm(*m_hipdnn, m_inT, *m_kernelT, *m_conv, m_outT, HIPDNN_CONVOLUTION_FWD_NO_WORKSPACE, 0, &algo);
         };
         // find deterministic algorithm 
-        auto deterministicFinder = [&, this](int& calgo, cudnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount]) -> cudnnStatus_t
+        auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
             auto result = finder(calgo, algoPerf); 
             auto found = std::find_if(algoPerf, algoPerf + calgo,
-                [](const cudnnConvolutionFwdAlgoPerf_t& a) { return a.algo == CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM && a.status == CUDNN_STATUS_SUCCESS; });
+                [](const hipdnnConvolutionFwdAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM && a.status == HIPDNN_STATUS_SUCCESS; });
             if (found == algoPerf + calgo)
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry 
@@ -276,18 +276,18 @@ protected:
             return result;
         };
         // finde workspace size needed to auto-tune all algorithms, as well as the size needed for deterministic algorithm 
-        auto workspaceSizeFinder = [&, this]() -> cudnnStatus_t
+        auto workspaceSizeFinder = [&, this]() -> hipdnnStatus_t
         {
             size_t tmpSize;
-            cudnnStatus_t err = CUDNN_STATUS_EXECUTION_FAILED;
+            hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;
             for (int i = 0; i < MaxAlgoCount; i++)
             {
-                auto err0 = cudnnGetConvolutionForwardWorkspaceSize(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, (cudnnConvolutionFwdAlgo_t)i, &tmpSize);
-                if (err0 == CUDNN_STATUS_SUCCESS)
+                auto err0 = hipdnnGetConvolutionForwardWorkspaceSize(*m_hipdnn, m_inT, *m_kernelT, *m_conv, m_outT, (hipdnnConvolutionFwdAlgo_t)i, &tmpSize);
+                if (err0 == HIPDNN_STATUS_SUCCESS)
                 {
                     if (m_fwdAlgo.AlgoWorkspaceSize < tmpSize)
                         m_fwdAlgo.AlgoWorkspaceSize = tmpSize;
-                    if ((cudnnConvolutionFwdAlgo_t)i == CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM)
+                    if ((hipdnnConvolutionFwdAlgo_t)i == HIPDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM)
                         m_fwdAlgo.DeterministicAlgoWorkspaceSize = tmpSize;
                     err = err0; 
                 }
@@ -296,41 +296,41 @@ protected:
         }; 
         FindBestAlgo(batchSize, m_fwdAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Perform forward convolution operation.
-        CUDNN_CALL(cudnnConvolutionForward(*m_cudnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
+        HIPDNN_CALL(hipdnnConvolutionForward(*m_hipdnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
     }
 
     void BackwardDataCore(const Mat& srcGrad, const Mat& kernel, Mat& grad, bool accumulateGradient, Mat& workspace) override
     {
         size_t batchSize = srcGrad.GetNumCols();
         // Find best algo and allocate temp buffer, if needed.
-        auto finder = [&,this](int& calgo, cudnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount]) -> cudnnStatus_t
+        auto finder = [&,this](int& calgo, hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
-            cudnnStatus_t result;
+            hipdnnStatus_t result;
             if (accumulateGradient)
             {
-                // cudnnFindConvolutionBackwardDataAlgorithmEx will overwrite the output buffer, thus we create a temporary buffer here
+                // hipdnnFindConvolutionBackwardDataAlgorithmEx will overwrite the output buffer, thus we create a temporary buffer here
                 // note this memory allocation might fail, so use try...catch for safety 
                 auto gradReplace = Matrix<ElemType>((grad.BufferSize() + sizeof(ElemType) - 1)/sizeof(ElemType), 1, m_deviceId);
-                result = cudnnFindConvolutionBackwardDataAlgorithmEx(*m_cudnn, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_inT, ptr(gradReplace), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+                result = hipdnnFindConvolutionBackwardDataAlgorithmEx(*m_hipdnn, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_inT, ptr(gradReplace), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
                 gradReplace.ReleaseMemory();
             }
             else
-                result = cudnnFindConvolutionBackwardDataAlgorithmEx(*m_cudnn, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_inT, ptr(grad), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+                result = hipdnnFindConvolutionBackwardDataAlgorithmEx(*m_hipdnn, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_inT, ptr(grad), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
             return result;
         };
-        // Find max Memory needed while running static finder. Workaround for cudnnFind fail. Number of algo is constant as in cudnn 5.1
-        auto staticFinder = [&,this](cudnnConvolutionBwdDataAlgo_t& algo, bool noMem) -> cudnnStatus_t
+        // Find max Memory needed while running static finder. Workaround for hipdnnFind fail. Number of algo is constant as in hipdnn 5.1
+        auto staticFinder = [&,this](hipdnnConvolutionBwdDataAlgo_t& algo, bool noMem) -> hipdnnStatus_t
         {
             if(!noMem)
-                return cudnnGetConvolutionBackwardDataAlgorithm(*m_cudnn, *m_kernelT, m_outT, *m_conv, m_inT, CUDNN_CONVOLUTION_BWD_DATA_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
-            return cudnnGetConvolutionBackwardDataAlgorithm(*m_cudnn, *m_kernelT, m_outT, *m_conv, m_inT, CUDNN_CONVOLUTION_BWD_DATA_NO_WORKSPACE, 0, &algo);
+                return hipdnnGetConvolutionBackwardDataAlgorithm(*m_hipdnn, *m_kernelT, m_outT, *m_conv, m_inT, HIPDNN_CONVOLUTION_BWD_DATA_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
+            return hipdnnGetConvolutionBackwardDataAlgorithm(*m_hipdnn, *m_kernelT, m_outT, *m_conv, m_inT, HIPDNN_CONVOLUTION_BWD_DATA_NO_WORKSPACE, 0, &algo);
         };
         // find deterministic algorithm 
-        auto deterministicFinder = [&, this](int& calgo, cudnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount]) -> cudnnStatus_t
+        auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
             auto result = finder(calgo, algoPerf);
             auto found = std::find_if(algoPerf, algoPerf + calgo,
-                [](const cudnnConvolutionBwdDataAlgoPerf_t& a) { return a.algo == CUDNN_CONVOLUTION_BWD_DATA_ALGO_1 && a.status == CUDNN_STATUS_SUCCESS; });
+                [](const hipdnnConvolutionBwdDataAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_BWD_DATA_ALGO_1 && a.status == HIPDNN_STATUS_SUCCESS; });
             if (found == algoPerf + calgo)
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry 
@@ -338,18 +338,18 @@ protected:
             return result;
         };
         // finde workspace size needed to auto-tune all algorithms, as well as the size needed for deterministic algorithm 
-        auto workspaceSizeFinder = [&, this]() -> cudnnStatus_t
+        auto workspaceSizeFinder = [&, this]() -> hipdnnStatus_t
         {
             size_t tmpSize;
-            cudnnStatus_t err = CUDNN_STATUS_EXECUTION_FAILED;
+            hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;
             for (int i = 0; i < MaxAlgoCount; i++)
             {
-                auto err0 = cudnnGetConvolutionBackwardDataWorkspaceSize(*m_cudnn, *m_kernelT, m_outT, *m_conv, m_inT, (cudnnConvolutionBwdDataAlgo_t)i, &tmpSize);
-                if (err0 == CUDNN_STATUS_SUCCESS)
+                auto err0 = hipdnnGetConvolutionBackwardDataWorkspaceSize(*m_hipdnn, *m_kernelT, m_outT, *m_conv, m_inT, (hipdnnConvolutionBwdDataAlgo_t)i, &tmpSize);
+                if (err0 == HIPDNN_STATUS_SUCCESS)
                 {
                     if (m_backDataAlgo.AlgoWorkspaceSize < tmpSize)
                         m_backDataAlgo.AlgoWorkspaceSize = tmpSize;
-                    if ((cudnnConvolutionBwdDataAlgo_t)i == CUDNN_CONVOLUTION_BWD_DATA_ALGO_1)
+                    if ((hipdnnConvolutionBwdDataAlgo_t)i == HIPDNN_CONVOLUTION_BWD_DATA_ALGO_1)
                         m_backDataAlgo.DeterministicAlgoWorkspaceSize = tmpSize;
                     err = err0; 
                 }
@@ -358,41 +358,41 @@ protected:
         }; 
         FindBestAlgo(batchSize, m_backDataAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Compute gradients with respect to the output tensor (data).
-        CUDNN_CALL(cudnnConvolutionBackwardData(*m_cudnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, ptr(grad)));
+        HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_hipdnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, ptr(grad)));
     }
 
     void BackwardKernelCore(const Mat& srcGrad, const Mat& in, Mat& kernelGrad, bool accumulateGradient, bool /*allowReuse*/, Mat& workspace) override
     {
         size_t batchSize = in.GetNumCols();
         // Find best algo and allocate temp buffer, if needed.
-        auto finder = [&,this](int& calgo, cudnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount]) -> cudnnStatus_t
+        auto finder = [&,this](int& calgo, hipdnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
-            cudnnStatus_t result;
+            hipdnnStatus_t result;
             if (accumulateGradient)
             {
-                // cudnnFindConvolutionBackwardFilterAlgorithmEx will overwrite the output buffer, thus we create a temporary buffer here
+                // hipdnnFindConvolutionBackwardFilterAlgorithmEx will overwrite the output buffer, thus we create a temporary buffer here
                 // note this memory allocation might fail, so use try...catch for safety 
                 auto kernelGradReplace = Matrix<ElemType>((kernelGrad.BufferSize() + sizeof(ElemType) - 1)/sizeof(ElemType), 1, m_deviceId);
-                result = cudnnFindConvolutionBackwardFilterAlgorithmEx(*m_cudnn, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, *m_kernelT, ptr(kernelGradReplace), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+                result = hipdnnFindConvolutionBackwardFilterAlgorithmEx(*m_hipdnn, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, *m_kernelT, ptr(kernelGradReplace), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
                 kernelGradReplace.ReleaseMemory();
             }
             else
-                result = cudnnFindConvolutionBackwardFilterAlgorithmEx(*m_cudnn, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, *m_kernelT, ptr(kernelGrad), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+                result = hipdnnFindConvolutionBackwardFilterAlgorithmEx(*m_hipdnn, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, *m_kernelT, ptr(kernelGrad), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
             return result;
         };
-        // Find max Memory needed while running static finder. Workaround for cudnnFind fail. Number of algo is constant as in cudnn 5.1
-        auto staticFinder = [&,this](cudnnConvolutionBwdFilterAlgo_t& algo, bool noMem) -> cudnnStatus_t
+        // Find max Memory needed while running static finder. Workaround for hipdnnFind fail. Number of algo is constant as in hipdnn 5.1
+        auto staticFinder = [&,this](hipdnnConvolutionBwdFilterAlgo_t& algo, bool noMem) -> hipdnnStatus_t
         {
             if(!noMem)
-                return cudnnGetConvolutionBackwardFilterAlgorithm(*m_cudnn, m_inT, m_outT, *m_conv, *m_kernelT, CUDNN_CONVOLUTION_BWD_FILTER_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
-            return cudnnGetConvolutionBackwardFilterAlgorithm(*m_cudnn, m_inT, m_outT, *m_conv, *m_kernelT, CUDNN_CONVOLUTION_BWD_FILTER_NO_WORKSPACE, 0, &algo);
+                return hipdnnGetConvolutionBackwardFilterAlgorithm(*m_hipdnn, m_inT, m_outT, *m_conv, *m_kernelT, HIPDNN_CONVOLUTION_BWD_FILTER_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
+            return hipdnnGetConvolutionBackwardFilterAlgorithm(*m_hipdnn, m_inT, m_outT, *m_conv, *m_kernelT, HIPDNN_CONVOLUTION_BWD_FILTER_NO_WORKSPACE, 0, &algo);
         };
         // find deterministic algorithm 
-        auto deterministicFinder = [&, this](int& calgo, cudnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount])->cudnnStatus_t
+        auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount])->hipdnnStatus_t
         {
             auto result = finder(calgo, algoPerf); 
             auto found = std::find_if(algoPerf, algoPerf + calgo,
-                [](const cudnnConvolutionBwdFilterAlgoPerf_t& a) { return a.algo == CUDNN_CONVOLUTION_BWD_FILTER_ALGO_1 && a.status == CUDNN_STATUS_SUCCESS; });
+                [](const hipdnnConvolutionBwdFilterAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_1 && a.status == HIPDNN_STATUS_SUCCESS; });
             if (found == algoPerf + calgo)
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry 
@@ -400,18 +400,18 @@ protected:
             return result;
         };
         // finde workspace size needed to auto-tune all algorithms, as well as the size needed for deterministic algorithm 
-        auto workspaceSizeFinder = [&, this]() -> cudnnStatus_t
+        auto workspaceSizeFinder = [&, this]() -> hipdnnStatus_t
         {
             size_t tmpSize;
-            cudnnStatus_t err = CUDNN_STATUS_EXECUTION_FAILED;
+            hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;
             for (int i = 0; i < MaxAlgoCount; i++)
             {
-                auto err0 = cudnnGetConvolutionBackwardFilterWorkspaceSize(*m_cudnn, m_inT, m_outT, *m_conv, *m_kernelT, (cudnnConvolutionBwdFilterAlgo_t)i, &tmpSize);
-                if (err0 == CUDNN_STATUS_SUCCESS)
+                auto err0 = hipdnnGetConvolutionBackwardFilterWorkspaceSize(*m_hipdnn, m_inT, m_outT, *m_conv, *m_kernelT, (hipdnnConvolutionBwdFilterAlgo_t)i, &tmpSize);
+                if (err0 == HIPDNN_STATUS_SUCCESS)
                 {
                     if (m_backFiltAlgo.AlgoWorkspaceSize < tmpSize)
                         m_backFiltAlgo.AlgoWorkspaceSize = tmpSize;
-                    if ((cudnnConvolutionBwdFilterAlgo_t)i == CUDNN_CONVOLUTION_BWD_FILTER_ALGO_1)
+                    if ((hipdnnConvolutionBwdFilterAlgo_t)i == HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_1)
                         m_backFiltAlgo.DeterministicAlgoWorkspaceSize = tmpSize;
                     err = err0; 
                 }
@@ -420,7 +420,7 @@ protected:
         }; 
         FindBestAlgo(batchSize, m_backFiltAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Compute gradients with respect to the output tensor (data).
-        CUDNN_CALL(cudnnConvolutionBackwardFilter(*m_cudnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
+        HIPDNN_CALL(hipdnnConvolutionBackwardFilter(*m_hipdnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
     }
 
     void EnsurePoolingInitialized() override
@@ -434,7 +434,7 @@ protected:
         size_t batchSize = in.GetNumCols();
         m_inT.UpdateBatchSize(batchSize);
         m_outT.UpdateBatchSize(batchSize);
-        CUDNN_CALL(cudnnPoolingForward(*m_cudnn, *(m_pool), &C::One, m_inT, ptr(in), &C::Zero, m_outT, ptr(out)));
+        HIPDNN_CALL(hipdnnPoolingForward(*m_hipdnn, *(m_pool), &C::One, m_inT, ptr(in), &C::Zero, m_outT, ptr(out)));
     }
 
     void BackwardPoolingCore(const Mat& out, const Mat& srcGrad, const Mat& in, Mat& grad) override
@@ -442,7 +442,7 @@ protected:
         size_t batchSize = in.GetNumCols();
         m_inT.UpdateBatchSize(batchSize);
         m_outT.UpdateBatchSize(batchSize);
-        CUDNN_CALL(cudnnPoolingBackward(*m_cudnn, *(m_pool), &C::One, m_outT, ptr(out), m_outT, ptr(srcGrad),
+        HIPDNN_CALL(hipdnnPoolingBackward(*m_hipdnn, *(m_pool), &C::One, m_outT, ptr(out), m_outT, ptr(srcGrad),
                                         m_inT, ptr(in), &C::One, m_inT, ptr(grad)));
     }
 
@@ -493,21 +493,24 @@ private:
         if (algo.autotuningState == AutotuningState::Init)
         {
             // find workspace size needed for finderEx and deterministic algorithm 
-            CUDNN_CALL(workspaceSizeFinder()); 
+            HIPDNN_CALL(workspaceSizeFinder()); 
             if (m_forceDeterministicAlgorithms)
             {
                 workspace.Resize((algo.DeterministicAlgoWorkspaceSize + sizeof(ElemType) - 1) / sizeof(ElemType), 1, 0, false);
-                CUDNN_CALL(deterministicFinder(calgo, algoPerf));
+                HIPDNN_CALL(deterministicFinder(calgo, algoPerf));
                 assert(calgo == 1);                                 // only one deterministic algorithm will be returned 
                 algo.MBSizeForCurrentAlgo = batchSize;
-                algo.selectedAlgo = (*algoPerf).algo;               // deterministic algorithm is the first in the list  
+		hipdnnConvolutionFwdAlgo_t sel_algo;
+		hipdnnStatus_t status_hipdnn;
+		status_hipdnn = cudnnTohipConvolutionFwdAlgo((*algoPerf).algo, &sel_algo);
+                algo.selectedAlgo = sel_algo;               // deterministic algorithm is the first in the list  
                 algo.maxAlgo = algo.selectedAlgo;
                 algo.autotuningState = AutotuningState::Running;    // no further need for tuning since this is deterministic, directly enter running state 
                 algo.AlgoWorkspaceSize = (*algoPerf).memory;
             }
             else
             {
-                CUDNN_CALL(staticFinder(algo.selectedAlgo, true));
+                HIPDNN_CALL(staticFinder(algo.selectedAlgo, true));
                 algo.maxMBSizeSeen = batchSize;
                 algo.MBSizeForCurrentAlgo = batchSize;
                 algo.autotuningState = AutotuningState::PendingTuning;
@@ -541,11 +544,14 @@ private:
 
                 // Pending State now, let's do a find and get algorithm Perfs
                 calgo = 0; 
-                CUDNN_CALL(finder(calgo, algoPerf));
+                HIPDNN_CALL(finder(calgo, algoPerf));
                 assert(calgo > 0); 
                 auto res = algoPerf;        // first returned algorithm is the fastest 
                 algo.MBSizeForCurrentAlgo = batchSize;
-                algo.selectedAlgo = (*res).algo;
+		hipdnnConvolutionFwdAlgo_t sel_algo;
+                hipdnnStatus_t status_hipdnn;
+                status_hipdnn = cudnnTohipConvolutionFwdAlgo((*res).algo, &sel_algo);
+                algo.selectedAlgo = sel.algo;
                 algo.maxAlgo = algo.selectedAlgo;
                 algo.autotuningState = AutotuningState::Running;
                 algo.AlgoWorkspaceSize = (*res).memory;
@@ -561,19 +567,22 @@ private:
                 try
                 {
                     calgo = 0;
-                    CUDNN_CALL(finder(calgo, algoPerf));
+                    HIPDNN_CALL(finder(calgo, algoPerf));
                     assert(calgo > 0);
                     auto res = algoPerf;    // first returned algorithm is the fastest 
                     algo.MBSizeForCurrentAlgo = batchSize;
-                    algo.selectedAlgo = (*res).algo;
+		    hipdnnConvolutionFwdAlgo_t sel_algo;
+                    hipdnnStatus_t status_hipdnn;
+                    status_hipdnn = cudnnTohipConvolutionFwdAlgo((*res).algo, &sel_algo);
+                    algo.selectedAlgo = sel.algo;
                     algo.maxAlgo = algo.selectedAlgo;
                     algo.autotuningState = AutotuningState::Running;
                     algo.AlgoWorkspaceSize = (*res).memory;
                 } 
                 catch (...) 
-                {   // fails again, let's fall back to cudnnGet
+                {   // fails again, let's fall back to hipdnnGet
                     fprintf(stderr, "Fall back to use static finder to get the algorithm for convolution\n");
-                    CUDNN_CALL(staticFinder(algo.selectedAlgo, false));
+                    HIPDNN_CALL(staticFinder(algo.selectedAlgo, false));
                     algo.MBSizeForCurrentAlgo = batchSize;
                     algo.maxAlgo = algo.selectedAlgo;
                     algo.autotuningState = AutotuningState::Running;
@@ -589,7 +598,7 @@ private:
         }
         else    // use fast/static method to get algorithm when batchsize get smaller, assuming workspace size doesn't expand. Avoid severe slowdown when batchsize change frequently
         {
-            CUDNN_CALL(staticFinder(algo.selectedAlgo, false));
+            HIPDNN_CALL(staticFinder(algo.selectedAlgo, false));
             algo.MBSizeForCurrentAlgo = batchSize;
             algo.autotuningState = AutotuningState::Running;
         }
@@ -621,8 +630,8 @@ private:
         size_t AlgoWorkspaceSize;           // maximum workspace size for any algorithm 
         size_t DeterministicAlgoWorkspaceSize;  // workspace size for deterministic algorithm 
         AutotuningState autotuningState;    // state of auto-tuning: Init, PendingTuning and Running 
-        decltype(T::algo) selectedAlgo;     // currently selected algorithm 
-        decltype(T::algo) maxAlgo;          // algorithm that was selected when the current workspace is allocated 
+        decltype(static_cast<hipdnnConvolutionFwdAlgo_t>(T::algo)) selectedAlgo;     // currently selected algorithm 
+        decltype(static_cast<hipdnnConvolutionFwdAlgo_t>(T::algo)) maxAlgo;          // algorithm that was selected when the current workspace is allocated 
 
         bool NeedAutotuning(size_t batchSize)
         {
@@ -637,8 +646,8 @@ private:
         }
     };
 
-    CuDnn::ptr_t m_cudnn;
-    cudnnDataType_t m_dataType;
+    CuDnn::ptr_t m_hipdnn;
+    hipdnnDataType_t m_dataType;
     CuDnnTensor m_inT;
     CuDnnTensor m_outT;
     // Convolution specific.
@@ -647,9 +656,9 @@ private:
     // Pooling specific.
     std::unique_ptr<CuDnnPool> m_pool;
 
-    ConvAlgoInfo<cudnnConvolutionFwdAlgoPerf_t> m_fwdAlgo;
-    ConvAlgoInfo<cudnnConvolutionBwdDataAlgoPerf_t> m_backDataAlgo;
-    ConvAlgoInfo<cudnnConvolutionBwdFilterAlgoPerf_t> m_backFiltAlgo;
+    ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t> m_fwdAlgo;
+    ConvAlgoInfo<hipdnnConvolutionBwdDataAlgoPerf_t> m_backDataAlgo;
+    ConvAlgoInfo<hipdnnConvolutionBwdFilterAlgoPerf_t> m_backFiltAlgo;
 
     // Flag indicating whether only deterministic algorithms should be used.
     bool m_forceDeterministicAlgorithms;

@@ -85,23 +85,23 @@ def _get_rnn_gates(op_type):
     if op_type == 'lstm':
         num_gates = 4
     elif op_type == 'gru':
-        # NOTE that cudnn GRU implementation is different from standard one
+        # NOTE that hipdnn GRU implementation is different from standard one
         # that cell got projection/bias as well before element_times
-        # from CUDNN doc watch out for the difference in h't calculation:
+        # from HIPDNN doc watch out for the difference in h't calculation:
         #
         # it = sigmoid(Wixt + Riht-1 + bWi + bRu)
         # rt = sigmoid(Wrxt + Rrht-1 + bWr + bRr)
         # h't = tanh(Whxt + rt.*(Rhht-1 + bRh) + bWh)
         # ht = (1 - it) .* h't + it .* ht-1
         #
-        # so to convert cudnn to CPU we need a different GRU
+        # so to convert hipdnn to CPU we need a different GRU
         num_gates = 3
     else:
         raise NotImplementedError()
     return num_gates
 
-# return splitter for cudnn param of shape (_inferred, hidden_dim) along _inferred
-def _get_cudnn_rnn_splitter(attr):
+# return splitter for hipdnn param of shape (_inferred, hidden_dim) along _inferred
+def _get_hipdnn_rnn_splitter(attr):
     in_dim = attr.input_dim
     h_dim = attr.hidden_dim
     gates = _get_rnn_gates(attr.op_type)
@@ -127,9 +127,9 @@ def _get_birnn_param(f):
                         bw_b=find_func_param(bw, name='b'))
 
 '''
-cudnn lstm gate is in order of input/forget/mem/output,
+hipdnn lstm gate is in order of input/forget/mem/output,
 while both CNTK and tensorflow is input/mem/forget/output
-the saved model uses CNTK/tensorflow order so cudnn weights needs ajust
+the saved model uses CNTK/tensorflow order so hipdnn weights needs ajust
 NOTE this function is identical to its reverse
 '''            
 def _adjust_lstm_gate_order(W):
@@ -145,10 +145,10 @@ def _adjust_lstm_gate_order(W):
 def _rnn_getter(f, attr):
     if not attr.bidirectional:
         raise NotImplementedError()
-    use_cudnn = (len(f.parameters) == 1) # CNTK has only 1 big fat parameter when using cudnn
-    if use_cudnn:
+    use_hipdnn = (len(f.parameters) == 1) # CNTK has only 1 big fat parameter when using hipdnn
+    if use_hipdnn:
         gates = _get_rnn_gates(attr.op_type)
-        fw_Wt, fw_Ht, bw_Wt, bw_Ht, fw_b1, fw_b2, bw_b1, bw_b2 = np.split(f.parameters[0].value.reshape(-1), _get_cudnn_rnn_splitter(attr))
+        fw_Wt, fw_Ht, bw_Wt, bw_Ht, fw_b1, fw_b2, bw_b1, bw_b2 = np.split(f.parameters[0].value.reshape(-1), _get_hipdnn_rnn_splitter(attr))
         return cstk.RnnArgs(fw_W=_adjust_lstm_gate_order(fw_Wt.reshape(gates*attr.hidden_dim, -1).transpose()),
                             fw_H=_adjust_lstm_gate_order(fw_Ht.reshape(gates*attr.hidden_dim, -1).transpose()),
                             fw_b=_adjust_lstm_gate_order(fw_b1 + fw_b2),
@@ -167,8 +167,8 @@ def _rnn_getter(f, attr):
 def _rnn_setter(f, raw_value, attr):
     if not attr.bidirectional:
         raise NotImplementedError()
-    use_cudnn = (len(f.parameters) == 1)
-    if use_cudnn:
+    use_hipdnn = (len(f.parameters) == 1)
+    if use_hipdnn:
         gates = _get_rnn_gates(attr.op_type)
         _parameter_setter(f.parameters[0], 
                          np.concatenate((_adjust_lstm_gate_order(raw_value.fw_W).transpose().reshape(-1),

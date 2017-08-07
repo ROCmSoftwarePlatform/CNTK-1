@@ -73,7 +73,7 @@ def tf_baseline_lstm():
         ci.reset()
         sess.close()
 
-def test_cntk_cudnn():
+def test_cntk_hipdnn():
     try:
         import tensorflow
         has_tensorflow = True
@@ -95,21 +95,21 @@ def test_cntk_cudnn():
     ci.set_workdir(workdir)
 
     W = C.parameter((-1,dim,), init=C.glorot_uniform())
-    cudnn_fwbw = C.optimized_rnnstack(input_var, W, dim, 1, bidirectional=True, recurrent_op='lstm')
-    ci.watch(cudnn_fwbw, 'cntk_birnn_cudnn', var_type=cstk.RnnAttr,
+    hipdnn_fwbw = C.optimized_rnnstack(input_var, W, dim, 1, bidirectional=True, recurrent_op='lstm')
+    ci.watch(hipdnn_fwbw, 'cntk_birnn_hipdnn', var_type=cstk.RnnAttr,
           attr=cstk.RnnAttr(bidirectional=True, op_type='lstm', input_dim=in_dim, hidden_dim=dim, forget_bias=0))
-    ci.watch(cudnn_fwbw, 'cntk_birnn_cudnn_out')
+    ci.watch(hipdnn_fwbw, 'cntk_birnn_hipdnn_out')
 
-    ci.assign('cntk_birnn_cudnn', load=True, load_name='birnn')
-    assert ci.compare('cntk_birnn_cudnn_out', compare_name='birnn_out', rtol=1e-4, atol=1e-6)
+    ci.assign('cntk_birnn_hipdnn', load=True, load_name='birnn')
+    assert ci.compare('cntk_birnn_hipdnn_out', compare_name='birnn_out', rtol=1e-4, atol=1e-6)
 
-    ci.fetch('cntk_birnn_cudnn', save=True)
-    ci.assign('cntk_birnn_cudnn', load=True)
-    assert ci.compare('cntk_birnn_cudnn_out', compare_name='birnn_out', rtol=1e-4, atol=1e-6)
+    ci.fetch('cntk_birnn_hipdnn', save=True)
+    ci.assign('cntk_birnn_hipdnn', load=True)
+    assert ci.compare('cntk_birnn_hipdnn_out', compare_name='birnn_out', rtol=1e-4, atol=1e-6)
 
     # test assign with value
     num_gates=4
-    ci.assign('cntk_birnn_cudnn', value=cstk.RnnArgs(fw_W=np.random.random((in_dim,num_gates*dim)).astype(np.float32),
+    ci.assign('cntk_birnn_hipdnn', value=cstk.RnnArgs(fw_W=np.random.random((in_dim,num_gates*dim)).astype(np.float32),
                                                      fw_H=np.random.random((dim,num_gates*dim)).astype(np.float32),
                                                      fw_b=np.random.random((num_gates*dim,)).astype(np.float32),
                                                      bw_W=np.random.random((in_dim,num_gates*dim)).astype(np.float32),

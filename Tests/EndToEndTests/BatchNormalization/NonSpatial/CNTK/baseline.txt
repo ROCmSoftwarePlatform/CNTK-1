@@ -3,10 +3,10 @@ CPU info:
     Hardware threads: 8
     Total Memory: 12580436 kB
 -------------------------------------------------------------------
-=== Running /cygdrive/c/jenkins/workspace/CNTK-Test-Windows-W1/x64/release/cntk.exe configFile=C:\jenkins\workspace\CNTK-Test-Windows-W1\Tests\EndToEndTests\BatchNormalization\NonSpatial/01_OneHidden.cntk currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu\TestData RunDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu\TestData ConfigDir=C:\jenkins\workspace\CNTK-Test-Windows-W1\Tests\EndToEndTests\BatchNormalization\NonSpatial OutputDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu DeviceId=0 timestamping=true batchNormalizationEngine=cudnn
+=== Running /cygdrive/c/jenkins/workspace/CNTK-Test-Windows-W1/x64/release/cntk.exe configFile=C:\jenkins\workspace\CNTK-Test-Windows-W1\Tests\EndToEndTests\BatchNormalization\NonSpatial/01_OneHidden.cntk currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu\TestData RunDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu\TestData ConfigDir=C:\jenkins\workspace\CNTK-Test-Windows-W1\Tests\EndToEndTests\BatchNormalization\NonSpatial OutputDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu DeviceId=0 timestamping=true batchNormalizationEngine=hipdnn
 CNTK 2.0.beta6.0+ (HEAD 5f1fab, Dec 15 2016 06:29:34) on cntk-muc01 at 2016/12/15 08:27:27
 
-C:\jenkins\workspace\CNTK-Test-Windows-W1\x64\release\cntk.exe  configFile=C:\jenkins\workspace\CNTK-Test-Windows-W1\Tests\EndToEndTests\BatchNormalization\NonSpatial/01_OneHidden.cntk  currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu\TestData  RunDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu  DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu\TestData  ConfigDir=C:\jenkins\workspace\CNTK-Test-Windows-W1\Tests\EndToEndTests\BatchNormalization\NonSpatial  OutputDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu  DeviceId=0  timestamping=true  batchNormalizationEngine=cudnn
+C:\jenkins\workspace\CNTK-Test-Windows-W1\x64\release\cntk.exe  configFile=C:\jenkins\workspace\CNTK-Test-Windows-W1\Tests\EndToEndTests\BatchNormalization\NonSpatial/01_OneHidden.cntk  currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu\TestData  RunDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu  DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu\TestData  ConfigDir=C:\jenkins\workspace\CNTK-Test-Windows-W1\Tests\EndToEndTests\BatchNormalization\NonSpatial  OutputDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu  DeviceId=0  timestamping=true  batchNormalizationEngine=hipdnn
 Changed current directory to C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu\TestData
 12/15/2016 08:27:27: -------------------------------------------------------------------
 12/15/2016 08:27:27: Build info: 
@@ -20,7 +20,7 @@ Changed current directory to C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161
 12/15/2016 08:27:27: 		Math lib: mkl
 12/15/2016 08:27:27: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 12/15/2016 08:27:27: 		CUB_PATH: c:\src\cub-1.4.1
-12/15/2016 08:27:27: 		CUDNN_PATH: C:\local\cudnn-8.0-windows10-x64-v5.1
+12/15/2016 08:27:27: 		HIPDNN_PATH: C:\local\hipdnn-8.0-windows10-x64-v5.1
 12/15/2016 08:27:27: 		Build Branch: HEAD
 12/15/2016 08:27:27: 		Build SHA1: 5f1fabfe95e68af0787193f8849159f824d914d5 (modified)
 12/15/2016 08:27:27: 		Built by svcphil on liana-08-w
@@ -34,7 +34,7 @@ Changed current directory to C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161
 
 Configuration After Processing and Variable Resolution:
 
-configparameters: 01_OneHidden.cntk:batchNormalizationEngine=cudnn
+configparameters: 01_OneHidden.cntk:batchNormalizationEngine=hipdnn
 configparameters: 01_OneHidden.cntk:command=train:test
 configparameters: 01_OneHidden.cntk:configDir=C:\jenkins\workspace\CNTK-Test-Windows-W1\Tests\EndToEndTests\BatchNormalization\NonSpatial
 configparameters: 01_OneHidden.cntk:currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\BatchNormalization\NonSpatial_CuDNN@release_gpu\TestData

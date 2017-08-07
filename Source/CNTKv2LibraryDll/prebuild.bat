@@ -20,7 +20,7 @@ set p_Configuration=%~1
 set p_CNTK_MKL_SEQUENTIAL=%~2
 set p_CNTK_ENABLE_1BitSGD=%~3
 set p_CudaPath=%~4
-set p_CUDNN_PATH=%~5
+set p_HIPDNN_PATH=%~5
 set p_CUB_PATH=%~6
 set p_CNTK_ENABLE_ASGD=%~7
 
@@ -89,8 +89,8 @@ if not %l_build_target% == CPU-only (
         echo #define _CUDA_PATH_    "!p_CudaPath:\=\\!" >> buildinfo.h$$
     )
 
-    if not "%p_CUDNN_PATH%" == "" (
-        echo #define _CUDNN_PATH_  "%p_CUDNN_PATH:\=\\%" >> buildinfo.h$$
+    if not "%p_HIPDNN_PATH%" == "" (
+        echo #define _HIPDNN_PATH_  "%p_HIPDNN_PATH:\=\\%" >> buildinfo.h$$
     )
 
     if not "%p_CUB_PATH%" == "" (

@@ -27,14 +27,14 @@
   <Import Project="$(SolutionDir)\CNTK.Cpp.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Choose>
-    <When Condition="Exists('$(CUDNN_PATH)')">
+    <When Condition="Exists('$(HIPDNN_PATH)')">
       <PropertyGroup>
         <UseCuDnn>true</UseCuDnn>
-        <CuDnnDefine>USE_CUDNN</CuDnnDefine>
-        <CuDnnIncPath>$(CUDNN_PATH)\include</CuDnnIncPath>
-        <CuDnnLibPath>$(CUDNN_PATH)\lib\x64</CuDnnLibPath>
-        <CuDnnLib>cudnn.lib</CuDnnLib>
-        <CuDnnDll>$(CUDNN_PATH)\bin\cudnn64_*.dll</CuDnnDll>
+        <CuDnnDefine>USE_HIPDNN</CuDnnDefine>
+        <CuDnnIncPath>$(HIPDNN_PATH)\include</CuDnnIncPath>
+        <CuDnnLibPath>$(HIPDNN_PATH)\lib\x64</CuDnnLibPath>
+        <CuDnnLib>hipdnn.lib</CuDnnLib>
+        <CuDnnDll>$(HIPDNN_PATH)\bin\hipdnn64_*.dll</CuDnnDll>
       </PropertyGroup>
     </When>
     <Otherwise>
@@ -210,6 +210,6 @@ xcopy /D /Y "$(CuDnnDll)" "$(OutputPath)"
   </ImportGroup>
   <Target Name="CheckDependencies">
     <Error Condition="!Exists('$(CUB_PATH)')" Text="CNTK requires the NVIDIA CUB library to build. Please see https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Windows#nvidia-cuda-8 for installation instructions." />
-    <Error Condition="!Exists('$(CUDNN_PATH)')" Text="CNTK requires the NVIDIA cuDNN library 5.0 or higher to build. Please see https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Windows#nvidia-cuda-8 for installation instructions." />
+    <Error Condition="!Exists('$(HIPDNN_PATH)')" Text="CNTK requires the NVIDIA cuDNN library 5.0 or higher to build. Please see https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Windows#nvidia-cuda-8 for installation instructions." />
   </Target>
 </Project>

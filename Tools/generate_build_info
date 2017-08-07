@@ -14,7 +14,7 @@
 #   MATHLIB         (MKL)
 #   CUDA_PATH       (if exists, i.e., for GPU builds)
 #   CUB_PATH        (if exists, i.e., for GPU builds)
-#   CUDNN_PATH      (if exists, i.e., only for GPU builds)
+#   HIPDNN_PATH      (if exists, i.e., only for GPU builds)
 #   GIT_COMMIT      (SHA1, and whether working directory is modified)
 #   GTT_BRANCH      (the current branch)
 #   BUILDER         (user under which the build was done)
@@ -79,8 +79,8 @@ makebuildinfo()
         if [ ! -z "$CUB_PATH" ]; then
             printf "#define _CUB_PATH_ \"%s\"\n"  "$CUB_PATH"
         fi
-        if [ ! -z "$CUDNN_PATH" ]; then
-            printf "#define _CUDNN_PATH_ \"%s\"\n"  $CUDNN_PATH
+        if [ ! -z "$HIPDNN_PATH" ]; then
+            printf "#define _HIPDNN_PATH_ \"%s\"\n"  $HIPDNN_PATH
         fi
         printf "#define _BUILDTYPE_ \"%s\"\n" "$BUILDTYPE"
         if [ ! -z "$WITH_1BITSGD" ]; then

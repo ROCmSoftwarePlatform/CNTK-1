@@ -21,7 +21,7 @@ Changed current directory to C:\cygwin64\tmp\cntk-test-20161220114426.791596\Exa
 12/20/2016 19:44:31: 		Math lib: mkl
 12/20/2016 19:44:31: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 12/20/2016 19:44:31: 		CUB_PATH: C:\src\cub-1.4.1
-12/20/2016 19:44:31: 		CUDNN_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
+12/20/2016 19:44:31: 		HIPDNN_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 12/20/2016 19:44:31: 		Build Branch: chazhang/rmse
 12/20/2016 19:44:31: 		Build SHA1: 8f552eb944007e43031ebd259ba4d6d998b2658a (modified)
 12/20/2016 19:44:31: 		Built by chazhang on CHAZHANG

@@ -813,12 +813,12 @@ private:
 
 // image layouts used in CNTK
 // Nodes that do semantic interpretation of width, height, channel information must know which index they are in.
-// Eventually this can go away once we switch completely to cudnn layout.
-// The cudnn layout is actually our layout in order W,H,C.
+// Eventually this can go away once we switch completely to hipdnn layout.
+// The hipdnn layout is actually our layout in order W,H,C.
 enum ImageLayoutKind
 {
     HWC, // legacy; default for NDL
-    CHW  // cudnn; default for BrainScript
+    CHW  // hipdnn; default for BrainScript
 };
 static inline std::string ToString(ImageLayoutKind imageLayoutKind)
 {
@@ -831,12 +831,12 @@ static inline std::string ToString(ImageLayoutKind imageLayoutKind)
 }
 static inline ImageLayoutKind ImageLayoutKindFrom(const wstring& s)
 {
-    if (s == L"CHW" || s == L"cudnn")
+    if (s == L"CHW" || s == L"hipdnn")
         return ImageLayoutKind::CHW;
     else if (s == L"HWC" || s == L"legacy")
         return ImageLayoutKind::HWC;
     else
-        InvalidArgument("ImageLayoutKindFrom: Unknown ImageLayoutKind '%ls', must be 'CHW' (cudnn) or 'HWC' (CNTK legacy)", s.c_str());
+        InvalidArgument("ImageLayoutKindFrom: Unknown ImageLayoutKind '%ls', must be 'CHW' (hipdnn) or 'HWC' (CNTK legacy)", s.c_str());
 }
 
 // interpret TensorShape as an image descriptor

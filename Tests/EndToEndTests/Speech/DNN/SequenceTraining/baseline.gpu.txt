@@ -20,7 +20,7 @@ Changed current directory to /tmp/cntk-test-20161220160002.370246/Speech/DNN_Seq
 12/20/2016 16:01:53: 		Math lib: mkl
 12/20/2016 16:01:53: 		CUDA_PATH: /usr/local/cuda-8.0
 12/20/2016 16:01:53: 		CUB_PATH: /usr/local/cub-1.4.1
-12/20/2016 16:01:53: 		CUDNN_PATH: /usr/local
+12/20/2016 16:01:53: 		HIPDNN_PATH: /usr/local
 12/20/2016 16:01:53: 		Build Branch: HEAD
 12/20/2016 16:01:53: 		Build SHA1: bf0ca998cd077aa28c04371fd2093770e819ffd0
 12/20/2016 16:01:53: 		Built by Source/CNTK/buildinfo.h$$0 on b4b39bc07965

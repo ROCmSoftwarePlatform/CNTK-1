@@ -15,7 +15,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: c:\src\cub-1.4.1
-		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
+		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
 		Build Branch: HEAD
 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 		Built by svcphil on Philly-Pool1
@@ -34,7 +34,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: c:\src\cub-1.4.1
-		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
+		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
 		Build Branch: HEAD
 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 		Built by svcphil on Philly-Pool1
@@ -53,7 +53,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: c:\src\cub-1.4.1
-		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
+		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
 		Build Branch: HEAD
 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 		Built by svcphil on Philly-Pool1
@@ -97,7 +97,7 @@ MPI Rank 0: 08/16/2016 03:19:18: 		With 1bit-SGD: yes
 MPI Rank 0: 08/16/2016 03:19:18: 		Math lib: mkl
 MPI Rank 0: 08/16/2016 03:19:18: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 MPI Rank 0: 08/16/2016 03:19:18: 		CUB_PATH: c:\src\cub-1.4.1
-MPI Rank 0: 08/16/2016 03:19:18: 		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
+MPI Rank 0: 08/16/2016 03:19:18: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
 MPI Rank 0: 08/16/2016 03:19:18: 		Build Branch: HEAD
 MPI Rank 0: 08/16/2016 03:19:18: 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 MPI Rank 0: 08/16/2016 03:19:18: 		Built by svcphil on Philly-Pool1
@@ -653,7 +653,7 @@ MPI Rank 1: 08/16/2016 03:19:18: 		With 1bit-SGD: yes
 MPI Rank 1: 08/16/2016 03:19:18: 		Math lib: mkl
 MPI Rank 1: 08/16/2016 03:19:18: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 MPI Rank 1: 08/16/2016 03:19:18: 		CUB_PATH: c:\src\cub-1.4.1
-MPI Rank 1: 08/16/2016 03:19:18: 		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
+MPI Rank 1: 08/16/2016 03:19:18: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
 MPI Rank 1: 08/16/2016 03:19:18: 		Build Branch: HEAD
 MPI Rank 1: 08/16/2016 03:19:18: 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 MPI Rank 1: 08/16/2016 03:19:18: 		Built by svcphil on Philly-Pool1
@@ -1206,7 +1206,7 @@ MPI Rank 2: 08/16/2016 03:19:19: 		With 1bit-SGD: yes
 MPI Rank 2: 08/16/2016 03:19:19: 		Math lib: mkl
 MPI Rank 2: 08/16/2016 03:19:19: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 MPI Rank 2: 08/16/2016 03:19:19: 		CUB_PATH: c:\src\cub-1.4.1
-MPI Rank 2: 08/16/2016 03:19:19: 		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
+MPI Rank 2: 08/16/2016 03:19:19: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
 MPI Rank 2: 08/16/2016 03:19:19: 		Build Branch: HEAD
 MPI Rank 2: 08/16/2016 03:19:19: 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 MPI Rank 2: 08/16/2016 03:19:19: 		Built by svcphil on Philly-Pool1

@@ -29,7 +29,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 //     - output : [K x W' x H'     x T]  or  ARRAY[1..T] OF                ARRAY[1..H'] OF ARRAY[1..W'] OF ARRAY[1..K]
 //     - filter : [K x W" x H" x C    ]  or                 ARRAY[1..C] OF ARRAY[1..H"] OF ARRAY[1..W"] OF ARRAY[1..K]
 //
-// * cudnn ("CHW") mode (works both GPU and CPU): Channels are planes
+// * hipdnn ("CHW") mode (works both GPU and CPU): Channels are planes
 //
 //     - input :   [W  x H  x C      x T]   or  ARRAY[1..T] OF                ARRAY[1..C]  OF ARRAY[1..H]  OF ARRAY[1..W]
 //     - output :  [W' x H' x      K x T]   or  ARRAY[1..T] OF ARRAY[1..K] OF                 ARRAY[1..H'] OF ARRAY[1..W']
@@ -44,7 +44,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 //     - for hidden layer: dimension of activation vector for each pixel
 //  - K = output channels = dimension of activation vector for each pixel (also called N by NVidia, inconsistently)
 //
-// For ND-convolution/pooling only second format ('cudnn') is supported.
+// For ND-convolution/pooling only second format ('hipdnn') is supported.
 // 
 template <class ElemType>
 class ConvolutionNodeBase : public ComputationNode<ElemType>
@@ -915,7 +915,7 @@ public:
         {
             InvalidArgument(
                 "%ls %ls supports only cuDNN (CHW) data layout. "
-                "Please specify imageLayout=\"cudnn\" in %ls node in your script "
+                "Please specify imageLayout=\"hipdnn\" in %ls node in your script "
                 "and make sure input data layout is CHW", NodeName().c_str(), OperationName().c_str(), NodeName().c_str());
         }
 
@@ -1033,7 +1033,7 @@ public:
         {
             InvalidArgument(
                 "%ls %ls supports only cuDNN (CHW) data layout. "
-                "Please specify imageLayout=\"cudnn\" in %ls node in your script "
+                "Please specify imageLayout=\"hipdnn\" in %ls node in your script "
                 "and make sure input data layout is CHW", NodeName().c_str(), OperationName().c_str(), NodeName().c_str());
         }
 

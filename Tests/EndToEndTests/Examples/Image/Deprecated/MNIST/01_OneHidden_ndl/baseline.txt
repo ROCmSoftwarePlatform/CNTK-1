@@ -20,7 +20,7 @@ Changed current directory to D:\GitHub\CNTK\Examples\Image\DataSets\MNIST
 09/29/2016 22:45:57: 		Math lib: mkl
 09/29/2016 22:45:57: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 09/29/2016 22:45:57: 		CUB_PATH: C:\src\cub-1.4.1
-09/29/2016 22:45:57: 		CUDNN_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
+09/29/2016 22:45:57: 		HIPDNN_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 09/29/2016 22:45:57: 		Build Branch: chazhang/image_examples
 09/29/2016 22:45:57: 		Build SHA1: e04f125298711fdaab8c60371888c62896780ffe (modified)
 09/29/2016 22:45:57: 		Built by chazhang on CHAZHANG
@@ -92,7 +92,7 @@ labelDim = 10
         outputNodes     = (z)
     ]
     NDLNetworkBuilder = [
-        imageLayout = "cudnn"
+        imageLayout = "hipdnn"
         initOnCPUOnly = true
         ndlMacros = "D:\GitHub\CNTK\Tests\EndToEndTests\Examples\Image\Deprecated\MNIST\01_OneHidden_ndl/../Macros.ndl"
         networkDescription = "D:\GitHub\CNTK\Tests\EndToEndTests\Examples\Image\Deprecated\MNIST\01_OneHidden_ndl/01_OneHidden.ndl"

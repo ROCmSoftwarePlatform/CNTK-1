@@ -27,7 +27,7 @@ MPI Rank 0: 12/21/2016 05:28:27: 		With ASGD: yes
 MPI Rank 0: 12/21/2016 05:28:27: 		Math lib: mkl
 MPI Rank 0: 12/21/2016 05:28:27: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 MPI Rank 0: 12/21/2016 05:28:27: 		CUB_PATH: c:\src\cub-1.4.1
-MPI Rank 0: 12/21/2016 05:28:27: 		CUDNN_PATH: C:\local\cudnn-8.0-windows10-x64-v5.1
+MPI Rank 0: 12/21/2016 05:28:27: 		HIPDNN_PATH: C:\local\hipdnn-8.0-windows10-x64-v5.1
 MPI Rank 0: 12/21/2016 05:28:27: 		Build Branch: HEAD
 MPI Rank 0: 12/21/2016 05:28:27: 		Build SHA1: 0a2e20ddce32ca3cd458ef0358757e1489d9afe3 (modified)
 MPI Rank 0: 12/21/2016 05:28:27: 		Built by svcphil on LIANA-09-w
@@ -892,7 +892,7 @@ MPI Rank 1: 12/21/2016 05:28:28: 		With ASGD: yes
 MPI Rank 1: 12/21/2016 05:28:28: 		Math lib: mkl
 MPI Rank 1: 12/21/2016 05:28:28: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 MPI Rank 1: 12/21/2016 05:28:28: 		CUB_PATH: c:\src\cub-1.4.1
-MPI Rank 1: 12/21/2016 05:28:28: 		CUDNN_PATH: C:\local\cudnn-8.0-windows10-x64-v5.1
+MPI Rank 1: 12/21/2016 05:28:28: 		HIPDNN_PATH: C:\local\hipdnn-8.0-windows10-x64-v5.1
 MPI Rank 1: 12/21/2016 05:28:28: 		Build Branch: HEAD
 MPI Rank 1: 12/21/2016 05:28:28: 		Build SHA1: 0a2e20ddce32ca3cd458ef0358757e1489d9afe3 (modified)
 MPI Rank 1: 12/21/2016 05:28:28: 		Built by svcphil on LIANA-09-w

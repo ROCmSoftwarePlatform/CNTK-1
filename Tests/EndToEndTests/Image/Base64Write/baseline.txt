@@ -21,7 +21,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 		CUB_PATH: c:\local\cub-1.4.1
-		CUDNN_PATH: c:\local\cudnn-8.0-v5.1\cuda
+		HIPDNN_PATH: c:\local\hipdnn-8.0-v5.1\cuda
 		Build Branch: eldak/writeBase64Warning
 		Build SHA1: 86aa59812995ef8b783b2b8bb9cf88b08ab67d06
 		Built by eldak on ELDAK-0

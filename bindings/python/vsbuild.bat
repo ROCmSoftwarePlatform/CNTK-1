@@ -95,7 +95,7 @@ if exist Cntk.Deserializers.Image-%CNTK_COMPONENT_VERSION%.dll for %%D in (
 if /i %p_GpuBuild% equ true for %%D in (
   hipblas64_*.dll
   cudart64_*.dll
-  cudnn64_*.dll
+  hipdnn64_*.dll
   hiprng64_*.dll
   cusparse64_*.dll
   nvml.dll

@@ -66,9 +66,9 @@ TrainFCN8 = [
         bnTimeConst = 15992
 
         # Network inputs.
-        features = ImageInput(imageWidth, imageHeight, imageChannels, imageLayout = "cudnn", tag = 'feature')
-        labels = ImageInput(imageWidth, imageHeight, classCount, imageLayout = "cudnn", tag = 'label')
-        ignoreMask = ImageInput(imageWidth, imageHeight, 1, imageLayout = "cudnn", tag = 'feature')
+        features = ImageInput(imageWidth, imageHeight, imageChannels, imageLayout = "hipdnn", tag = 'feature')
+        labels = ImageInput(imageWidth, imageHeight, classCount, imageLayout = "hipdnn", tag = 'label')
+        ignoreMask = ImageInput(imageWidth, imageHeight, 1, imageLayout = "hipdnn", tag = 'feature')
 
         # Shallow (FCN4) features
         featuresFCN4 = Sequential(

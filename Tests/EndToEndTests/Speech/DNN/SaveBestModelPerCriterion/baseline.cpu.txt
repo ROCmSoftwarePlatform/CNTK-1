@@ -37,7 +37,7 @@ MPI Rank 0: 04/13/2017 12:44:12: 		With ASGD: yes
 MPI Rank 0: 04/13/2017 12:44:12: 		Math lib: mkl
 MPI Rank 0: 04/13/2017 12:44:12: 		CUDA_PATH: /usr/local/cuda-8.0
 MPI Rank 0: 04/13/2017 12:44:12: 		CUB_PATH: /usr/local/cub-1.4.1
-MPI Rank 0: 04/13/2017 12:44:12: 		CUDNN_PATH: /usr/local/cudnn-5.1
+MPI Rank 0: 04/13/2017 12:44:12: 		HIPDNN_PATH: /usr/local/hipdnn-5.1
 MPI Rank 0: 04/13/2017 12:44:12: 		Build Branch: HEAD
 MPI Rank 0: 04/13/2017 12:44:12: 		Build SHA1: e354ea5b2ef2cb39db9f24ea5cd091b4c3637803
 MPI Rank 0: 04/13/2017 12:44:12: 		Built by Source/CNTK/buildinfo.h$$0 on 6d6cbd508175
@@ -403,7 +403,7 @@ MPI Rank 1: 04/13/2017 12:44:13: 		With ASGD: yes
 MPI Rank 1: 04/13/2017 12:44:13: 		Math lib: mkl
 MPI Rank 1: 04/13/2017 12:44:13: 		CUDA_PATH: /usr/local/cuda-8.0
 MPI Rank 1: 04/13/2017 12:44:13: 		CUB_PATH: /usr/local/cub-1.4.1
-MPI Rank 1: 04/13/2017 12:44:13: 		CUDNN_PATH: /usr/local/cudnn-5.1
+MPI Rank 1: 04/13/2017 12:44:13: 		HIPDNN_PATH: /usr/local/hipdnn-5.1
 MPI Rank 1: 04/13/2017 12:44:13: 		Build Branch: HEAD
 MPI Rank 1: 04/13/2017 12:44:13: 		Build SHA1: e354ea5b2ef2cb39db9f24ea5cd091b4c3637803
 MPI Rank 1: 04/13/2017 12:44:13: 		Built by Source/CNTK/buildinfo.h$$0 on 6d6cbd508175
@@ -772,7 +772,7 @@ MPI Rank 0: 04/13/2017 12:52:15: 		With ASGD: yes
 MPI Rank 0: 04/13/2017 12:52:15: 		Math lib: mkl
 MPI Rank 0: 04/13/2017 12:52:15: 		CUDA_PATH: /usr/local/cuda-8.0
 MPI Rank 0: 04/13/2017 12:52:15: 		CUB_PATH: /usr/local/cub-1.4.1
-MPI Rank 0: 04/13/2017 12:52:15: 		CUDNN_PATH: /usr/local/cudnn-5.1
+MPI Rank 0: 04/13/2017 12:52:15: 		HIPDNN_PATH: /usr/local/hipdnn-5.1
 MPI Rank 0: 04/13/2017 12:52:15: 		Build Branch: HEAD
 MPI Rank 0: 04/13/2017 12:52:15: 		Build SHA1: e354ea5b2ef2cb39db9f24ea5cd091b4c3637803
 MPI Rank 0: 04/13/2017 12:52:15: 		Built by Source/CNTK/buildinfo.h$$0 on 6d6cbd508175
@@ -861,7 +861,7 @@ MPI Rank 1: 04/13/2017 12:52:15: 		With ASGD: yes
 MPI Rank 1: 04/13/2017 12:52:15: 		Math lib: mkl
 MPI Rank 1: 04/13/2017 12:52:15: 		CUDA_PATH: /usr/local/cuda-8.0
 MPI Rank 1: 04/13/2017 12:52:15: 		CUB_PATH: /usr/local/cub-1.4.1
-MPI Rank 1: 04/13/2017 12:52:15: 		CUDNN_PATH: /usr/local/cudnn-5.1
+MPI Rank 1: 04/13/2017 12:52:15: 		HIPDNN_PATH: /usr/local/hipdnn-5.1
 MPI Rank 1: 04/13/2017 12:52:15: 		Build Branch: HEAD
 MPI Rank 1: 04/13/2017 12:52:15: 		Build SHA1: e354ea5b2ef2cb39db9f24ea5cd091b4c3637803
 MPI Rank 1: 04/13/2017 12:52:15: 		Built by Source/CNTK/buildinfo.h$$0 on 6d6cbd508175

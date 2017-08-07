@@ -15,7 +15,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: /usr/local/cuda-7.5
 		CUB_PATH: /usr/local/cub-1.4.1
-		CUDNN_PATH: /usr/local/cudnn-4.0
+		HIPDNN_PATH: /usr/local/hipdnn-4.0
 		Build Branch: HEAD
 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 		Built by philly on 643085f7f8c2
@@ -33,7 +33,7 @@ Changed current directory to /home/philly/data/CNTKTestData/Speech/ASR
 08/16/2016 10:14:18: 		Math lib: mkl
 08/16/2016 10:14:18: 		CUDA_PATH: /usr/local/cuda-7.5
 08/16/2016 10:14:18: 		CUB_PATH: /usr/local/cub-1.4.1
-08/16/2016 10:14:18: 		CUDNN_PATH: /usr/local/cudnn-4.0
+08/16/2016 10:14:18: 		HIPDNN_PATH: /usr/local/hipdnn-4.0
 08/16/2016 10:14:18: 		Build Branch: HEAD
 08/16/2016 10:14:18: 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 08/16/2016 10:14:18: 		Built by philly on 643085f7f8c2
@@ -3644,7 +3644,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: /usr/local/cuda-7.5
 		CUB_PATH: /usr/local/cub-1.4.1
-		CUDNN_PATH: /usr/local/cudnn-4.0
+		HIPDNN_PATH: /usr/local/hipdnn-4.0
 		Build Branch: HEAD
 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 		Built by philly on 643085f7f8c2
@@ -3662,7 +3662,7 @@ Changed current directory to /home/philly/data/CNTKTestData/Speech/ASR
 08/16/2016 10:16:50: 		Math lib: mkl
 08/16/2016 10:16:50: 		CUDA_PATH: /usr/local/cuda-7.5
 08/16/2016 10:16:50: 		CUB_PATH: /usr/local/cub-1.4.1
-08/16/2016 10:16:50: 		CUDNN_PATH: /usr/local/cudnn-4.0
+08/16/2016 10:16:50: 		HIPDNN_PATH: /usr/local/hipdnn-4.0
 08/16/2016 10:16:50: 		Build Branch: HEAD
 08/16/2016 10:16:50: 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 08/16/2016 10:16:50: 		Built by philly on 643085f7f8c2

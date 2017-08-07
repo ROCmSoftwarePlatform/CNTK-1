@@ -21,7 +21,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 		CUB_PATH: C:\src\cub-1.4.1
-		CUDNN_PATH: C:\local\cudnn-8.0-v5.1\cuda
+		HIPDNN_PATH: C:\local\hipdnn-8.0-v5.1\cuda
 		Build Branch: chazhang/asym
 		Build SHA1: 937c03c0f998ee7c913884c3d35647a9bfda2845 (modified)
 		Built by chazhang on CHAZHANG

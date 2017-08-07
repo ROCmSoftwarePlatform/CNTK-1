@@ -158,7 +158,7 @@ protected:
     void EnsureCompatible() override
     {
         if (m_imageLayout != ImageLayoutKind::CHW)
-            RuntimeError("Reference convolution engine supports only CHW/cudnn layout.");
+            RuntimeError("Reference convolution engine supports only CHW/hipdnn layout.");
     }
 
     void EnsureConvolutionInitialized() override
@@ -586,7 +586,7 @@ protected:
     void EnsureCompatible() override
     {
         if (m_imageLayout != ImageLayoutKind::CHW)
-            LogicError("GEMM convolution engine supports only CHW/cudnn layout.");
+            LogicError("GEMM convolution engine supports only CHW/hipdnn layout.");
         if (IsGpu(m_deviceId))
             LogicError("GEMM convolution engine currently supports only CPU device.");
     }
@@ -641,7 +641,7 @@ protected:
             unrolledInput.SetValue(0);
             inputSlice.UnrollConvolutionInput(unrollCols, mapOutSize, m_mpRowCol, *m_mpRowRun, *m_runs, unrolledInput);
 
-            // cudnn layout uses row-major kernel weight matrix.
+            // hipdnn layout uses row-major kernel weight matrix.
             auto kern = kernel.ColumnSlice(0, kernel.GetNumCols());
             kern.Reshape(unrollCols, kernel.GetNumElements()/unrollCols);
 
@@ -716,7 +716,7 @@ protected:
 
         auto kern = kernel.ColumnSlice(0, kernel.GetNumCols());
         size_t kernTCols = kernT.GetNumElements(); 
-        // cudnn layout uses row-major kernel weight matrix.
+        // hipdnn layout uses row-major kernel weight matrix.
         kern.Reshape(kernTCols, kernCols/kernTCols);
         // Now transpose and reshape to [KXY x C].
         auto kernTran = workspace.ColumnSlice(0, kernCols);
@@ -835,7 +835,7 @@ protected:
             unrolledInputSlice.SetValue(0);
             inputSlice.UnrollConvolutionInputForKernelBackprop(mapOutSize, m_mpRowCol, *m_mpRowRun, *m_runs, unrolledInputSlice);
 
-            // cudnn layout uses row-major kernel weight matrix.
+            // hipdnn layout uses row-major kernel weight matrix.
             auto kernGrad = kernelGrad.ColumnSlice(0, kernelGrad.GetNumCols());
             kernGrad.Reshape(unrollRows, kernGrad.GetNumElements() / unrollRows); 
             // 3. Multiply.

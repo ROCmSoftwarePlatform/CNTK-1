@@ -20,7 +20,7 @@ Changed current directory to C:\jenkins\workspace\CNTK-Test-Windows-SlaveTest\Te
 01/23/2017 13:42:35: 		Math lib: mkl
 01/23/2017 13:42:35: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 01/23/2017 13:42:35: 		CUB_PATH: c:\src\cub-1.4.1
-01/23/2017 13:42:35: 		CUDNN_PATH: C:\local\cudnn-8.0-windows10-x64-v5.1
+01/23/2017 13:42:35: 		HIPDNN_PATH: C:\local\hipdnn-8.0-windows10-x64-v5.1
 01/23/2017 13:42:35: 		Build Branch: HEAD
 01/23/2017 13:42:35: 		Build SHA1: d15bec5a5bee9dd08c2c19c9d6befd7b5b4a0feb (modified)
 01/23/2017 13:42:35: 		Built by svcphil on LIANA-09-w
@@ -929,7 +929,7 @@ Changed current directory to C:\jenkins\workspace\CNTK-Test-Windows-SlaveTest\Te
 01/23/2017 13:42:42: 		Math lib: mkl
 01/23/2017 13:42:42: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 01/23/2017 13:42:42: 		CUB_PATH: c:\src\cub-1.4.1
-01/23/2017 13:42:42: 		CUDNN_PATH: C:\local\cudnn-8.0-windows10-x64-v5.1
+01/23/2017 13:42:42: 		HIPDNN_PATH: C:\local\hipdnn-8.0-windows10-x64-v5.1
 01/23/2017 13:42:42: 		Build Branch: HEAD
 01/23/2017 13:42:42: 		Build SHA1: d15bec5a5bee9dd08c2c19c9d6befd7b5b4a0feb (modified)
 01/23/2017 13:42:42: 		Built by svcphil on LIANA-09-w

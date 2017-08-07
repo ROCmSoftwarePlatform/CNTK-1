@@ -15,7 +15,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: c:\src\cub-1.4.1
-		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
+		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
 		Build Branch: HEAD
 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 		Built by svcphil on Philly-Pool3
@@ -34,7 +34,7 @@ Changed current directory to C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160
 08/16/2016 03:02:05: 		Math lib: mkl
 08/16/2016 03:02:05: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 08/16/2016 03:02:05: 		CUB_PATH: c:\src\cub-1.4.1
-08/16/2016 03:02:05: 		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
+08/16/2016 03:02:05: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
 08/16/2016 03:02:05: 		Build Branch: HEAD
 08/16/2016 03:02:05: 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 08/16/2016 03:02:05: 		Built by svcphil on Philly-Pool3
@@ -64,7 +64,7 @@ ModelDir = "$OutputDir$/Models"
 ndlMacros = "$ConfigDir$/Macros.ndl"
 precision = "float"
 deviceId = 0
-imageLayout = "cudnn"
+imageLayout = "hipdnn"
 initOnCPUOnly=true
 command = Train:Test
 modelPath = "$ModelDir$/01_Convolution"
@@ -140,7 +140,7 @@ ModelDir = "C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\
 ndlMacros = "C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\Miscellaneous\CIFAR-10/Macros.ndl"
 precision = "float"
 deviceId = 0
-imageLayout = "cudnn"
+imageLayout = "hipdnn"
 initOnCPUOnly=true
 command = Train:Test
 modelPath = "C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu/Models/01_Convolution"
@@ -213,7 +213,7 @@ configparameters: 01_Conv.cntk:ConfigDir=C:\jenkins\workspace\CNTK-Test-Windows-
 configparameters: 01_Conv.cntk:currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu\TestData
 configparameters: 01_Conv.cntk:DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu\TestData
 configparameters: 01_Conv.cntk:deviceId=0
-configparameters: 01_Conv.cntk:imageLayout=cudnn
+configparameters: 01_Conv.cntk:imageLayout=hipdnn
 configparameters: 01_Conv.cntk:initOnCPUOnly=true
 configparameters: 01_Conv.cntk:ModelDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu/Models
 configparameters: 01_Conv.cntk:modelPath=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu/Models/01_Convolution

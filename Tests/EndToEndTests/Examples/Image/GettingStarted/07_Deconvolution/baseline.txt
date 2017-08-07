@@ -21,7 +21,7 @@ Changed current directory to /home/philly/jenkins/workspace/CNTK-Test-Linux-W1/E
 01/18/2017 15:46:17: 		Math lib: mkl
 01/18/2017 15:46:17: 		CUDA_PATH: /usr/local/cuda-8.0
 01/18/2017 15:46:17: 		CUB_PATH: /usr/local/cub-1.4.1
-01/18/2017 15:46:17: 		CUDNN_PATH: /usr/local
+01/18/2017 15:46:17: 		HIPDNN_PATH: /usr/local
 01/18/2017 15:46:17: 		Build Branch: HEAD
 01/18/2017 15:46:17: 		Build SHA1: 9868006eead294385f4a867ea7363369364c1fa1
 01/18/2017 15:46:17: 		Built by Source/CNTK/buildinfo.h$$0 on e70c5b6e6849

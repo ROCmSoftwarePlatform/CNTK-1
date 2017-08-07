@@ -95,7 +95,7 @@ protected:
     void EnsureCompatible() override
     {
         if (m_spatial && m_imageLayout == ImageLayoutKind::HWC)
-            InvalidArgument("CNTK batch normalization supports only cudnn(CHW) layout.");
+            InvalidArgument("CNTK batch normalization supports only hipdnn(CHW) layout.");
     }
 
     void ForwardCore(const Mat& in, const Mat& scale, const Mat& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, Mat& runMean, Mat& runVariance,

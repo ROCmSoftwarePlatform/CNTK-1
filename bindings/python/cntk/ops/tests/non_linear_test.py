@@ -531,9 +531,9 @@ def test_op_hardmax(sample, device_id, precision):
     _test_unary_op(precision, device_id, hardmax, sample,
                    expected_forward, expected_backward)
 
-@pytest.mark.parametrize("use_cudnn", [True, False])
+@pytest.mark.parametrize("use_hipdnn", [True, False])
 @pytest.mark.parametrize("sample", SAMPLES)
-def test_op_batch_normalization(use_cudnn, sample, device_id, precision):
+def test_op_batch_normalization(use_hipdnn, sample, device_id, precision):
     dtype = PRECISION_TO_TYPE[precision]
     epsilon = 0.00001
     dev = cntk_device(device_id)
@@ -561,10 +561,10 @@ def test_op_batch_normalization(use_cudnn, sample, device_id, precision):
     with pytest.warns(Warning):
         op = batch_normalization(a, scale, bias, run_mean, run_variance, False,
             #no running_count here,
-            epsilon=epsilon, use_cudnn_engine=use_cudnn)
+            epsilon=epsilon, use_hipdnn_engine=use_hipdnn)
 
     op_node = batch_normalization(a, scale, bias, run_mean, run_variance, running_count=run_count, spatial=False,
-        epsilon=epsilon, use_cudnn_engine=use_cudnn)
+        epsilon=epsilon, use_hipdnn_engine=use_hipdnn)
 
     forward_input = {a: t}
 

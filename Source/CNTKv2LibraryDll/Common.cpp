@@ -876,8 +876,8 @@ namespace CNTK
 #ifdef _CUB_PATH_
             LOGPRINTF(stderr, "\t\tCUB_PATH: %s\n", _CUB_PATH_);
 #endif
-#ifdef _CUDNN_PATH_
-            LOGPRINTF(stderr, "\t\tCUDNN_PATH: %s\n", _CUDNN_PATH_);
+#ifdef _HIPDNN_PATH_
+            LOGPRINTF(stderr, "\t\tHIPDNN_PATH: %s\n", _HIPDNN_PATH_);
 #endif
 #ifdef _GIT_EXIST
             LOGPRINTF(stderr, "\t\tBuild Branch: %s\n", _BUILDBRANCH_);

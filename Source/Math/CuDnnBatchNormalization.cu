@@ -8,7 +8,7 @@
 #include "BatchNormalizationEngine.h"
 #include "CuDnnCommon.h"
 #include "GPUMatrix.h"
-
+#define HIPDNN_BN_MIN_EPSILON 1e-5 //TODO: __add__ replace with the correct macro
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 template <class ElemType>
@@ -22,10 +22,10 @@ public:
     CuDnnBatchNormEngine(DEVICEID_TYPE deviceId, const TensorShape& inOutT,
                         bool spatial, ImageLayoutKind imageLayout)
                         : Base(deviceId, inOutT, spatial, imageLayout),
-                        m_cudnn(CuDnn::Instance()),
+                        m_hipdnn(CuDnn::Instance()),
                         m_inOutCuDnnT(GetInOutTensor(inOutT), CuDnnTensor::GetDataType<ElemType>()),
                         m_scaleBiasCuDnnT(GetScaleBiasTensor(inOutT, spatial), CuDnnTensor::GetDataType<ElemType>()),
-                        m_cudnnEpsilon(CUDNN_BN_MIN_EPSILON)
+                        m_hipdnnEpsilon(HIPDNN_BN_MIN_EPSILON)
     {
     }
 
@@ -38,7 +38,7 @@ protected:
     void EnsureCompatible() override
     {
         if (m_spatial && m_imageLayout == ImageLayoutKind::HWC)
-            InvalidArgument("cuDNN batch normalization supports only cudnn(CHW) layout.");
+            InvalidArgument("cuDNN batch normalization supports only hipdnn(CHW) layout.");
         if (m_inOutT.GetRank() > 4)
             InvalidArgument("cuDNN batch normalization supports tensors of max 4 dimensions.");
     }
@@ -53,25 +53,26 @@ protected:
             InvalidArgument("cuDNN batch normalization engine currently supports blendTimeConstant of 0 or 1 only.");
 
         m_inOutCuDnnT.UpdateBatchSize(in.GetNumCols());
-        cudnnBatchNormMode_t mode = m_spatial ? CUDNN_BATCHNORM_SPATIAL : CUDNN_BATCHNORM_PER_ACTIVATION;
-        // cuDNN will fail with BAD_PARAM if epsilon < CUDNN_BN_MIN_EPSILON.
-        m_cudnnEpsilon = max(epsilon, CUDNN_BN_MIN_EPSILON);
+        hipdnnBatchNormMode_t mode = m_spatial ? HIPDNN_BATCHNORM_SPATIAL : HIPDNN_BATCHNORM_PER_ACTIVATION;
+        // cuDNN will fail with BAD_PARAM if epsilon < HIPDNN_BN_MIN_EPSILON.
+        m_hipdnnEpsilon = max(epsilon, HIPDNN_BN_MIN_EPSILON);
         if (inferenceOnly)
         {
             assert(expAvgFactor == 0 && blendFactor == 1);
             savedMean.Resize(0, 0);      // (these are not produced in this case)
             savedInvStdDev.Resize(0, 0);
-            CUDNN_CALL2(cudnnBatchNormalizationForwardInference(*m_cudnn, mode, &C::One, &C::Zero, m_inOutCuDnnT, ptr(in), m_inOutCuDnnT, ptr(out),
-                                                                  m_scaleBiasCuDnnT, ptr(scale), ptr(bias), ptr(runMean), ptr(runVariance), m_cudnnEpsilon),
-                        "\nProbably hitting cuDNN limit on batch size, try reducing minibatch size");
+            /*TODO: __add__ HIPDNN_CALL2(hipdnnBatchNormalizationForwardInference(*m_hipdnn, mode, &C::One, &C::Zero, m_inOutCuDnnT, ptr(in), m_inOutCuDnnT, ptr(out),
+                                                                  m_scaleBiasCuDnnT, ptr(scale), ptr(bias), ptr(runMean), ptr(runVariance), m_hipdnnEpsilon),
+                        "\nProbably hitting cuDNN limit on batch size, try reducing minibatch size");*/
         }
         else
         {
             savedMean.Resize(runMean);
             savedInvStdDev.Resize(runMean);
-            CUDNN_CALL(cudnnBatchNormalizationForwardTraining(*m_cudnn, mode, &C::One, &C::Zero, m_inOutCuDnnT, ptr(in),
-                                                              m_inOutCuDnnT, ptr(out), m_scaleBiasCuDnnT, ptr(scale), ptr(bias), expAvgFactor, ptr(runMean), ptr(runVariance),
-                                                              m_cudnnEpsilon, ptr(savedMean), ptr(savedInvStdDev)));
+            HIPDNN_CALL(hipdnnBatchNormalizationForwardTraining(*m_hipdnn, mode, const_cast<void*>(static_cast<const void*>(&C::One)),
+					 const_cast<void*>(static_cast<const void*>(&C::Zero)), m_inOutCuDnnT, ptr(in),
+                                         m_inOutCuDnnT, ptr(out), m_scaleBiasCuDnnT, const_cast<void*>(static_cast<const void*>(ptr(scale))), 
+			const_cast<void*>(static_cast<const void*>(ptr(bias))), expAvgFactor, const_cast<void*>(static_cast<const void*>(ptr(runMean))), 			 const_cast<void*>(static_cast<const void*>(ptr(runVariance))),m_hipdnnEpsilon, ptr(savedMean), ptr(savedInvStdDev)));
         }
     }
 
@@ -80,10 +81,10 @@ protected:
     {
         UNUSED(blendFactor);  // BUGBUG: It should be used.
         m_inOutCuDnnT.UpdateBatchSize(srcGrad.GetNumCols());
-        cudnnBatchNormMode_t mode = m_spatial ? CUDNN_BATCHNORM_SPATIAL : CUDNN_BATCHNORM_PER_ACTIVATION;
+        hipdnnBatchNormMode_t mode = m_spatial ? HIPDNN_BATCHNORM_SPATIAL : HIPDNN_BATCHNORM_PER_ACTIVATION;
         // REVIEW alexeyk: change betaParamDiff to 1 and update CNTK BN engine.
-        CUDNN_CALL(cudnnBatchNormalizationBackward(*m_cudnn, mode, &C::One, &C::One, &C::One, &C::Zero, m_inOutCuDnnT, ptr(in), m_inOutCuDnnT, ptr(srcGrad), m_inOutCuDnnT, ptr(grad),
-                                                   m_scaleBiasCuDnnT, ptr(scale), ptr(scaleGrad), ptr(biasGrad), m_cudnnEpsilon, ptr(savedMean), ptr(savedInvStdDev)));
+        HIPDNN_CALL(hipdnnBatchNormalizationBackward(*m_hipdnn, mode, &C::One, &C::One, &C::One, &C::Zero, m_inOutCuDnnT, ptr(in), m_inOutCuDnnT, ptr(srcGrad), m_inOutCuDnnT, ptr(grad),
+                                                   m_scaleBiasCuDnnT, ptr(scale), ptr(scaleGrad), ptr(biasGrad), m_hipdnnEpsilon, ptr(savedMean), ptr(savedInvStdDev)));
     }
 
 private:
@@ -125,10 +126,10 @@ private:
 private:
     using C = Consts<ElemType>;
 
-    CuDnn::ptr_t m_cudnn;
+    CuDnn::ptr_t m_hipdnn;
     CuDnnTensor m_inOutCuDnnT;
     CuDnnTensor m_scaleBiasCuDnnT;
-    double m_cudnnEpsilon;
+    double m_hipdnnEpsilon;
 };
 
 template class CuDnnBatchNormEngine<float>;

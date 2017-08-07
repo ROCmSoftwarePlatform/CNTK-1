@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE(BatchNormalizationForward)
             bool spatial = std::get<2>(cfg);
             double expAvg = std::get<3>(cfg);
             double blendFactor = 0; // cuDNN supports blendFactor == 0 (train) or 1 (eval) only.
-            double eps = 1e-5; // CUDNN_BN_MIN_EPSILON
+            double eps = 1e-5; // HIPDNN_BN_MIN_EPSILON
             bool inferenceOnly = false;
 
             auto engCudnn = BNEng::Create(baseDeviceId, inOutT, spatial, ImageLayoutKind::CHW, BatchNormEngineKind::CuDnn);

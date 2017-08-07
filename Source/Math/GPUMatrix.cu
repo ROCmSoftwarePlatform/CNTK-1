@@ -26,7 +26,7 @@
 #include <memory>
 #include "CntkBatchNormalization.cuh"
 #include "Convolution.cuh"
-#include "CuDnnRNN.h"
+//TODO __add__ #include "CuDnnRNN.h"
 
 #pragma comment(lib, "cudart.lib") // instruct linker to reference these libs
 #pragma comment(lib, "hipblas.lib")
@@ -4910,7 +4910,7 @@ void GPUMatrix<ElemType>::TensorOp(ElemType beta, const GPUMatrix<ElemType>& a, 
         return;
     }
 
-    // TODO: Add a special case for tensor bias reduction. cudnn is ~7% faster on Image/QuickE2E.
+    // TODO: Add a special case for tensor bias reduction. hipdnn is ~7% faster on Image/QuickE2E.
 
     // regular case
     else

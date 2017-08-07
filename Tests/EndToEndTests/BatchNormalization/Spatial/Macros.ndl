@@ -24,7 +24,7 @@ ConvBNLayerW(W, inp, outMap, kW, kH, hStride, vStride, bValue, scValue, bnTimeCo
     v = LearnableParameter(outMap, 1, init = fixedValue, value = 0, learningRateMultiplier = 0)
     
     c = Convolution(W, inp, kW, kH, outMap, hStride, vStride, zeroPadding = true, imageLayout = $imageLayout$)
-    y = BatchNormalization(c, sc, b, m, v, spatial = true, normalizationTimeConstant = bnTimeConst, imageLayout = $imageLayout$, engine=cudnn)
+    y = BatchNormalization(c, sc, b, m, v, spatial = true, normalizationTimeConstant = bnTimeConst, imageLayout = $imageLayout$, engine=hipdnn)
 ]
 
 ConvBNLayer(inp, outMap, inWCount, kW, kH, hStride, vStride, wScale, bValue, scValue, bnTimeConst)
@@ -47,7 +47,7 @@ ProjLayer(W, inp, outMap, hStride, vStride, bValue, scValue, bnTimeConst)
     v = LearnableParameter(outMap, 1, init = fixedValue, value = 0, learningRateMultiplier = 0)
     
     c = Convolution(W, inp, 1, 1, outMap, hStride, vStride, zeroPadding = false, imageLayout = $imageLayout$)
-    y = BatchNormalization(c, sc, b, m, v, spatial = true, normalizationTimeConstant = bnTimeConst, imageLayout = $imageLayout$, engine=cudnn)
+    y = BatchNormalization(c, sc, b, m, v, spatial = true, normalizationTimeConstant = bnTimeConst, imageLayout = $imageLayout$, engine=hipdnn)
 ]
 
 ResNetNode2(inp, outMap, inWCount, kW, kH, wScale, bValue, scValue, bnTimeConst)
@@ -115,7 +115,7 @@ DnnBNReLULayer(inDim, outDim, x, wScale, bValue, scValue, bnTimeConst)
     m = LearnableParameter(outDim, 1, init = fixedValue, value = 0, learningRateMultiplier = 0)
     v = LearnableParameter(outDim, 1, init = fixedValue, value = 0, learningRateMultiplier = 0)
     t = Times(W, x)
-    bn = BatchNormalization(t, sc, b, m, v, spatial = false, normalizationTimeConstant = bnTimeConst, engine=cudnn)
+    bn = BatchNormalization(t, sc, b, m, v, spatial = false, normalizationTimeConstant = bnTimeConst, engine=hipdnn)
     y = RectifiedLinear(bn)
 ]
 
@@ -127,7 +127,7 @@ DnnImageBNReLULayer(inW, inH, inC, outDim, x, wScale, bValue, scValue, bnTimeCon
     m = LearnableParameter(outDim, 1, init = fixedValue, value = 0, learningRateMultiplier = 0)
     v = LearnableParameter(outDim, 1, init = fixedValue, value = 0, learningRateMultiplier = 0)
     t = Times(W, x)
-    bn = BatchNormalization(t, sc, b, m, v, spatial = false, normalizationTimeConstant = bnTimeConst, engine=cudnn)
+    bn = BatchNormalization(t, sc, b, m, v, spatial = false, normalizationTimeConstant = bnTimeConst, engine=hipdnn)
     y = RectifiedLinear(bn)
 ]
 
