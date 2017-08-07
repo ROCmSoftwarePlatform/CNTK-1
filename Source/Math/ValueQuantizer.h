@@ -6,9 +6,11 @@
 #include "BestGpu.h" // for CPUONLY
 #ifndef CPUONLY
 //#include <cuda.h>
-#include <hip/hip_runtime.h>
+//#include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
+#ifdef __HIP_PLATFORM_NVCC__
 #include <device_launch_parameters.h>
+#endif
 #endif // !CPUONLY
 
 #include <cassert>

@@ -8,13 +8,13 @@
 #include "BestGpu.h" // for CPUONLY flag only
 
 #ifndef CPUONLY
-#include <cuda_profiler_api.h>
+#include <hip/hip_runtime_api.h>
 #else
 // If compiling without CUDA, defining profiler control functions as no-op stubs
-void cudaProfilerStart()
+void hipProfilerStart()
 {
 }
-void cudaProfilerStop()
+void hipProfilerStop()
 {
 }
 #endif
@@ -36,7 +36,7 @@ void Profiler::Start()
     assert(!m_isProfilingActive);
     m_isProfilingActive = true;
     fprintf(stderr, "Starting profiling\n");
-    cudaProfilerStart();
+    hipProfilerStart();
 }
 
 void Profiler::NextSample()
@@ -56,7 +56,7 @@ void Profiler::NextSample()
 void Profiler::Stop()
 {
     assert(m_isProfilingActive);
-    cudaProfilerStop();
+    hipProfilerStop();
     fprintf(stderr, "Stopping profiling\n");
     m_isProfilingActive = false;
 }

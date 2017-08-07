@@ -2,17 +2,17 @@
 #include "CUDAPageLockedMemAllocator.h"
 #include "BestGpu.h" // for CPUONLY
 #ifndef CPUONLY
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
 #endif
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 #ifndef CPUONLY
 
-inline static void CheckCudaReturnCode(cudaError_t rc, const char* msg)
+inline static void CheckCudaReturnCode(hipError_t rc, const char* msg)
 {
-    if (rc != cudaSuccess)
-        RuntimeError("%s: %s (cuda error %d)", msg, cudaGetErrorString(rc), (int)rc);
+    if (rc != hipSuccess)
+        RuntimeError("%s: %s (hip error %d)", msg, hipGetErrorString(rc), (int)rc);
 }
 
 CUDAPageLockedMemAllocator::CUDAPageLockedMemAllocator(int deviceID)
@@ -23,17 +23,17 @@ CUDAPageLockedMemAllocator::CUDAPageLockedMemAllocator(int deviceID)
 void* CUDAPageLockedMemAllocator::Malloc(size_t size, int deviceId)
 {
     void* p = nullptr;
-    CheckCudaReturnCode(cudaSetDevice(deviceId), "Cannot set cuda device");
+    CheckCudaReturnCode(hipSetDevice(deviceId), "Cannot set hip device");
 
-    // Note: I ask for cudaHostAllocDefault but cudaHostGetFlags() shows that it is allocated as 'cudaHostAllocMapped'
-    CheckCudaReturnCode(cudaHostAlloc(&p, size, cudaHostAllocDefault), "Malloc in CUDAPageLockedMemAllocator failed");
+    // Note: I ask for hipHostAllocDefault but hipHostGetFlags() shows that it is allocated as 'hipHostAllocMapped'
+    CheckCudaReturnCode(hipHostMalloc(&p, size, hipHostMallocDefault), "Malloc in CUDAPageLockedMemAllocator failed");
     return p;
 }
 
 void CUDAPageLockedMemAllocator::Free(void* p, int deviceId)
 {
-    CheckCudaReturnCode(cudaSetDevice(deviceId), "Cannot set cuda device");
-    CheckCudaReturnCode(cudaFreeHost(p), "Free in CUDAPageLockedMemAllocator failed");
+    CheckCudaReturnCode(hipSetDevice(deviceId), "Cannot set hip device");
+    CheckCudaReturnCode(hipHostFree(p), "Free in CUDAPageLockedMemAllocator failed");
 }
 
 void* CUDAPageLockedMemAllocator::Malloc(size_t size)

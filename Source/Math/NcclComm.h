@@ -15,7 +15,9 @@
 #include <type_traits>
 
 // Forward declare CUDA stuff
+#ifdef __HIP_PLATFORM_NVCC__
 typedef struct CUstream_st* hipStream_t;
+#endif
 typedef struct ncclComm* ncclComm_t;
 
 namespace Microsoft { namespace MSR { namespace CNTK {
