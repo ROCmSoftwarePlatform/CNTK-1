@@ -269,8 +269,14 @@ protected:
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
             auto result = finder(calgo, algoPerf); 
+	    #ifdef __HIP_PLATFORM_NVCC__
             auto found = std::find_if(algoPerf, algoPerf + calgo,
                 [](const hipdnnConvolutionFwdAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM && a.status == HIPDNN_STATUS_SUCCESS; });
+	    #endif
+	    #ifdef __HIP_PLATFORM_HCC__
+            auto found = std::find_if(algoPerf, algoPerf + calgo,
+                [](const hipdnnConvolutionFwdAlgoPerf_t& a) { return a.fwd_algo == HIPDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM /*&& a.status == HIPDNN_STATUS_SUCCESS*/; });
+	    #endif
             if (found == algoPerf + calgo)
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry 
@@ -331,9 +337,15 @@ protected:
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
             auto result = finder(calgo, algoPerf);
+	    #ifdef __HIP_PLATFORM_NVCC__
             auto found = std::find_if(algoPerf, algoPerf + calgo,
                 [](const hipdnnConvolutionBwdDataAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_BWD_DATA_ALGO_1 && a.status == HIPDNN_STATUS_SUCCESS; });
-            if (found == algoPerf + calgo)
+	    #endif
+	    #ifdef __HIP_PLATFORM_HCC__
+            auto found = std::find_if(algoPerf, algoPerf + calgo,
+                [](const hipdnnConvolutionBwdDataAlgoPerf_t& a) { return a.fwd_algo == HIPDNN_CONVOLUTION_BWD_DATA_ALGO_1 /*&& a.status == HIPDNN_STATUS_SUCCESS*/; });
+	    #endif
+	    if (found == algoPerf + calgo)
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry 
             calgo = 1;              // set count of algorithms 
@@ -393,9 +405,15 @@ protected:
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount])->hipdnnStatus_t
         {
             auto result = finder(calgo, algoPerf); 
+	    #ifdef __HIP_PLATFORM_NVCC__
             auto found = std::find_if(algoPerf, algoPerf + calgo,
                 [](const hipdnnConvolutionBwdFilterAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_1 && a.status == HIPDNN_STATUS_SUCCESS; });
-            if (found == algoPerf + calgo)
+	    #endif
+	    #ifdef __HIP_PLATFORM_HCC__
+            auto found = std::find_if(algoPerf, algoPerf + calgo,
+                [](const hipdnnConvolutionBwdFilterAlgoPerf_t& a) { return a.fwd_algo == HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_1 /*&& a.status == HIPDNN_STATUS_SUCCESS*/; });
+	    #endif
+	    if (found == algoPerf + calgo)
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry 
             calgo = 1;              // set count of algorithms 

@@ -3,7 +3,7 @@
 #include "GPUDataTransferer.h"
 #include "GPUMatrix.h"
 
-#pragma comment(lib, "cudart.lib")
+#pragma comment(lib, "hiprt.lib")
 
 #pragma warning(disable : 4267) // conversion from 'size_t' to 'unsigned int'; happens in CUDA <<<a,b>>> syntax if a and b are size_t
 #pragma warning(disable : 4127) // conditional expression is constant; "if (sizeof(ElemType)==sizeof(float))" triggers this
@@ -14,16 +14,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 // CUDA failed
 // Since the outer code sometimes does not recover properly, as an option we log and die right away.
 // This is needed for our GCD farm which has intermittent CUDA errors that sometimes cause the DBN tool, when running with MPI, to hang instead of terminating.
-static void cudafail(const char* msg)
+static void hipfail(const char* msg)
 {
     // TODO: get from an env variable
-    bool dieoncudafailure = false;
-    if (!dieoncudafailure)
+    bool dieonhipfailure = false;
+    if (!dieonhipfailure)
     {
         RuntimeError("%s", msg);
     }
     fprintf(stderr, "%s\n", msg);
-    fprintf(stderr, "cudafail: terminating\n"), fflush(stderr);
+    fprintf(stderr, "hipfail: terminating\n"), fflush(stderr);
 #ifdef WIN32
     TerminateProcess(GetCurrentProcess(), EXIT_FAILURE); // fail the hard way to ensure it won't hang elsewhere
 #else
@@ -31,24 +31,24 @@ static void cudafail(const char* msg)
 #endif
 }
 
-// allows to write cudaFunction() || "error"   (CUDA runtime)
+// allows to write hipFunction() || "error"   (CUDA runtime)
 static
 #ifdef WIN32
     __declspec(noinline)
 #endif
         void
-        operator||(cudaError_t rc, const char* msg)
+        operator||(hipError_t rc, const char* msg)
 {
-    if (rc != cudaSuccess)
+    if (rc != hipSuccess)
     {
         char buf[1000];
-        sprintf_s(buf, 1000, "%s: %s (cuda error %d)", msg, cudaGetErrorString(rc), rc);
-        cudafail(buf);
+        sprintf_s(buf, 1000, "%s: %s (hip error %d)", msg, hipGetErrorString(rc), rc);
+        hipfail(buf);
     }
 }
 
 //// Base class for different data transferers.
-GranularGPUDataTransferer::GranularGPUDataTransferer(int deviceId, const cudaStream_t& fetchStream, const cudaStream_t& assignStream, bool blocking)
+GranularGPUDataTransferer::GranularGPUDataTransferer(int deviceId, const hipStream_t& fetchStream, const hipStream_t& assignStream, bool blocking)
     : m_fetchStream(fetchStream),
       m_assignStream(assignStream),
       m_deviceId(deviceId),
@@ -58,101 +58,101 @@ GranularGPUDataTransferer::GranularGPUDataTransferer(int deviceId, const cudaStr
 {
     PrepareDevice(m_deviceId);
 
-    // Note: Do NOT use cudaEventBlockingSync (which supposedly yields the process)--it will totally break cudaEventSynchronize(), causing it to take 50 or 100 ms randomly.
+    // Note: Do NOT use hipEventBlockingSync (which supposedly yields the process)--it will totally break hipEventSynchronize(), causing it to take 50 or 100 ms randomly.
     // NOTE: We never saw this in reading prefetch.
-    unsigned flags = cudaEventDisableTiming;
+    unsigned flags = hipEventDisableTiming;
     if (blocking)
-        flags |= cudaEventBlockingSync;
+        flags |= hipEventBlockingSync;
 
     // events
-    cudaEventCreateWithFlags(&m_fetchCompleteEvent, flags) || "cudaEventCreateWithFlags failed";
-    cudaEventCreateWithFlags(&m_assignCompleteEvent, flags) || "cudaEventCreateWithFlags failed";
-    cudaEventCreateWithFlags(&m_syncEvent, cudaEventDisableTiming) || "cudaEventCreateWithFlags failed";
+    hipEventCreateWithFlags(&m_fetchCompleteEvent, flags) || "hipEventCreateWithFlags failed";
+    hipEventCreateWithFlags(&m_assignCompleteEvent, flags) || "hipEventCreateWithFlags failed";
+    hipEventCreateWithFlags(&m_syncEvent, hipEventDisableTiming) || "hipEventCreateWithFlags failed";
 }
 
 GranularGPUDataTransferer::~GranularGPUDataTransferer()
 {
     // TODO: Check for error code and throw if !std::uncaught_exception()
-    cudaEventDestroy(m_assignCompleteEvent);
-    cudaEventDestroy(m_fetchCompleteEvent);
-    cudaEventDestroy(m_syncEvent);
+    hipEventDestroy(m_assignCompleteEvent);
+    hipEventDestroy(m_fetchCompleteEvent);
+    hipEventDestroy(m_syncEvent);
 }
 
 void GranularGPUDataTransferer::CopyGPUToCPUAsync(const void* gpuBuffer, size_t numElements, size_t elementSize, void* cpuBuffer)
 {
     PrepareDevice(m_deviceId);
 
-    cudaMemcpyAsync(cpuBuffer, gpuBuffer, numElements * elementSize, cudaMemcpyDeviceToHost, GetFetchStream()) || "cudaMemcpyAsync failed";
+    hipMemcpyAsync(cpuBuffer, gpuBuffer, numElements * elementSize, hipMemcpyDeviceToHost, GetFetchStream()) || "hipMemcpyAsync failed";
 }
 
 void GranularGPUDataTransferer::RecordGPUToCPUCopy()
 {
-    cudaEventRecord(m_fetchCompleteEvent, GetFetchStream()) || "cudaEventRecord failed";
+    hipEventRecord(m_fetchCompleteEvent, GetFetchStream()) || "hipEventRecord failed";
 }
 
 void GranularGPUDataTransferer::WaitForCopyGPUToCPU()
 {
     PrepareDevice(m_deviceId);
-    cudaEventSynchronize(m_fetchCompleteEvent) || "cudaEventSynchronize failed";
+    hipEventSynchronize(m_fetchCompleteEvent) || "hipEventSynchronize failed";
 }
 
 void GranularGPUDataTransferer::CopyCPUToGPUAsync(const void* cpuBuffer, size_t numElements, size_t elementSize, void* gpuBuffer)
 {
     PrepareDevice(m_deviceId);
-    cudaMemcpyAsync(gpuBuffer, cpuBuffer, numElements * elementSize, cudaMemcpyHostToDevice, GetAssignStream()) || "cudaMemcpyAsync failed";
+    hipMemcpyAsync(gpuBuffer, cpuBuffer, numElements * elementSize, hipMemcpyHostToDevice, GetAssignStream()) || "hipMemcpyAsync failed";
 }
 
 void GranularGPUDataTransferer::RecordCPUToGPUCopy()
 {
-    cudaEventRecord(m_assignCompleteEvent, GetAssignStream()) || "cudaEventRecord failed";
+    hipEventRecord(m_assignCompleteEvent, GetAssignStream()) || "hipEventRecord failed";
 }
 
 void GranularGPUDataTransferer::WaitForCopyCPUToGPU()
 {
     PrepareDevice(m_deviceId);
-    cudaEventSynchronize(m_assignCompleteEvent) || "cudaEventSynchronize failed";
+    hipEventSynchronize(m_assignCompleteEvent) || "hipEventSynchronize failed";
 }
 
 void GranularGPUDataTransferer::RecordComputeStreamSyncPoint()
 {
     PrepareDevice(m_deviceId);
-    cudaEventRecord(m_syncEvent, GetStream()) || "cudeEventRecord failed";
+    hipEventRecord(m_syncEvent, GetStream()) || "cudeEventRecord failed";
 }
 
 void GranularGPUDataTransferer::WaitForSyncPointOnFetchStreamAsync()
 {
     PrepareDevice(m_deviceId);
-    cudaStreamWaitEvent(GetFetchStream(), m_syncEvent, 0 /*flags 'must be 0'*/) || "cudaStreamWaitEvent failed";
+    hipStreamWaitEvent(GetFetchStream(), m_syncEvent, 0 /*flags 'must be 0'*/) || "hipStreamWaitEvent failed";
 }
 
 void GranularGPUDataTransferer::WaitForSyncPointOnAssignStreamAsync()
 {
     PrepareDevice(m_deviceId);
-    cudaStreamWaitEvent(GetAssignStream(), m_syncEvent, 0 /*flags 'must be 0'*/) || "cudaStreamWaitEvent failed";
+    hipStreamWaitEvent(GetAssignStream(), m_syncEvent, 0 /*flags 'must be 0'*/) || "hipStreamWaitEvent failed";
 }
 
 //// GPUDataTransferer
 
 // same but for event
-void GPUDataTransferer::SyncEvent(cudaEvent_t ev)
+void GPUDataTransferer::SyncEvent(hipEvent_t ev)
 {
-    auto rc = cudaEventQuery(ev);
-    if (rc != cudaErrorNotReady)
+    auto rc = hipEventQuery(ev);
+    if (rc != hipErrorNotReady)
     {
         // if Event is ready then no need to wait
-        rc || "cudaEventQuery failed";
+        rc || "hipEventQuery failed";
         return;
     }
     // we must wait
-    cudaEventSynchronize(ev) || "cudaEventSynchronize failed";
+    hipEventSynchronize(ev) || "hipEventSynchronize failed";
 }
 
 //streams
-cudaStream_t GPUDataTransferer::s_fetchStream = NULL;
+hipStream_t GPUDataTransferer::s_fetchStream = NULL;
 
-cudaStream_t GPUDataTransferer::s_assignStream = NULL;
+hipStream_t GPUDataTransferer::s_assignStream = NULL;
 
-cudaStream_t GPUDataTransferer::GetFetchStream()
+hipStream_t GPUDataTransferer::GetFetchStream()
 {
     return s_fetchStream;
 }
@@ -162,8 +162,8 @@ GPUDataTransferer::GPUDataTransferer(int deviceId, bool useConcurrentStreams)
 #pragma warning(disable : 4127)
     if (useConcurrentStreams && (s_fetchStream == NULL))
     {
-        cudaStreamCreateWithFlags(&s_fetchStream, cudaStreamNonBlocking) || "cudaStreamCreateWithFlags failed";
-        cudaStreamCreateWithFlags(&s_assignStream, cudaStreamNonBlocking) || "cudaStreamCreateWithFlags failed";
+        hipStreamCreateWithFlags(&s_fetchStream, hipStreamNonBlocking) || "hipStreamCreateWithFlags failed";
+        hipStreamCreateWithFlags(&s_assignStream, hipStreamNonBlocking) || "hipStreamCreateWithFlags failed";
     }
 
     m_inner = make_unique<GranularGPUDataTransferer>(deviceId, s_fetchStream, s_assignStream);
@@ -202,7 +202,7 @@ void GPUDataTransferer::WaitForCopyCPUToGPUAsync()
 
 PrefetchGPUDataTransferer::PrefetchGPUDataTransferer(int deviceId) : GranularGPUDataTransferer(deviceId, nullptr, nullptr, true)
 {
-     cudaStreamCreateWithFlags(&m_stream, cudaStreamNonBlocking) || "cudaStreamCreateWithFlags failed (PrefetchGPUDataTransferer ctor)";
+     hipStreamCreateWithFlags(&m_stream, hipStreamNonBlocking) || "hipStreamCreateWithFlags failed (PrefetchGPUDataTransferer ctor)";
 }
 
 PrefetchGPUDataTransferer::~PrefetchGPUDataTransferer()
@@ -217,11 +217,11 @@ PrefetchGPUDataTransferer::~PrefetchGPUDataTransferer()
         return;
     }
 
-    auto code = cudaStreamDestroy(m_stream);
-    if (code != cudaSuccess)
+    auto code = hipStreamDestroy(m_stream);
+    if (code != hipSuccess)
     {
-        std::cerr << "cudaStreamDestroy failed (PrefetchGPUDataTransferer dtor): "
-            << cudaGetErrorString(code) << " (cuda error " <<  code << ")"<< std::endl;
+        std::cerr << "hipStreamDestroy failed (PrefetchGPUDataTransferer dtor): "
+            << hipGetErrorString(code) << " (hip error " <<  code << ")"<< std::endl;
     }
 }
 

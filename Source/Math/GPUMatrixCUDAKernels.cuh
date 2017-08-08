@@ -14,7 +14,9 @@
 #include "CommonMatrix.h"
 #include "GPUMatrix.h"
 #include "TensorOps.h" // for exp_() etc.
+#ifdef __HIP_PLATFORM_NVCC__
 #include "device_functions.h"
+#endif
 #include <hip/hip_runtime.h>
 #include <assert.h>
 #include <float.h>
@@ -29,7 +31,9 @@
 #pragma warning(disable : 4458) // declaration of 'identifier' hides class member
 #pragma warning(disable : 4515) // 'namespace': namespace uses itself
 #endif
+#ifdef __HIP_PLATFORM_NVCC__
 #include <cub/cub.cuh>
+#endif
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif

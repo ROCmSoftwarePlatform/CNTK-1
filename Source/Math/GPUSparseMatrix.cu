@@ -11,7 +11,9 @@
 #include "GPUSparseMatrix.h"
 #include "GPUMatrix.h"
 #include <hip/hip_runtime.h>
+#ifdef __HIP_PLATFORM_NVCC__
 #include <cusparse_v2.h>
+#endif
 #include "hipblas.h"
 #include "GPUMatrixCUDAKernels.cuh"
 #include <functional>
