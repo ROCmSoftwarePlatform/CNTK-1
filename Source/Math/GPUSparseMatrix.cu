@@ -1583,7 +1583,7 @@ void GPUSparseMatrix<ElemType>::FSAdagrad(
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    _fsadagrad4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+    _fsadagrad4BlockSparseCol<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
         n, Data(), ColOrRow2BlockId(), GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, unitGainMomentum);
@@ -1618,7 +1618,7 @@ void GPUSparseMatrix<ElemType>::Adam(
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    _adam4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+    _adam4BlockSparseCol<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
         n, Data(), ColOrRow2BlockId(), GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, epsilon, unitGainMomentum, adamax);
@@ -1659,7 +1659,7 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         ElemType* steps = c.Data() + 2 * n; // current step size
                                             // Data()+3*n is temp memory used to store multipliers, no need to initialize
 
-        _rmsprop_init4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+        _rmsprop_init4BlockSparseCol<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
             avars, signs, steps, 
             Data(), ColOrRow2BlockId(), GetNumRows(),
             n);
@@ -1692,7 +1692,7 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         CUDA_CALL(hipMemcpy(upd_gpu, upd, sizeof(ElemType) * _countof(upd), hipMemcpyHostToDevice));
     }
 
-    _rmsprop4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+    _rmsprop4BlockSparseCol<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
         avars, signs, steps,
         Data(), ColOrRow2BlockId(), GetNumRows(),
         n,
@@ -1737,7 +1737,7 @@ void GPUSparseMatrix<ElemType>::AdaDelta(GPUMatrix<ElemType>&c, GPUMatrix<ElemTy
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    _adadelta4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+    _adadelta4BlockSparseCol<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
         n, Data(), ColOrRow2BlockId(), GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learningRate, rho, epsilon);

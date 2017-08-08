@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Copyright (c) Microsoft. All rights reserved.
 // Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved
@@ -797,14 +798,14 @@ static void LaunchTensorOp(ElemType beta, array<ElemType*, N> pointerVector, Ele
     if ((reductionOp == ElementWiseOperator::opArgmax) ||
         (reductionOp == ElementWiseOperator::opArgmin))
     {
-        _launchTensorArgOp<ElemType, N, /*M=*/0, K> << <grid.m_blocksPerGrid, grid.m_threadsPerBlock, 0, t_stream >> > (pointers, reductionOp,
+        hipLaunchKernel(HIP_KERNEL_NAME(_launchTensorArgOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, pointers, reductionOp,
                                                                                                                         regularOpStrides, regularStrides, grid.m_N,
                                                                                                                         reducingOpDims, reducingStrides,
                                                                                                                         regularOpStrideDivmod, reducingOpDimDivmod);
     }
     else
     {
-        _launchTensorOp<ElemType, N, /*M=*/0, K> << <grid.m_blocksPerGrid, grid.m_threadsPerBlock, 0, t_stream >> > (beta, pointers, alpha, op, (ElementWiseOperator)(-1) /* dummy reductionOp */, regularOpStrides, regularStrides,
+        hipLaunchKernel(HIP_KERNEL_NAME(_launchTensorOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, beta, pointers, alpha, op, (ElementWiseOperator)(-1) /* dummy reductionOp */, regularOpStrides, regularStrides,
                                                                                                                      grid.m_N, reducingOpDims, reducingStrides,
                                                                                                                      regularOpStrideDivmod, reducingOpDimDivmod);
     }
@@ -927,7 +928,7 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
     if ((reductionOp == ElementWiseOperator::opArgmax) ||
         (reductionOp == ElementWiseOperator::opArgmin))
     {
-        _launchTensorArgOp<ElemType, N, M, K> << <grid.m_blocksPerGrid, grid.m_threadsPerBlock, 0, t_stream >> > (
+        hipLaunchKernel(HIP_KERNEL_NAME(_launchTensorArgOp<ElemType, N, M, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, 
             pointers, reductionOp,
             regularOpStrides, regularStrides, grid.m_N,
             reducingOpDims, reducingStrides,
@@ -1033,7 +1034,7 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
             FixedMatrix<C_int, N, K> regularStrides1(regularStrideVectors1);
             ElemType beta1  = 0;
             ElemType alpha1 = 1;
-            _launchTensorOpWithReduction<ElemType, N, M, K> << <dim3(numBlocksX, numBlocksY, numBlocksZ), numThreadsX, numThreadsX * sizeof(ReduceElemType), t_stream >> >(
+            _launchTensorOpWithReduction<ElemType, N, M, K><<<dim3(numBlocksX, numBlocksY, numBlocksZ), numThreadsX, numThreadsX * sizeof(ReduceElemType), t_stream >> >(
                 beta1, pointers1, alpha1, op, reductionOp,
                 regularOpStrides, regularStrides1, NN,
                 reducingOpDims, reducingStrides, /*reductionBegin*/0, reductionChunkSize,

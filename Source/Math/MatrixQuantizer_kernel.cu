@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #ifndef __MATRIX_QUANTIZER_KERNEL_CUH__
 #define __MATRIX_QUANTIZER_KERNEL_CUH__
 #include <float.h>
