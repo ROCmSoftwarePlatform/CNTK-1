@@ -5190,12 +5190,14 @@ __global__ void _assignNumOfDiffCol(const ElemType* a, const ElemType* b, ElemTy
         cur += (irow == crowB);
     }
 
+    #ifdef __HIP_PLATFORM_NVCC__ //TODO:__add__ enable when cub-hip is available for AMD platform
     using BlockReduceT = cub::BlockReduce<int, BlockSize>;
     __shared__ typename BlockReduceT::TempStorage tmp;
 
     int res = BlockReduceT(tmp).Sum(cur);
     if (hipThreadIdx_x == 0)
         *c = res;
+    #endif
 }
 
 template <class ElemType>

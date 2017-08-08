@@ -244,6 +244,7 @@ endif
   INCLUDEPATH += $(HIP_PATH)/include
   INCLUDEPATH += /opt/rocm/hcblas/include/
   INCLUDEPATH += /opt/rocm/hcrng/include/
+  INCLUDEPATH += /opt/rocm/hcsparse/include/
   INCLUDEPATH += /opt/rocm/hipdnn/include/
   LIBPATH += /opt/rocm/lib64
 #  LIBS_LIST += hipblas cudart cuda hiprng cusparse nvidia-ml

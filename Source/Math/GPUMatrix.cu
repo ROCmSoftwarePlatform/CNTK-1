@@ -17,7 +17,9 @@
 #include "CommonMatrix.h"
 #define TENSOR_OPS_DECL __device__ __host__
 #include "TensorOps.h"
+#ifdef __HIP_PLATFORM_NVCC__
 #include "device_launch_parameters.h"
+#endif
 #include <cuda.h>
 #include <hip/hip_runtime.h>
 #include <hiprng.h>

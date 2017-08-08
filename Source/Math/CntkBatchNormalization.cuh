@@ -15,7 +15,9 @@
 #pragma warning(disable : 4458) // declaration of 'identifier' hides class member
 #pragma warning(disable : 4515) // 'namespace': namespace uses itself
 #endif
+#ifdef __HIP_PLATFORM_NVCC__ //TODO: __add__ remove platform dependency once CUB is buildable on AMD
 #include <cub/cub.cuh>
+#endif
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
