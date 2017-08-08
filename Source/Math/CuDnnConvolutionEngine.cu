@@ -10,6 +10,8 @@
 #include <typeinfo>
 #include <typeindex>
 #include "CuDnnCommon.h"
+#include <typeinfo>
+#include <cxxabi.h>
 
 template <>
 const char* CudaErrString<hipdnnStatus_t>(hipdnnStatus_t x)
@@ -460,6 +462,22 @@ private:
 
     static const int MaxAlgoCount = 10;
 
+    void convert_type(cudnnConvolutionFwdAlgo_t in, hipdnnConvolutionFwdAlgo_t* out)
+    {
+	hipdnnStatus_t status_hipdnn;
+	status_hipdnn = cudnnTohipConvolutionFwdAlgo(in, out);
+    }
+    void convert_type(cudnnConvolutionBwdDataAlgo_t in, hipdnnConvolutionBwdDataAlgo_t* out)
+    {
+        hipdnnStatus_t status_hipdnn;
+        status_hipdnn = cudnnTohipConvolutionBwdDataAlgo(in, out);
+    }
+    void convert_type(cudnnConvolutionBwdFilterAlgo_t in, hipdnnConvolutionBwdFilterAlgo_t* out)
+    {
+        hipdnnStatus_t status_hipdnn;
+        status_hipdnn = cudnnTohipConvolutionBwdFilterAlgo(in, out);
+    }
+
     template <typename TAlgo, typename TWorkspaceSizeFinder, typename TDeterministicFinder, typename TFinder, typename TStaticFinder>
     void FindBestAlgo(size_t batchSize, TAlgo& algo, TWorkspaceSizeFinder workspaceSizeFinder, TDeterministicFinder deterministicFinder, TFinder finder, TStaticFinder staticFinder, Mat& workspace)
     {
@@ -500,12 +518,27 @@ private:
                 HIPDNN_CALL(deterministicFinder(calgo, algoPerf));
                 assert(calgo == 1);                                 // only one deterministic algorithm will be returned 
                 algo.MBSizeForCurrentAlgo = batchSize;
-		hipdnnConvolutionFwdAlgo_t sel_algo;
+		/*const char *type = typeid(algo.selectedAlgo).name();
+        	int status;
+        	char *res = abi::__cxa_demangle(type, NULL, NULL, &status);
+		typename TAlgo::typeL sel_algo;
 		hipdnnStatus_t status_hipdnn;
-		status_hipdnn = cudnnTohipConvolutionFwdAlgo((*algoPerf).algo, &sel_algo);
+        	if(strcmp(res,"hipdnnConvolutionFwdAlgo_t")==0)
+		{
+			status_hipdnn = cudnnTohipConvolutionFwdAlgo((*algoPerf).algo, &sel_algo);
+		}
+		//std::cout<<endl<<res;
+		else if(strcmp(res, "hipdnnConvolutionBwdDataAlgo_t")==0)
+			status_hipdnn = cudnnTohipConvolutionBwdDataAlgo((*algoPerf).algo, &sel_algo);
+		else if(strcmp(res, "hipdnnConvolutionBwdFilterAlgo_t")==0)
+			status_hipdnn = cudnnTohipConvolutionBwdFilterAlgo((*algoPerf).algo, &sel_algo);
+		else
+			status_hipdnn = HIPDNN_STATUS_SUCCESS;*/
+		typename TAlgo::typeL sel_algo;
+		convert_type((*algoPerf).algo, &sel_algo);
                 algo.selectedAlgo = sel_algo;               // deterministic algorithm is the first in the list  
                 algo.maxAlgo = algo.selectedAlgo;
-                algo.autotuningState = AutotuningState::Running;    // no further need for tuning since this is deterministic, directly enter running state 
+		algo.autotuningState = AutotuningState::Running;    // no further need for tuning since this is deterministic, directly enter running state 
                 algo.AlgoWorkspaceSize = (*algoPerf).memory;
             }
             else
@@ -548,10 +581,9 @@ private:
                 assert(calgo > 0); 
                 auto res = algoPerf;        // first returned algorithm is the fastest 
                 algo.MBSizeForCurrentAlgo = batchSize;
-		hipdnnConvolutionFwdAlgo_t sel_algo;
-                hipdnnStatus_t status_hipdnn;
-                status_hipdnn = cudnnTohipConvolutionFwdAlgo((*res).algo, &sel_algo);
-                algo.selectedAlgo = sel.algo;
+		typename TAlgo::typeL sel_algo;
+                convert_type((*algoPerf).algo, &sel_algo);
+                algo.selectedAlgo = sel_algo;
                 algo.maxAlgo = algo.selectedAlgo;
                 algo.autotuningState = AutotuningState::Running;
                 algo.AlgoWorkspaceSize = (*res).memory;
@@ -571,10 +603,9 @@ private:
                     assert(calgo > 0);
                     auto res = algoPerf;    // first returned algorithm is the fastest 
                     algo.MBSizeForCurrentAlgo = batchSize;
-		    hipdnnConvolutionFwdAlgo_t sel_algo;
-                    hipdnnStatus_t status_hipdnn;
-                    status_hipdnn = cudnnTohipConvolutionFwdAlgo((*res).algo, &sel_algo);
-                    algo.selectedAlgo = sel.algo;
+                    typename TAlgo::typeL sel_algo;
+                    convert_type((*algoPerf).algo, &sel_algo);
+		    algo.selectedAlgo = sel_algo;
                     algo.maxAlgo = algo.selectedAlgo;
                     algo.autotuningState = AutotuningState::Running;
                     algo.AlgoWorkspaceSize = (*res).memory;
@@ -615,10 +646,11 @@ private:
     }
 
 private:
-    template <typename T>
+    template <typename T, typename L>
     struct ConvAlgoInfo
     {
         typedef T typeT;
+	typedef L typeL;
         ConvAlgoInfo()
             : MBSizeForCurrentAlgo(0), MBSizeForCurrentWorkspace(0), maxMBSizeSeen(0),autotuningState(AutotuningState::Init), AlgoWorkspaceSize(0)
         {
@@ -630,8 +662,8 @@ private:
         size_t AlgoWorkspaceSize;           // maximum workspace size for any algorithm 
         size_t DeterministicAlgoWorkspaceSize;  // workspace size for deterministic algorithm 
         AutotuningState autotuningState;    // state of auto-tuning: Init, PendingTuning and Running 
-        decltype(static_cast<hipdnnConvolutionFwdAlgo_t>(T::algo)) selectedAlgo;     // currently selected algorithm 
-        decltype(static_cast<hipdnnConvolutionFwdAlgo_t>(T::algo)) maxAlgo;          // algorithm that was selected when the current workspace is allocated 
+        decltype(static_cast<L>(T::algo)) selectedAlgo;     // currently selected algorithm 
+        decltype(static_cast<L>(T::algo)) maxAlgo;          // algorithm that was selected when the current workspace is allocated 
 
         bool NeedAutotuning(size_t batchSize)
         {
@@ -656,9 +688,9 @@ private:
     // Pooling specific.
     std::unique_ptr<CuDnnPool> m_pool;
 
-    ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t> m_fwdAlgo;
-    ConvAlgoInfo<hipdnnConvolutionBwdDataAlgoPerf_t> m_backDataAlgo;
-    ConvAlgoInfo<hipdnnConvolutionBwdFilterAlgoPerf_t> m_backFiltAlgo;
+    ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t, hipdnnConvolutionFwdAlgo_t> m_fwdAlgo;
+    ConvAlgoInfo<hipdnnConvolutionBwdDataAlgoPerf_t, hipdnnConvolutionBwdDataAlgo_t> m_backDataAlgo;
+    ConvAlgoInfo<hipdnnConvolutionBwdFilterAlgoPerf_t, hipdnnConvolutionBwdFilterAlgo_t> m_backFiltAlgo;
 
     // Flag indicating whether only deterministic algorithms should be used.
     bool m_forceDeterministicAlgorithms;

@@ -11,7 +11,7 @@
 
 #include "GPUMatrix.h"
 #include "GPUMatrixCUDAKernels.cuh"
-//#include "GPUSparseMatrix.h"
+#include "GPUSparseMatrix.h"
 #include "GPUTensor.h"
 #include "CommonMatrix.h"
 #define TENSOR_OPS_DECL __device__ __host__
@@ -26,7 +26,7 @@
 #include <memory>
 #include "CntkBatchNormalization.cuh"
 #include "Convolution.cuh"
-//TODO __add__ #include "CuDnnRNN.h"
+//TODO: __add__ #include "CuDnnRNN.h"
 
 #pragma comment(lib, "cudart.lib") // instruct linker to reference these libs
 #pragma comment(lib, "hipblas.lib")

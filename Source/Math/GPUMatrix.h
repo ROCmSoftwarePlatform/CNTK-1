@@ -698,7 +698,7 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
 
 #define CUDA_CALL(expr)     (CudaCall((expr), #expr, "CUDA",     hipSuccess))
 #define HIPBLAS_CALL(expr)   (CudaCall((expr), #expr, "HIPBLAS",   HIPBLAS_STATUS_SUCCESS))
-#define HIPSPARSE_CALL(expr) (CudaCall((expr), #expr, "HIPSPARSE", HIPSPARSE_STATUS_SUCCESS))
+#define CUSPARSE_CALL(expr) (CudaCall((expr), #expr, "HIPSPARSE", HIPSPARSE_STATUS_SUCCESS))
 #define HIPRNG_CALL(expr)   (CudaCall((expr), #expr, "HIPRNG",   HIPRNG_STATUS_SUCCESS))
 #define HIPDNN_CALL(expr)    (CudaCall((expr), #expr, "cuDNN",    HIPDNN_STATUS_SUCCESS))
 #define HIPDNN_CALL2(expr,m) (CudaCall((expr), #expr, "cuDNN",    HIPDNN_STATUS_SUCCESS, m))
