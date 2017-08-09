@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 //
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE.md file in the project root for full license information.
@@ -1584,7 +1585,7 @@ void GPUSparseMatrix<ElemType>::FSAdagrad(
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    _fsadagrad4BlockSparseCol<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+    hipLaunchKernel(HIP_KERNEL_NAME(_fsadagrad4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
         n, Data(), ColOrRow2BlockId(), GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, unitGainMomentum);
@@ -1619,7 +1620,7 @@ void GPUSparseMatrix<ElemType>::Adam(
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    _adam4BlockSparseCol<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+    hipLaunchKernel(HIP_KERNEL_NAME(_adam4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
         n, Data(), ColOrRow2BlockId(), GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, epsilon, unitGainMomentum, adamax);
@@ -1660,7 +1661,7 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         ElemType* steps = c.Data() + 2 * n; // current step size
                                             // Data()+3*n is temp memory used to store multipliers, no need to initialize
 
-        _rmsprop_init4BlockSparseCol<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+        hipLaunchKernel(HIP_KERNEL_NAME(_rmsprop_init4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
             avars, signs, steps, 
             Data(), ColOrRow2BlockId(), GetNumRows(),
             n);
@@ -1693,7 +1694,7 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         CUDA_CALL(hipMemcpy(upd_gpu, upd, sizeof(ElemType) * _countof(upd), hipMemcpyHostToDevice));
     }
 
-    _rmsprop4BlockSparseCol<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+    hipLaunchKernel(HIP_KERNEL_NAME(_rmsprop4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
         avars, signs, steps,
         Data(), ColOrRow2BlockId(), GetNumRows(),
         n,
@@ -1738,7 +1739,7 @@ void GPUSparseMatrix<ElemType>::AdaDelta(GPUMatrix<ElemType>&c, GPUMatrix<ElemTy
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    _adadelta4BlockSparseCol<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+    hipLaunchKernel(HIP_KERNEL_NAME(_adadelta4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
         n, Data(), ColOrRow2BlockId(), GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learningRate, rho, epsilon);

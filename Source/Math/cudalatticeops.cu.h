@@ -1,4 +1,3 @@
-#include "hip/hip_runtime.h"
 // cudamatrix.cu(.h) -- CUDA kernels for lattice ops. Consider this a .cu/.cpp file.
 //
 // F. Seide, V-hansu

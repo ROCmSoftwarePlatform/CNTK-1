@@ -1572,7 +1572,7 @@ void GPUMatrix<ElemType>::Adam(GPUMatrix<ElemType>& gradients,
 
     size_t n = gradients.GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    _adam<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(n, gradients.Data(), Data(), Data() + n, functionValues.Data(),
+    hipLaunchKernel(HIP_KERNEL_NAME(_adam<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, n, gradients.Data(), Data(), Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, epsilon, unitGainMomentum, adamax);
 }
 
@@ -1673,7 +1673,7 @@ void GPUMatrix<ElemType>::AdaDelta(GPUMatrix<ElemType>& gradients, GPUMatrix<Ele
 
     size_t n = gradients.GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    _adadelta<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock >> >(n, gradients.Data(), Data(), Data() + n, functionValues.Data(), learningRate, rho, epsilon);
+    hipLaunchKernel(HIP_KERNEL_NAME(_adadelta<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, n, gradients.Data(), Data(), Data() + n, functionValues.Data(), learningRate, rho, epsilon);
 }
 
 template <class ElemType>
@@ -2151,7 +2151,7 @@ void GPUMatrix<ElemType>::AssignNoiseContrastiveEstimation(const GPUMatrix<ElemT
         p = p / 2;
 
     // note: kernel has hard-coded dimension of 512
-    _computeNceOutputMax512Threads<ElemType><<<GetNumElements() / 2, p >> >(
+    hipLaunchKernel(HIP_KERNEL_NAME(_computeNceOutputMax512Threads<ElemType>), dim3(GetNumElements() / 2), dim3(p), 0, 0, 
         Data(),
         sampleCount,
         m_numRows / 2,
@@ -2166,7 +2166,7 @@ void GPUMatrix<ElemType>::AssignNoiseContrastiveEstimation(const GPUMatrix<ElemT
         p = p / 2;
     // summing up objective must be done in one block
     // note: kernel has hard-coded dimension of 512
-    _assignNoiseContrastiveEstimationMax512Threads<ElemType><<<1, p >> >(
+    hipLaunchKernel(HIP_KERNEL_NAME(_assignNoiseContrastiveEstimationMax512Threads<ElemType>), dim3(1), dim3(p), 0, 0, 
         Data(),
         sampleCount,
         m_numRows / 2,
@@ -2212,7 +2212,7 @@ void GPUMatrix<ElemType>::AssignSoftmaxSum(const GPUMatrix<ElemType>& a, GPUMatr
         p = p / 2;
 
     // note: kernel has hard-coded dimension of 512
-    _assignSoftmaxSumMax512Threads<ElemType><<<1, p >> >(
+    hipLaunchKernel(HIP_KERNEL_NAME(_assignSoftmaxSumMax512Threads<ElemType>), dim3(1), dim3(p), 0, 0, 
         my_a.Data(),
         width,
         Data(),
@@ -2236,7 +2236,7 @@ void GPUMatrix<ElemType>::AssignNCEUnnormalizedEval(const GPUMatrix<ElemType>& a
         while (p / 2 > width) p = p / 2;
 
         // this kernel need be launched in nnz blocks
-        _sparseInnerProductDenseTimesDense<ElemType><<<m_nz, p >> >(
+        hipLaunchKernel(HIP_KERNEL_NAME(_sparseInnerProductDenseTimesDense<ElemType>), dim3(m_nz), dim3(p), 0, 0, 
         m_dVal,
         m_buf,
         m_dCol,
@@ -2248,7 +2248,7 @@ void GPUMatrix<ElemType>::AssignNCEUnnormalizedEval(const GPUMatrix<ElemType>& a
         m_res);
 
         // sum up the results
-        _reductionSum32<ElemType><<<1, 32 >> >(m_res, c.Buffer(), m_nz);*/
+        hipLaunchKernel(HIP_KERNEL_NAME(_reductionSum32<ElemType>), dim3(1), dim3(32), 0, 0, m_res, c.Buffer(), m_nz);*/
 }
 
 DEF_ELEMWISE_INPLACE_FUNC(Tanh)
@@ -2316,7 +2316,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignHardmaxOf(const GPUMatrix<ElemTy
         CUDA_LONG M = (CUDA_LONG) GetNumRows();
         SyncGuard syncGuard;
         // note: kernel uses hard-coded thread dimension
-        _assignColumnwiseHardmaxOf512Threads<<<N, 512, 0, t_stream >> >(a.Data(), Data(), N, M);
+        hipLaunchKernel(HIP_KERNEL_NAME(_assignColumnwiseHardmaxOf512Threads), dim3(N), dim3(512), 0, t_stream, a.Data(), Data(), N, M);
     }
     else
     {
@@ -2469,7 +2469,7 @@ ElemType GPUMatrix<ElemType>::SumOfElements() const
 
     // WARNING: THIS kernel is not the most efficient way!
     // note: kernel has hard-coded dimension of 1024
-    _reductionSum1024Threads<ElemType><<<1, 1024, 0, t_stream >> >(Data(), d_sum, (CUDA_LONG)GetNumElements());
+    hipLaunchKernel(HIP_KERNEL_NAME(_reductionSum1024Threads<ElemType>), dim3(1), dim3(1024), 0, t_stream, Data(), d_sum, (CUDA_LONG)GetNumElements());
     CUDA_CALL(hipMemcpy(&h_sum, d_sum, sizeof(ElemType), hipMemcpyDeviceToHost));
     TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), d_sum);
     return h_sum;
@@ -2487,7 +2487,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignSumOfElements(const GPUMatrix<El
     SyncGuard syncGuard;
     // WARNING: THIS kernel is not the most efficient way!
     // note: kernel has hard-coded dimension of 1024
-    _reductionSumAndAssign1024Threads<ElemType><<<1, 1024 >> >(Data(), a.Data(), (CUDA_LONG)a.GetNumElements(), (CUDA_LONG)GetNumElements());
+    hipLaunchKernel(HIP_KERNEL_NAME(_reductionSumAndAssign1024Threads<ElemType>), dim3(1), dim3(1024), 0, 0, Data(), a.Data(), (CUDA_LONG)a.GetNumElements(), (CUDA_LONG)GetNumElements());
     return (*this);
 }
 
@@ -2500,7 +2500,7 @@ DeviceBoundNumber<ElemType> GPUMatrix<ElemType>::Sum_AsDeviceBoundNum() const
 
     // WARNING: THIS kernel is not the most efficient way!
     // note: kernel has hard-coded dimension of 1024
-    _reductionSum1024Threads<ElemType><<<1, 1024, 0, t_stream >> >(Data(), d_sum, (CUDA_LONG)GetNumElements());
+    hipLaunchKernel(HIP_KERNEL_NAME(_reductionSum1024Threads<ElemType>), dim3(1), dim3(1024), 0, t_stream, Data(), d_sum, (CUDA_LONG)GetNumElements());
     DeviceBoundNumber<ElemType> result;
     result.ShallowCopyFrom(d_sum, GetComputeDeviceId());
     return result;
@@ -2805,7 +2805,7 @@ ElemType GPUMatrix<ElemType>::FrobeniusNorm() const
     ElemType h_sum = 0;
     // WARNING: THIS kernel is not the most efficient way!
     // note: kernel has hard-coded dimension of 1024
-    _reductionSum21024Threads<ElemType><<<1, 1024, 0, t_stream >> >(Data(), d_sum, (CUDA_LONG)GetNumElements(), true);
+    hipLaunchKernel(HIP_KERNEL_NAME(_reductionSum21024Threads<ElemType>), dim3(1), dim3(1024), 0, t_stream, Data(), d_sum, (CUDA_LONG)GetNumElements(), true);
     CUDA_CALL(hipMemcpy(&h_sum, d_sum, sizeof(ElemType), hipMemcpyDeviceToHost));
     TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), d_sum);
 
@@ -2823,7 +2823,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignFrobeniusNormOf(const GPUMatrix<
     PrepareDevice();
     // WARNING: THIS kernel is not the most efficient way!
     // note: kernel has hard-coded dimension of 1024
-    _reductionSum21024Threads<ElemType><<<1, 1024, 0, t_stream >> >(a.Data(), Data(), (CUDA_LONG)a.GetNumElements(), true);
+    hipLaunchKernel(HIP_KERNEL_NAME(_reductionSum21024Threads<ElemType>), dim3(1), dim3(1024), 0, t_stream, a.Data(), Data(), (CUDA_LONG)a.GetNumElements(), true);
 
     return *this;
 }
@@ -2839,7 +2839,7 @@ ElemType GPUMatrix<ElemType>::MatrixNormInf() const
     ElemType h_maxAbs = 0;
     // WARNING: THIS kernel is not the most efficient way!
     // note: kernel has hard-coded dimension of 1024
-    _reductionMatrixNormInf1024Threads<ElemType><<<1, 1024, 0, t_stream >> >(Data(), d_maxAbs, (CUDA_LONG)GetNumElements());
+    hipLaunchKernel(HIP_KERNEL_NAME(_reductionMatrixNormInf1024Threads<ElemType>), dim3(1), dim3(1024), 0, t_stream, Data(), d_maxAbs, (CUDA_LONG)GetNumElements());
     CUDA_CALL(hipMemcpy(&h_maxAbs, d_maxAbs, sizeof(ElemType), hipMemcpyDeviceToHost));
     TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), d_maxAbs);
     return h_maxAbs;
@@ -2863,7 +2863,7 @@ ElemType GPUMatrix<ElemType>::MatrixNorm0() const
     ElemType h_nz = 0;
     // WARNING: THIS kernel is not the most efficient way!
     // note: kernel has hard-coded dimension of 1024
-    _reductionMatrixNorm01024Threads<ElemType><<<1, 1024, 0, t_stream >> >(Data(), d_nz, (CUDA_LONG)GetNumElements());
+    hipLaunchKernel(HIP_KERNEL_NAME(_reductionMatrixNorm01024Threads<ElemType>), dim3(1), dim3(1024), 0, t_stream, Data(), d_nz, (CUDA_LONG)GetNumElements());
     CUDA_CALL(hipMemcpy(&h_nz, d_nz, sizeof(ElemType), hipMemcpyDeviceToHost));
     TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), d_nz);
     return h_nz;
@@ -3055,7 +3055,7 @@ void GPUMatrix<ElemType>::VectorMin(GPUMatrix<ElemType>& minIndexes, GPUMatrix<E
 
         int blocksPerGrid = n; // we'll have 1 block processing 1 column
         // note: kernel has hard-coded dimension of 512
-        _vectorMaxMinReduce512Threads<ElemType, false><<<blocksPerGrid, 512, 0, t_stream >> >(us.Data(), minIndexes.Data(), minValues.Data(), m, n);
+        hipLaunchKernel(HIP_KERNEL_NAME(_vectorMaxMinReduce512Threads<ElemType, false>), dim3(blocksPerGrid), dim3(512), 0, t_stream, us.Data(), minIndexes.Data(), minValues.Data(), m, n);
 
         /*
             int blocksPerGrid=(int)ceil(1.0*n/GridDim::maxThreadsPerBlock);
@@ -3087,7 +3087,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignNumOfDiff(const GPUMatrix<ElemTy
         // int blocksPerGrid=(int)ceil(1.0*a.GetNumElements()/GridDim::maxThreadsPerBlock);
         // hipLaunchKernelGGL((_assignNumOfDiff1024Threads<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a.Data(), b.Data(), Data(), a.GetNumElements());
         // note: kernel has hard-coded dimension of 1024
-        _assignNumOfDiff1024Threads<ElemType><<<1, 1024, 0, t_stream >> >(a.Data(), b.Data(), Data(), (CUDA_LONG)a.GetNumElements());
+        hipLaunchKernel(HIP_KERNEL_NAME(_assignNumOfDiff1024Threads<ElemType>), dim3(1), dim3(1024), 0, t_stream, a.Data(), b.Data(), Data(), (CUDA_LONG)a.GetNumElements());
     }
     else
     {
@@ -4360,7 +4360,7 @@ ElemType GPUMatrix<ElemType>::GetLearnRateForBlock_Helper(const GPUMatrix<ElemTy
     // d_res[0] should now contain inner product of matrices
     // Compute squared Frobenius norms (squared sums of elements)
     // note: kernel has hard-coded dimension of 512
-    _lrHelper512Threads<ElemType><<<1, 512, 0, t_stream >> >(Gradients.Data(), SmoothedGradients.Data(), (CUDA_LONG)Gradients.GetNumElements(), d_res);
+    hipLaunchKernel(HIP_KERNEL_NAME(_lrHelper512Threads<ElemType>), dim3(1), dim3(512), 0, t_stream, Gradients.Data(), SmoothedGradients.Data(), (CUDA_LONG)Gradients.GetNumElements(), d_res);
     ElemType res;
     CUDA_CALL(hipMemcpy(&res, d_res, sizeof(ElemType), hipMemcpyDeviceToHost));
     TracingGPUMemoryAllocator::Free<ElemType>(Gradients.GetComputeDeviceId(), d_res);
@@ -4393,7 +4393,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignElementProductOfWithShiftNeg(con
     a.PrepareDevice();
     SyncGuard syncGuard;
     hipLaunchKernelGGL((_assignElementProductOfWithShiftNeg<ElemType>), dim3(block_tail), dim3(thread_tail), 0, t_stream, Data(), a.Data(), b.Data(), shift, nt + 1, BS);
-    //      _assignElementProductOf<ElemType><<<block_tail, thread_tail, 0, t_stream >> >(Data(), a.Data(), b.Data(), nt);
+    //      hipLaunchKernel(HIP_KERNEL_NAME(_assignElementProductOf<ElemType>), dim3(block_tail), dim3(thread_tail), 0, t_stream, Data(), a.Data(), b.Data(), nt);
 
     return *this;
 }
@@ -4524,7 +4524,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::GetARowByIndex(const GPUMatrix<ElemTyp
     a.PrepareDevice();
     SyncGuard syncGuard;
     hipLaunchKernelGGL((_getARowByIndex<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, Data(), a.Data(), n, P, m);
-    //      _assignElementProductOf<ElemType><<<block_tail, thread_tail, 0, t_stream >> >(Data(), a.Data(), b.Data(), nt);
+    //      hipLaunchKernel(HIP_KERNEL_NAME(_assignElementProductOf<ElemType>), dim3(block_tail), dim3(thread_tail), 0, t_stream, Data(), a.Data(), b.Data(), nt);
     return *this;
 }
 
@@ -4596,13 +4596,13 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignCTCScore(const GPUMatrix<ElemTyp
         dim3 block_tail((uttNum + DEFAULT_THREAD_PER_DIM - 1) / DEFAULT_THREAD_PER_DIM, (maxPhoneNum + DEFAULT_THREAD_PER_DIM - 1) / DEFAULT_THREAD_PER_DIM);
         for (long t = 0; t < maxFrameNum; t++)
         {
-            _assignAlphaScore<<<block_tail, thread_tail, 0, t_stream >> >(prob.Data(), alpha.Data(), phoneSeq.Data(), phoneBoundary.Data(), gpuUttToChanInd,
+            hipLaunchKernel(HIP_KERNEL_NAME(_assignAlphaScore), dim3(block_tail), dim3(thread_tail), 0, t_stream, prob.Data(), alpha.Data(), phoneSeq.Data(), phoneBoundary.Data(), gpuUttToChanInd,
                 gpuFrameNum, gpuBeginFrame, gpuPhoneNum, numParallelSequences, uttNum, t, maxPhoneNum, totalPhoneNum, blankTokenId, delayConstraint);
         }
 
         for (long t = maxFrameNum - 1; t >= 0; t--)
         {
-            _assignBetaScore<<<block_tail, thread_tail, 0, t_stream >> >(prob.Data(), beta.Data(), phoneSeq.Data(), phoneBoundary.Data(), gpuUttToChanInd,
+            hipLaunchKernel(HIP_KERNEL_NAME(_assignBetaScore), dim3(block_tail), dim3(thread_tail), 0, t_stream, prob.Data(), beta.Data(), phoneSeq.Data(), phoneBoundary.Data(), gpuUttToChanInd,
                 gpuFrameNum, gpuBeginFrame, gpuPhoneNum, numParallelSequences, uttNum, t, maxPhoneNum, totalPhoneNum, blankTokenId, delayConstraint);
         }
         
@@ -4612,7 +4612,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignCTCScore(const GPUMatrix<ElemTyp
 
         dim3 block_tail_2((uttNum + DEFAULT_THREAD_PER_DIM - 1) / DEFAULT_THREAD_PER_DIM, (maxFrameNum + DEFAULT_THREAD_PER_DIM - 1) / DEFAULT_THREAD_PER_DIM);
 
-        _assignCTCScore<<< block_tail_2, thread_tail, 0, t_stream >> >(Data(), prob.Data(), alpha.Data(), beta.Data(), phoneSeq.Data(), uttNum, gpuUttToChanInd,
+        hipLaunchKernel(HIP_KERNEL_NAME(_assignCTCScore), dim3(block_tail_2), dim3(thread_tail), 0, t_stream, Data(), prob.Data(), alpha.Data(), beta.Data(), phoneSeq.Data(), uttNum, gpuUttToChanInd,
             gpuBeginFrame, gpuPhoneNum, gpuFrameNum, numParallelSequences, maxPhoneNum, totalPhoneNum);
 
         CUDA_CALL(hipFree(gpuFrameNum));
@@ -4770,12 +4770,12 @@ void GPUMatrix<ElemType>::RCRFBackwardCompute(
         szMemSize = sizeof(ElemType) * iNumLab;
         // This function assumes iNumLab <= 1024 and that shared memory == total (!) number of threads == iNumLab.
         assert(iNumLab <= 1024);
-        _rcrfBackwardComputeZetaMax1024Labels<ElemType><<<blocksPerGrid, 512, szMemSize >> >(t, iNumPos, alpha.Data(), d_zeta, pair_scores.Data(), iNumLab, shift);
+        hipLaunchKernel(HIP_KERNEL_NAME(_rcrfBackwardComputeZetaMax1024Labels<ElemType>), dim3(blocksPerGrid), dim3(512), szMemSize, 0, t, iNumPos, alpha.Data(), d_zeta, pair_scores.Data(), iNumLab, shift);
         szMemSize = iNumLab * 3;
         szMemSize *= sizeof(ElemType);
         // This function assumes iNumLab <= 1024 and that shared memory == total (!) number of threads == 3 * iNumLab.
         assert(iNumLab <= 1024);
-        _rcrfBackwardComputeMax1024Labels<ElemType><<<blocksPerGrid, 512, szMemSize >> >(t, iNumPos, alpha.Data(), beta.Data(),
+        hipLaunchKernel(HIP_KERNEL_NAME(_rcrfBackwardComputeMax1024Labels<ElemType>), dim3(blocksPerGrid), dim3(512), szMemSize, 0, t, iNumPos, alpha.Data(), beta.Data(),
                                                                                            d_zeta, pair_scores.Data(), iNumLab, shift);
     }
     /*
@@ -4817,12 +4817,12 @@ void GPUMatrix<ElemType>::RCRFTransGrdCompute(const GPUMatrix<ElemType>& lbls,
         // This function assumes iNumLab <= 1024 and that shared memory == total (!) number of threads == iNumLab.
         assert(iNumLab <= 1024);
         // BUGBUG: This is launched with 512 threads per block, but allocates shared mem as if there is only one block. Likewise for all 4 of these functions.
-        _rcrfTransGrdComputeZetaMax1024Labels<ElemType><<<blocksPerGrid, 512, szMemSize >> >(t - 1, iNumPos, alpha.Data(), d_zeta, pair_scores.Data(), iNumLab, startLbl, shift);
+        hipLaunchKernel(HIP_KERNEL_NAME(_rcrfTransGrdComputeZetaMax1024Labels<ElemType>), dim3(blocksPerGrid), dim3(512), szMemSize, 0, t - 1, iNumPos, alpha.Data(), d_zeta, pair_scores.Data(), iNumLab, startLbl, shift);
         szMemSize = iNumLab * 3;
         szMemSize *= sizeof(ElemType);
         // This function assumes iNumLab <= 1024 and that shared memory == total (!) number of threads == iNumLab.
         assert(iNumLab <= 1024);
-        _rcrfTransGrdComputeMax1024Labels<ElemType><<<blocksPerGrid, 512, szMemSize >> >(t, startLbl, alpha.Data(), beta.Data(),
+        hipLaunchKernel(HIP_KERNEL_NAME(_rcrfTransGrdComputeMax1024Labels<ElemType>), dim3(blocksPerGrid), dim3(512), szMemSize, 0, t, startLbl, alpha.Data(), beta.Data(),
                                                                                            d_zeta, pair_scores.Data(), lbls.Data(), grd.Data(), iNumPos, iNumLab, shift);
     }
     TracingGPUMemoryAllocator::Free<ElemType>(alpha.GetComputeDeviceId(), d_zeta);
