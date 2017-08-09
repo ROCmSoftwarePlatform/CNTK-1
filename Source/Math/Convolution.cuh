@@ -7,8 +7,10 @@
 #pragma once
 
 #include <hip/hip_runtime.h>
+#ifdef __HIP_PLATFORM_NVCC__
 #include <device_launch_parameters.h>
 #include <math_constants.h>
+#endif
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 

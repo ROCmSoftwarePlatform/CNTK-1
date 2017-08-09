@@ -12,7 +12,7 @@
 #include "GPUMatrix.h"
 #include <hip/hip_runtime.h>
 #ifdef __HIP_PLATFORM_NVCC__
-#include <cusparse_v2.h>
+#include <hipsparse_v2.h>
 #endif
 #include "hipsparse.h"
 #include "hipblas.h"
@@ -39,7 +39,7 @@ template <>
 const char* CudaErrString<hipsparseStatus_t>(hipsparseStatus_t)
 {
     hipDeviceSynchronize();
-    return "(see hipsparse.h & look for hipsparseStatus_t or CUSPARSE_STATUS_xxx)";
+    return "(see hipsparse.h & look for hipsparseStatus_t or HIPSPARSE_STATUS_xxx)";
 }
 
 namespace Microsoft { namespace MSR { namespace CNTK {
@@ -131,10 +131,10 @@ template <class ElemType>
         int blocksPerGrid = (int) ceil(1.0 * SecondaryIndexCount() / GridDim::maxThreadsPerBlock);
         SyncGuard syncGuard;
         hipLaunchKernelGGL((_shiftColCSCIndexFromSliceViewToAbsolute<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
-            SecondaryIndexLocation(),
-            SecondaryIndexCount(),
-            GetNumNZElements());
-    }
+            deepCopy.SecondaryIndexLocation(),
+            deepCopy.SecondaryIndexCount(),
+            deepCopy.GetNumNZElements());
+    } //TODO: __add__ remove the argument object calling in kenel call
 
     // TODO: to copy other variables used only for class based LM
 }
@@ -266,36 +266,36 @@ void GPUSparseMatrix<ElemType>::CopyToDenseMatrix(GPUMatrix<ElemType>& denseMatr
 
     PrepareDevice();
     hipsparseHandle_t hipsparseHandle = 0;
-    CUSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descr = 0;
-    CUSPARSE_CALL(hipsparseCreateMatDescr(&descr));
-    hipsparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO);
+    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descr));
+    hipsparseSetMatType(descr, HIPSPARSE_MATRIX_TYPE_GENERAL);
+    hipsparseSetMatIndexBase(descr, HIPSPARSE_INDEX_BASE_ZERO);
 
     denseMatrix.RequireSize(GetNumRows(), GetNumCols());
 
     SyncGuard syncGuard;
-    CUSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
+    ///TODO: __add__ HIPSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
     if (GetFormat() == MatrixFormat::matrixFormatSparseCSR)
     {
         if (sizeof(ElemType) == sizeof(float))
         {
-            CUSPARSE_CALL(hipsparseScsr2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (float*) Buffer(), RowLocation(), ColLocation(), (float*) denseMatrix.Data(), int(GetNumRows())));
+            HIPSPARSE_CALL(hipsparseScsr2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (float*) Buffer(), RowLocation(), ColLocation(), (float*) denseMatrix.Data(), int(GetNumRows())));
         }
         else
         {
-            CUSPARSE_CALL(hipsparseDcsr2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (double*) Buffer(), RowLocation(), ColLocation(), (double*) denseMatrix.Data(), int(GetNumRows())));
+            HIPSPARSE_CALL(hipsparseDcsr2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (double*) Buffer(), RowLocation(), ColLocation(), (double*) denseMatrix.Data(), int(GetNumRows())));
         }
     }
     else if (GetFormat() == MatrixFormat::matrixFormatSparseCSC)
     {
         if (sizeof(ElemType) == sizeof(float))
         {
-            CUSPARSE_CALL(hipsparseScsc2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (float*) Buffer(), RowLocation(), ColLocation(), (float*) denseMatrix.Data(), int(GetNumRows())));
+            HIPSPARSE_CALL(hipsparseScsc2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (float*) Buffer(), RowLocation(), ColLocation(), (float*) denseMatrix.Data(), int(GetNumRows())));
         }
         else
         {
-            CUSPARSE_CALL(hipsparseDcsc2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (double*) Buffer(), RowLocation(), ColLocation(), (double*) denseMatrix.Data(), int(GetNumRows())));
+            HIPSPARSE_CALL(hipsparseDcsc2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (double*) Buffer(), RowLocation(), ColLocation(), (double*) denseMatrix.Data(), int(GetNumRows())));
         }
     }
     else if (GetFormat() == MatrixFormat::matrixFormatSparseBlockCol || GetFormat() == MatrixFormat::matrixFormatSparseBlockRow)
@@ -307,7 +307,7 @@ void GPUSparseMatrix<ElemType>::CopyToDenseMatrix(GPUMatrix<ElemType>& denseMatr
     {
         NOT_IMPLEMENTED;
     }
-    CUSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
 
 }
 
@@ -331,10 +331,10 @@ void GPUSparseMatrix<ElemType>::ConvertToSparseFormat(MatrixFormat newFormat, GP
 
     PrepareDevice();
     hipsparseHandle_t hipsparseHandle = 0;
-    CUSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
 
     SyncGuard syncGuard;
-    CUSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
+    //TODO: __add__HIPSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
 
     outMatrix.ChangeDeviceTo(GetComputeDeviceId());
     outMatrix.RequireSizeAndAllocate(GetNumRows(), GetNumCols(), NzCount(), newFormat, true, false);
@@ -343,15 +343,15 @@ void GPUSparseMatrix<ElemType>::ConvertToSparseFormat(MatrixFormat newFormat, GP
     {
         if (sizeof(ElemType) == sizeof(float))
         {
-            CUSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), int(GetSizeAllocated()),
+            HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), int(GetSizeAllocated()),
                                            (float*) Data(), RowLocation(), ColLocation(), (float*) outMatrix.Data(),
-                                           outMatrix.RowLocation(), outMatrix.ColLocation(), CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO));
+                                           outMatrix.RowLocation(), outMatrix.ColLocation(), HIPSPARSE_INDEX_BASE_ZERO/*HIPSPARSE_ACTION_NUMERIC*/, HIPSPARSE_INDEX_BASE_ZERO)); //TODO: __add__
         }
         else
         {
-            CUSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), int(GetSizeAllocated()),
+            HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), int(GetSizeAllocated()),
                                            (double*) Data(), RowLocation(), ColLocation(), (double*) outMatrix.Data(),
-                                           outMatrix.RowLocation(), outMatrix.ColLocation(), CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO));
+                                           outMatrix.RowLocation(), outMatrix.ColLocation(), HIPSPARSE_INDEX_BASE_ZERO/*HIPSPARSE_ACTION_NUMERIC*/, HIPSPARSE_INDEX_BASE_ZERO)); //TODO: __add__
         }
     }
     else
@@ -359,7 +359,7 @@ void GPUSparseMatrix<ElemType>::ConvertToSparseFormat(MatrixFormat newFormat, GP
         NOT_IMPLEMENTED;
     }
 
-    CUSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
 }
 
 template <class ElemType>
@@ -476,11 +476,11 @@ void GPUSparseMatrix<ElemType>::SetValue(const GPUMatrix<ElemType>& denseMatrix,
 
     PrepareDevice();
     hipsparseHandle_t hipsparseHandle = 0;
-    CUSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descr = 0;
-    CUSPARSE_CALL(hipsparseCreateMatDescr(&descr));
-    hipsparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO);
+    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descr));
+    hipsparseSetMatType(descr, HIPSPARSE_MATRIX_TYPE_GENERAL);
+    hipsparseSetMatIndexBase(descr, HIPSPARSE_INDEX_BASE_ZERO);
 
     int numRows = (int) denseMatrix.GetNumRows(); // m
     int numCols = (int) denseMatrix.GetNumCols(); // n
@@ -492,12 +492,12 @@ void GPUSparseMatrix<ElemType>::SetValue(const GPUMatrix<ElemType>& denseMatrix,
         SyncGuard syncGuard;
         if (sizeof(ElemType) == sizeof(float))
         {
-            CUSPARSE_CALL(hipsparseSnnz(hipsparseHandle, (matrixFormat & matrixFormatRowMajor) ? CUSPARSE_DIRECTION_ROW : CUSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
+            HIPSPARSE_CALL(hipsparseSnnz(hipsparseHandle, (matrixFormat & matrixFormatRowMajor) ? HIPSPARSE_DIRECTION_ROW : HIPSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
                                        reinterpret_cast<float*>(denseMatrix.Data()), (int) numRows, nnzPerRowOrCol, &nnzTotalDevHostPtr));
         }
         else
         {
-            CUSPARSE_CALL(hipsparseDnnz(hipsparseHandle, (matrixFormat & matrixFormatRowMajor) ? CUSPARSE_DIRECTION_ROW : CUSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
+            HIPSPARSE_CALL(hipsparseDnnz(hipsparseHandle, (matrixFormat & matrixFormatRowMajor) ? HIPSPARSE_DIRECTION_ROW : HIPSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
                                        reinterpret_cast<double*>(denseMatrix.Data()), (int) numRows, nnzPerRowOrCol, &nnzTotalDevHostPtr));
         }
         // ~SyncGuard
@@ -510,12 +510,12 @@ void GPUSparseMatrix<ElemType>::SetValue(const GPUMatrix<ElemType>& denseMatrix,
     {
         if (sizeof(ElemType) == sizeof(float))
         {
-            CUSPARSE_CALL(hipsparseSdense2csr(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<float*>(denseMatrix.Data()),
+            HIPSPARSE_CALL(hipsparseSdense2csr(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<float*>(denseMatrix.Data()),
                                              (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<float*>(Data()), RowLocation(), ColLocation()));
         }
         else
         {
-            CUSPARSE_CALL(hipsparseDdense2csr(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<double*>(denseMatrix.Data()),
+            HIPSPARSE_CALL(hipsparseDdense2csr(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<double*>(denseMatrix.Data()),
                                              (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<double*>(Data()), RowLocation(), ColLocation()));
         }
     }
@@ -523,12 +523,12 @@ void GPUSparseMatrix<ElemType>::SetValue(const GPUMatrix<ElemType>& denseMatrix,
     {
         if (sizeof(ElemType) == sizeof(float))
         {
-            CUSPARSE_CALL(hipsparseSdense2csc(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<float*>(denseMatrix.Data()),
+            HIPSPARSE_CALL(hipsparseSdense2csc(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<float*>(denseMatrix.Data()),
                                              (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<float*>(Data()), RowLocation(), ColLocation()));
         }
         else
         {
-            CUSPARSE_CALL(hipsparseDdense2csc(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<double*>(denseMatrix.Data()),
+            HIPSPARSE_CALL(hipsparseDdense2csc(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<double*>(denseMatrix.Data()),
                                              (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<double*>(Data()), RowLocation(), ColLocation()));
         }
     }
@@ -1762,13 +1762,13 @@ void GPUSparseMatrix<ElemType>::MultiplyAndWeightedAdd(ElemType alpha, const GPU
 
     a.PrepareDevice();
     hipsparseHandle_t hipsparseHandle = 0;
-    CUSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descr = 0;
-    CUSPARSE_CALL(hipsparseCreateMatDescr(&descr));
-    hipsparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO);
+    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descr));
+    hipsparseSetMatType(descr, HIPSPARSE_MATRIX_TYPE_GENERAL);
+    hipsparseSetMatIndexBase(descr, HIPSPARSE_INDEX_BASE_ZERO);
 
-    hipsparseOperation_t oper = (transposeA != reinterpretAsCSR) ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
+    hipsparseOperation_t oper = (transposeA != reinterpretAsCSR) ? HIPSPARSE_OPERATION_TRANSPOSE : HIPSPARSE_OPERATION_NON_TRANSPOSE;
 
     int n = (int)b.GetNumCols();
     int m = (int)(reinterpretAsCSR ? a.GetNumCols() : a.GetNumRows());
@@ -1781,17 +1781,17 @@ void GPUSparseMatrix<ElemType>::MultiplyAndWeightedAdd(ElemType alpha, const GPU
     SyncGuard syncGuard;
     if (sizeof(ElemType) == sizeof(float))
     {
-        CUSPARSE_CALL(hipsparseScsrmm(hipsparseHandle, oper, m, n, k, (int) a.GetNumNZElements(), reinterpret_cast<float*>(&alpha), descr, reinterpret_cast<const float*>(a.Buffer()),
+        HIPSPARSE_CALL(hipsparseScsrmm(hipsparseHandle, oper, m, n, k, (int) a.GetNumNZElements(), reinterpret_cast<float*>(&alpha), descr, reinterpret_cast<const float*>(a.Buffer()),
                                      aRowLocation, aColLocation, reinterpret_cast<float*>(b.Data()),
                                      (int) b.GetNumRows(), reinterpret_cast<float*>(&beta), reinterpret_cast<float*>(c.Data()), (int) c.GetNumRows()));
     }
     else
     {
-        CUSPARSE_CALL(hipsparseDcsrmm(hipsparseHandle, oper, m, n, k, (int) a.GetNumNZElements(), reinterpret_cast<double*>(&alpha), descr, reinterpret_cast<const double*>(a.Buffer()),
+        HIPSPARSE_CALL(hipsparseDcsrmm(hipsparseHandle, oper, m, n, k, (int) a.GetNumNZElements(), reinterpret_cast<double*>(&alpha), descr, reinterpret_cast<const double*>(a.Buffer()),
                                      aRowLocation, aColLocation, reinterpret_cast<double*>(b.Data()),
                                      (int) b.GetNumRows(), reinterpret_cast<double*>(&beta), reinterpret_cast<double*>(c.Data()), (int) c.GetNumRows()));
     }
-    CUSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
 }
 
 template <class ElemType>
@@ -1911,19 +1911,19 @@ void GPUSparseMatrix<ElemType>::Multiply(const GPUSparseMatrix<ElemType>& S1, bo
 
     S1.PrepareDevice();
     hipsparseHandle_t hipsparseHandle = 0;
-    CUSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descrA = 0, descrB = 0, descrC = 0;
-    CUSPARSE_CALL(hipsparseCreateMatDescr(&descrA));
-    CUSPARSE_CALL(hipsparseCreateMatDescr(&descrB));
-    CUSPARSE_CALL(hipsparseCreateMatDescr(&descrC));
-    hipsparseSetMatType(descrA, CUSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatType(descrB, CUSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatType(descrC, CUSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatIndexBase(descrA, CUSPARSE_INDEX_BASE_ZERO);
-    hipsparseSetMatIndexBase(descrB, CUSPARSE_INDEX_BASE_ZERO);
-    hipsparseSetMatIndexBase(descrC, CUSPARSE_INDEX_BASE_ZERO);
-    hipsparseOperation_t operA = transposeS1 ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
-    hipsparseOperation_t operB = transposeS2 ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
+    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descrA));
+    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descrB));
+    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descrC));
+    hipsparseSetMatType(descrA, HIPSPARSE_MATRIX_TYPE_GENERAL);
+    hipsparseSetMatType(descrB, HIPSPARSE_MATRIX_TYPE_GENERAL);
+    hipsparseSetMatType(descrC, HIPSPARSE_MATRIX_TYPE_GENERAL);
+    hipsparseSetMatIndexBase(descrA, HIPSPARSE_INDEX_BASE_ZERO);
+    hipsparseSetMatIndexBase(descrB, HIPSPARSE_INDEX_BASE_ZERO);
+    hipsparseSetMatIndexBase(descrC, HIPSPARSE_INDEX_BASE_ZERO);
+    hipsparseOperation_t operA = transposeS1 ? HIPSPARSE_OPERATION_TRANSPOSE : HIPSPARSE_OPERATION_NON_TRANSPOSE;
+    hipsparseOperation_t operB = transposeS2 ? HIPSPARSE_OPERATION_TRANSPOSE : HIPSPARSE_OPERATION_NON_TRANSPOSE;
 
     int m = int(transposeS1 ? S1.GetNumCols() : S1.GetNumRows());
     int n = int(transposeS2 ? S2.GetNumRows() : S2.GetNumCols());
@@ -1941,7 +1941,7 @@ void GPUSparseMatrix<ElemType>::Multiply(const GPUSparseMatrix<ElemType>& S1, bo
                     [&](GPUSPARSE_INDEX_TYPE* csrRowPtrC) -> size_t
                     {
                         int nnzTotal = -1;
-                        CUSPARSE_CALL(hipsparseXcsrgemmNnz(hipsparseHandle, operA, operB, m, n, k, descrA, nnzA, S1.RowLocation(), S1.ColLocation(), descrB, nnzB,
+                        HIPSPARSE_CALL(hipsparseXcsrgemmNnz(hipsparseHandle, operA, operB, m, n, k, descrA, nnzA, S1.RowLocation(), S1.ColLocation(), descrB, nnzB,
                                                           S2.RowLocation(), S2.ColLocation(), descrC, csrRowPtrC, &nnzTotal));
                         return nnzTotal;
                     });
@@ -1949,13 +1949,13 @@ void GPUSparseMatrix<ElemType>::Multiply(const GPUSparseMatrix<ElemType>& S1, bo
     // Step 2
     if (sizeof(float) == sizeof(ElemType))
     {
-        CUSPARSE_CALL(hipsparseScsrgemm(hipsparseHandle, operA, operB, m, n, k, descrA, nnzA, (const float*) S1.Buffer(), S1.RowLocation(), S1.ColLocation(),
+        HIPSPARSE_CALL(hipsparseScsrgemm(hipsparseHandle, operA, operB, m, n, k, descrA, nnzA, (const float*) S1.Buffer(), S1.RowLocation(), S1.ColLocation(),
                                        descrB, nnzB, (const float*) S2.Buffer(), S2.RowLocation(), S2.ColLocation(),
                                        descrC, (float*) c.Data(), c.RowLocation(), c.ColLocation()));
     }
     else
     {
-        CUSPARSE_CALL(hipsparseDcsrgemm(hipsparseHandle, operA, operB, m, n, k, descrA, nnzA, (const double*) S1.Buffer(), S1.RowLocation(), S1.ColLocation(),
+        HIPSPARSE_CALL(hipsparseDcsrgemm(hipsparseHandle, operA, operB, m, n, k, descrA, nnzA, (const double*) S1.Buffer(), S1.RowLocation(), S1.ColLocation(),
                                        descrB, nnzB, (const double*) S2.Buffer(), S2.RowLocation(), S2.ColLocation(),
                                        descrC, (double*) c.Data(), c.RowLocation(), c.ColLocation()));
     }
@@ -1993,17 +1993,17 @@ void GPUSparseMatrix<ElemType>::ScaleAndAdd(ElemType alpha, const GPUSparseMatri
 
     a.PrepareDevice();
     hipsparseHandle_t hipsparseHandle = 0;
-    CUSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descrA = 0, descrB = 0, descrC = 0;
-    CUSPARSE_CALL(hipsparseCreateMatDescr(&descrA));
-    CUSPARSE_CALL(hipsparseCreateMatDescr(&descrB));
-    CUSPARSE_CALL(hipsparseCreateMatDescr(&descrC));
-    hipsparseSetMatType(descrA, CUSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatType(descrB, CUSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatType(descrB, CUSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatIndexBase(descrA, CUSPARSE_INDEX_BASE_ZERO);
-    hipsparseSetMatIndexBase(descrB, CUSPARSE_INDEX_BASE_ZERO);
-    hipsparseSetMatIndexBase(descrC, CUSPARSE_INDEX_BASE_ZERO);
+    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descrA));
+    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descrB));
+    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descrC));
+    hipsparseSetMatType(descrA, HIPSPARSE_MATRIX_TYPE_GENERAL);
+    hipsparseSetMatType(descrB, HIPSPARSE_MATRIX_TYPE_GENERAL);
+    hipsparseSetMatType(descrB, HIPSPARSE_MATRIX_TYPE_GENERAL);
+    hipsparseSetMatIndexBase(descrA, HIPSPARSE_INDEX_BASE_ZERO);
+    hipsparseSetMatIndexBase(descrB, HIPSPARSE_INDEX_BASE_ZERO);
+    hipsparseSetMatIndexBase(descrC, HIPSPARSE_INDEX_BASE_ZERO);
 
     SyncGuard syncGuard;
     // Step 1
@@ -2012,19 +2012,19 @@ void GPUSparseMatrix<ElemType>::ScaleAndAdd(ElemType alpha, const GPUSparseMatri
                     [&](GPUSPARSE_INDEX_TYPE* csrRowPtrC) -> size_t
                     {
                         int nnzTotal = -1;
-                        CUSPARSE_CALL(hipsparseXcsrgeamNnz(hipsparseHandle, m, n, descrA, nnzA, a.RowLocation(), a.ColLocation(), descrB, nnzB, b.RowLocation(), b.ColLocation(), descrC, csrRowPtrC, &nnzTotal));
+                        HIPSPARSE_CALL(hipsparseXcsrgeamNnz(hipsparseHandle, m, n, descrA, nnzA, a.RowLocation(), a.ColLocation(), descrB, nnzB, b.RowLocation(), b.ColLocation(), descrC, csrRowPtrC, &nnzTotal));
                         return nnzTotal;
                     });
 
     // Step 2
     if (sizeof(ElemType) == sizeof(float))
     {
-        CUSPARSE_CALL(hipsparseScsrgeam(hipsparseHandle, m, n, reinterpret_cast<const float*>(&alpha), descrA, nnzA, reinterpret_cast<const float*>(a.Data()), a.RowLocation(), a.ColLocation(),
+        HIPSPARSE_CALL(hipsparseScsrgeam(hipsparseHandle, m, n, reinterpret_cast<const float*>(&alpha), descrA, nnzA, reinterpret_cast<const float*>(a.Data()), a.RowLocation(), a.ColLocation(),
                                        reinterpret_cast<const float*>(&beta), descrB, nnzB, reinterpret_cast<const float*>(b.Data()), b.RowLocation(), b.ColLocation(), descrC, reinterpret_cast<float*>(c.Data()), c.RowLocation(), c.ColLocation()));
     }
     else
     {
-        CUSPARSE_CALL(hipsparseDcsrgeam(hipsparseHandle, m, n, reinterpret_cast<const double*>(&alpha), descrA, nnzA, reinterpret_cast<const double*>(a.Data()), a.RowLocation(), a.ColLocation(),
+        HIPSPARSE_CALL(hipsparseDcsrgeam(hipsparseHandle, m, n, reinterpret_cast<const double*>(&alpha), descrA, nnzA, reinterpret_cast<const double*>(a.Data()), a.RowLocation(), a.ColLocation(),
                                        reinterpret_cast<const double*>(&beta), descrB, nnzB, reinterpret_cast<const double*>(b.Data()), b.RowLocation(), b.ColLocation(), descrC, reinterpret_cast<double*>(c.Data()), c.RowLocation(), c.ColLocation()));
     }
     hipsparseDestroy(hipsparseHandle);
@@ -2115,10 +2115,10 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
     GPUSPARSE_INDEX_TYPE* cscRowIndA = nullptr;
     GPUSPARSE_INDEX_TYPE* cscColPtrA = nullptr;
 
-    hipsparseAction_t cpVals = CUSPARSE_ACTION_NUMERIC;
-    hipsparseIndexBase_t idxBase = CUSPARSE_INDEX_BASE_ZERO;
+    hipsparseAction_t cpVals = HIPSPARSE_ACTION_NUMERIC;
+    hipsparseIndexBase_t idxBase = HIPSPARSE_INDEX_BASE_ZERO;
     hipsparseHandle_t hipsparseHandle = 0;
-    CUSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
 
     bool allocTemp = (a.GetFormat() == matrixFormatSparseCSR);
 
@@ -2131,11 +2131,11 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
         SyncGuard syncGuard;
         if (sizeof(ElemType) == sizeof(float))
         {
-            CUSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const float*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<float*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
+            HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const float*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<float*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
         }
         else
         {
-            CUSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const double*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<double*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
+            HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const double*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<double*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
         }
     }
     else if (a.GetFormat() == matrixFormatSparseCSC)
@@ -2168,13 +2168,13 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
     ElemType res = 0;
     if (sizeof(ElemType) == sizeof(float))
     {
-        CUSPARSE_CALL(hipsparseSdoti(hipsparseHandle, (int) a_nz, reinterpret_cast<float*>(cscValA), vectArray,
+        HIPSPARSE_CALL(hipsparseSdoti(hipsparseHandle, (int) a_nz, reinterpret_cast<float*>(cscValA), vectArray,
                                     reinterpret_cast<float*>(b.Data()),
                                     reinterpret_cast<float*>(&res), idxBase));
     }
     else
     {
-        CUSPARSE_CALL(hipsparseDdoti(hipsparseHandle, (int) a_nz, reinterpret_cast<double*>(cscValA), vectArray,
+        HIPSPARSE_CALL(hipsparseDdoti(hipsparseHandle, (int) a_nz, reinterpret_cast<double*>(cscValA), vectArray,
                                     reinterpret_cast<double*>(b.Data()),
                                     reinterpret_cast<double*>(&res), idxBase));
     }
@@ -2183,7 +2183,7 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
     {
         TracingGPUMemoryAllocator::Free<ElemType>(a.GetComputeDeviceId(), cscValA);
     }
-    CUSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
     return res;
 }
 
@@ -2435,8 +2435,8 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
     int m = (int) GetNumRows();
     int n = (int) GetNumCols();
     int nnz = (int) GetNumNZElements();
-    hipsparseAction_t cpVals = CUSPARSE_ACTION_NUMERIC;
-    hipsparseIndexBase_t idxBase = CUSPARSE_INDEX_BASE_ZERO;
+    hipsparseAction_t cpVals = HIPSPARSE_ACTION_NUMERIC;
+    hipsparseIndexBase_t idxBase = HIPSPARSE_INDEX_BASE_ZERO;
 
     assert(GetFormat() & matrixFormatCompressed); // for now this only supports compressed formats
     PrepareDevice();
@@ -2444,7 +2444,7 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
     c.RequireSizeAndAllocate(n, m, nnz, GetFormat(), true, false);
 
     hipsparseHandle_t hipsparseHandle = 0;
-    CUSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
 
     SyncGuard syncGuard;
     if (GetFormat() == MatrixFormat::matrixFormatSparseCSR)
@@ -2453,12 +2453,12 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
         {
             if (sizeof(ElemType) == sizeof(float))
             {
-                CUSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const float*>(Data()), RowLocation(), ColLocation(),
+                HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const float*>(Data()), RowLocation(), ColLocation(),
                                                reinterpret_cast<float*>(c.Data()), c.ColLocation(), c.RowLocation(), cpVals, idxBase));
             }
             else
             {
-                CUSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const double*>(Data()), RowLocation(), ColLocation(),
+                HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const double*>(Data()), RowLocation(), ColLocation(),
                                                reinterpret_cast<double*>(c.Data()), c.ColLocation(), c.RowLocation(), cpVals, idxBase));
             }
         }
@@ -2473,12 +2473,12 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
         {
             if (sizeof(ElemType) == sizeof(float))
             {
-                CUSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, n, m, nnz, reinterpret_cast<const float*>(this->Data()), this->ColLocation(), this->RowLocation(),
+                HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, n, m, nnz, reinterpret_cast<const float*>(this->Data()), this->ColLocation(), this->RowLocation(),
                                                reinterpret_cast<float*>(c.Data()), c.RowLocation(), c.ColLocation(), cpVals, idxBase));
             }
             else
             {
-                CUSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, n, m, nnz, reinterpret_cast<const double*>(this->Data()), this->ColLocation(), this->RowLocation(),
+                HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, n, m, nnz, reinterpret_cast<const double*>(this->Data()), this->ColLocation(), this->RowLocation(),
                                                reinterpret_cast<double*>(c.Data()), c.RowLocation(), c.ColLocation(), cpVals, idxBase));
             }
         }
@@ -2491,7 +2491,7 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
     {
         NOT_IMPLEMENTED;
     }
-    CUSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
     return c;
 }
 
@@ -2559,24 +2559,24 @@ void GPUSparseMatrix<ElemType>::AssignColumnSliceToDense(GPUMatrix<ElemType>& sl
 
     PrepareDevice();
     hipsparseHandle_t hipsparseHandle = 0;
-    CUSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descr = 0;
-    CUSPARSE_CALL(hipsparseCreateMatDescr(&descr));
-    hipsparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO);
+    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descr));
+    hipsparseSetMatType(descr, HIPSPARSE_MATRIX_TYPE_GENERAL);
+    hipsparseSetMatIndexBase(descr, HIPSPARSE_INDEX_BASE_ZERO);
 
     SyncGuard syncGuard;
-    CUSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
+    //TODO: __add__ HIPSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
     if (sizeof(ElemType) == sizeof(float))
     {
-        CUSPARSE_CALL(hipsparseScsc2dense(hipsparseHandle, m, numCols, descr, (float*) Buffer(), RowLocation(), ColLocation() + startColumn, (float*) slice.Data(), m));
+        HIPSPARSE_CALL(hipsparseScsc2dense(hipsparseHandle, m, numCols, descr, (float*) Buffer(), RowLocation(), ColLocation() + startColumn, (float*) slice.Data(), m));
     }
     else
     {
-        CUSPARSE_CALL(hipsparseDcsc2dense(hipsparseHandle, m, numCols, descr, (double*) Buffer(), RowLocation(), ColLocation() + startColumn, (double*) slice.Data(), m));
+        HIPSPARSE_CALL(hipsparseDcsc2dense(hipsparseHandle, m, numCols, descr, (double*) Buffer(), RowLocation(), ColLocation() + startColumn, (double*) slice.Data(), m));
     }
 
-    CUSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+    HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
 
 }
 template <class ElemType>

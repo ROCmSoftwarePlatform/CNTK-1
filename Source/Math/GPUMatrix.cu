@@ -33,7 +33,7 @@
 
 #pragma comment(lib, "cudart.lib") // instruct linker to reference these libs
 #pragma comment(lib, "hipblas.lib")
-#pragma comment(lib, "cusparse.lib")
+#pragma comment(lib, "hipsparse.lib")
 #pragma comment(lib, "hiprng.lib")
 
 #pragma warning(disable : 4267) // conversion from 'size_t' to 'unsigned int'; happens in CUDA <<<a,b>>> syntax if a and b are size_t

@@ -22,6 +22,9 @@
 #pragma warning(pop)
 #endif
 
+#ifdef __HIP_PLATFORM_HCC__ //TODO: __add__ remove when CUB is integrated
+#define CUB_PTX_WARP_THREADS 64
+#endif
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 size_t RoundUpToMultiple(size_t n, size_t blockSize)
@@ -113,7 +116,7 @@ __device__ __forceinline__ void StoreValues<4, float>(const float src[4], float*
 template <typename T>
 __device__ __forceinline__ T Shuffle(T input, int srcLane)
 {
-#ifdef __CUDA_ARCH__
+#if defined(__HIP_DEVICE_COMPILE) && defined(__HIP_PLATFORM_NVCC__)
     // shfl is supported only on Kepler+
     static_assert(__CUDA_ARCH__ >= 300, "CNTK only supports only Kepler GPU architecture or newer.");
     return cub::ShuffleIndex(input, srcLane);
@@ -391,8 +394,10 @@ __global__ void kComputeSpatialBatchMeanAndInvStdDev(int vectorSize, int spatial
                                                      ElemType* runMean, ElemType* runVariance,
                                                      double epsilon, ElemType* xMean, ElemType* xInvStdDev)
 {
+    #ifdef __HIP_PLATFORM_NVCC__
     static_assert(BlockDimX * U == CUB_PTX_WARP_THREADS, "BlockDimX * U must be equal to warp size (32).");
     static_assert((BlockDimX * BlockDimY % CUB_PTX_WARP_THREADS) == 0, "Block size must be a multiple of warp size (32).");
+    #endif
     assert(hipBlockDim_x == BlockDimX);
     assert(hipBlockDim_y == BlockDimY);
     assert(hipBlockDim_z == 1);
@@ -615,8 +620,10 @@ __global__ void kNormalizeBatchTraining(int vectorSize, int spatialSize, int bat
     const ElemType* runningMean, const ElemType* runningVariance,
     const ElemType* batchMean, ElemType* batchInvStdDev)
 {
+    #ifdef __HIP_PLATFORM_NVCC__
     static_assert(BlockDimX * U == CUB_PTX_WARP_THREADS, "BlockDimX * U must be equal to warp size (32).");
     static_assert((BlockDimX * BlockDimY % CUB_PTX_WARP_THREADS) == 0, "Block size must be a multiple of warp size (32).");
+    #endif
     assert(hipBlockDim_x == BlockDimX);
     assert(hipBlockDim_y == BlockDimY);
     assert(hipBlockDim_z == 1);
@@ -765,8 +772,10 @@ template <int BlockDimX, int BlockDimY, int U, typename ElemType>
 __global__ void kComputeScaleAndBiasGradients(int vectorSize, int batchSize, const ElemType* x, const ElemType* dy, ElemType* dScale, ElemType* dBias,
                                               const ElemType* savedMean, const ElemType* savedInvStdDev)
 {
+    #ifdef __HIP_PLATFORM_NVCC__
     static_assert(BlockDimX * U == CUB_PTX_WARP_THREADS, "BlockDimX * U must be equal to warp size (32).");
     static_assert((BlockDimX * BlockDimY % CUB_PTX_WARP_THREADS) == 0, "Block size must be a multiple of warp size (32).");
+    #endif
     static_assert(((BlockDimY - 1) & BlockDimY) == 0, "BlockDimY must be a power of 2.");
     assert((vectorSize % U) == 0);
     assert(hipBlockDim_x == BlockDimX);
@@ -869,8 +878,10 @@ template <int BlockDimX, int BlockDimY, int U, typename ElemType>
 __global__ void kComputeSpatialScaleAndBiasGradients(int vectorSize, int spatialSize, int batchSize, const ElemType* x, const ElemType* dy,
                                                         ElemType* dScale, ElemType* dBias, const ElemType* savedMean, const ElemType* savedInvStdDev)
 {
+    #ifdef __HIP_PLATFORM_NVCC__
     static_assert(BlockDimX * U == CUB_PTX_WARP_THREADS, "BlockDimX * U must be equal to warp size (32).");
     static_assert((BlockDimX * BlockDimY % CUB_PTX_WARP_THREADS) == 0, "Block size must be a multiple of warp size (32).");
+    #endif
     assert(hipBlockDim_x == BlockDimX);
     assert(hipBlockDim_y == BlockDimY);
     assert(hipBlockDim_z == 1);
@@ -938,6 +949,7 @@ __global__ void kComputeSpatialScaleAndBiasGradients(int vectorSize, int spatial
         }
     }
     __syncthreads();
+    #ifdef __HIP_PLATFORM_NVCC__ //TODO: __add__ 
     using BlockReduce = cub::BlockReduce<ElemType, BlockDimX, cub::BLOCK_REDUCE_WARP_REDUCTIONS, BlockDimY>;
     // Note: must use separate temp storages for each reduction.
     __shared__ typename BlockReduce::TempStorage tmp1;
@@ -949,6 +961,7 @@ __global__ void kComputeSpatialScaleAndBiasGradients(int vectorSize, int spatial
         dScale[hipBlockIdx_x] = dsRes;
         dBias[hipBlockIdx_x] = dbRes;
     }
+    #endif
 }
 
 template <int U>
