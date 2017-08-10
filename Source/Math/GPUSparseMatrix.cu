@@ -664,13 +664,15 @@ void GPUSparseMatrix<ElemType>::Reshape(const size_t numRows, const size_t numCo
 
         int blocksPerGrid = (int) ceil(1.0 * numCols / GridDim::maxThreadsPerBlock);
         SyncGuard syncGuard;
+	auto fc_mail = MajorIndexLocation(); //TODO: __add__ remove this and the one below
+	auto fc_sil = SecondaryIndexLocation();
         hipLaunchKernelGGL((_reshape<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
             GetNumRows(),                // old row count
             GetNumCols(),                // old col count
             numRows,                  // new row count
             numCols,                  // new col count
-            MajorIndexLocation(),     // old row index array
-            SecondaryIndexLocation(), // old column index array
+            fc_mail,     // old row index array
+            fc_sil, // old column index array
             majorIndexInNewBuffer,    // new row index array
             secondaryIndexInNewBuffer // new column index array
             );
@@ -1484,14 +1486,16 @@ void GPUSparseMatrix<ElemType>::NormalGrad(GPUMatrix<ElemType>& c, const ElemTyp
         LONG64 N = (LONG64) GetNumNZElements();
         int blocksPerGrid = (int) ceil(((double) N) / GridDim::maxThreadsPerBlock);
 
+	auto fc_data = Data(); //TODO:__add__ remove this and below
+	auto fc_bi2cor = BlockId2ColOrRow(); 
         hipLaunchKernelGGL((_normalGradForSparseBlock<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
             momentum,
             isBlockCol,
             GetNumRows(),
             GetNumCols(),
             GetBlockSize(),
-            Data(),
-            BlockId2ColOrRow(),
+            fc_data,
+            fc_bi2cor,
             c.Data(),
             unitGainMomentum);
     }
@@ -1534,7 +1538,9 @@ ElemType GPUSparseMatrix<ElemType>::Adagrad(GPUMatrix<ElemType>& c, const bool n
         int blocksPerGrid = (nz + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
         bool colMajor = GetFormat() == MatrixFormat::matrixFormatSparseBlockCol;
         size_t len = colMajor ? GetNumRows() : GetNumCols();
-        hipLaunchKernelGGL((_adagrad4BlockSparse<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, c.Buffer(), c.GetNumRows(), Data(), BlockId2ColOrRow(), multipliers, colMajor, len, nz);
+	auto fc_data = Data(); //TODO: __add__  remove this and below
+	auto fc_bi2cor = BlockId2ColOrRow();
+        hipLaunchKernelGGL((_adagrad4BlockSparse<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, c.Buffer(), c.GetNumRows(), fc_data, fc_bi2cor, multipliers, colMajor, len, nz);
     }
     else
         NOT_IMPLEMENTED;
@@ -1585,8 +1591,10 @@ void GPUSparseMatrix<ElemType>::FSAdagrad(
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
+    auto fc_data = Data(); //TODO: __add__  remove all
+    auto fc_cor2bi = ColOrRow2BlockId();
     hipLaunchKernel(HIP_KERNEL_NAME(_fsadagrad4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
-        n, Data(), ColOrRow2BlockId(), GetNumRows(),
+        n, fc_data, fc_cor2bi, GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, unitGainMomentum);
 }
@@ -1620,8 +1628,10 @@ void GPUSparseMatrix<ElemType>::Adam(
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
+    auto fc_data = Data(); //TODO: __add__ remove
+    auto fc_cor2bi = ColOrRow2BlockId();
     hipLaunchKernel(HIP_KERNEL_NAME(_adam4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
-        n, Data(), ColOrRow2BlockId(), GetNumRows(),
+        n, fc_data, fc_cor2bi, GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, epsilon, unitGainMomentum, adamax);
 }
@@ -1661,9 +1671,11 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         ElemType* steps = c.Data() + 2 * n; // current step size
                                             // Data()+3*n is temp memory used to store multipliers, no need to initialize
 
+	auto fc_data = Data(); //TODO: __add__ remove
+	auto fc_cor2bi = ColOrRow2BlockId();
         hipLaunchKernel(HIP_KERNEL_NAME(_rmsprop_init4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
             avars, signs, steps, 
-            Data(), ColOrRow2BlockId(), GetNumRows(),
+            fc_data, fc_cor2bi, GetNumRows(),
             n);
     }
     assert(c.GetNumRows() == GetNumRows() && c.GetNumCols() == numColsNeeded);
@@ -1694,9 +1706,11 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         CUDA_CALL(hipMemcpy(upd_gpu, upd, sizeof(ElemType) * _countof(upd), hipMemcpyHostToDevice));
     }
 
+    auto fc_data = Data(); //TODO: __add__ remove
+    auto fc_cor2bi = ColOrRow2BlockId();
     hipLaunchKernel(HIP_KERNEL_NAME(_rmsprop4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
         avars, signs, steps,
-        Data(), ColOrRow2BlockId(), GetNumRows(),
+        fc_data, fc_cor2bi, GetNumRows(),
         n,
         RMS_GAMMA, RMS_WGT_INC, RMS_WGT_MAX, RMS_WGT_DEC, RMS_WGT_MIN,
         floor, upd_gpu, multipliers);
@@ -1739,8 +1753,10 @@ void GPUSparseMatrix<ElemType>::AdaDelta(GPUMatrix<ElemType>&c, GPUMatrix<ElemTy
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
+    auto fc_data = Data(); //TODO: __add__ remove
+    auto fc_cor2bi = ColOrRow2BlockId();
     hipLaunchKernel(HIP_KERNEL_NAME(_adadelta4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
-        n, Data(), ColOrRow2BlockId(), GetNumRows(),
+        n, fc_data, fc_cor2bi, GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learningRate, rho, epsilon);
 }
@@ -2116,7 +2132,7 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
     GPUSPARSE_INDEX_TYPE* cscRowIndA = nullptr;
     GPUSPARSE_INDEX_TYPE* cscColPtrA = nullptr;
 
-    hipsparseAction_t cpVals = HIPSPARSE_ACTION_NUMERIC;
+    //TODO: __add__ hipsparseAction_t cpVals = HIPSPARSE_ACTION_NUMERIC;
     hipsparseIndexBase_t idxBase = HIPSPARSE_INDEX_BASE_ZERO;
     hipsparseHandle_t hipsparseHandle = 0;
     HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
@@ -2132,11 +2148,11 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
         SyncGuard syncGuard;
         if (sizeof(ElemType) == sizeof(float))
         {
-            HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const float*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<float*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
+            //TODO:__add__ HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const float*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<float*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
         }
         else
         {
-            HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const double*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<double*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
+            //TODO: __add__ HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const double*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<double*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
         }
     }
     else if (a.GetFormat() == matrixFormatSparseCSC)
@@ -2261,7 +2277,10 @@ bool GPUSparseMatrix<ElemType>::IsValid() const
 
     SyncGuard syncGuard;
     int blocksPerGrid = (int) ceil((1.0 * SecondaryIndexCount()) / GridDim::maxThreadsPerBlock);
-    hipLaunchKernelGGL((_isValid<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, MajorIndexLocation(), SecondaryIndexLocation(), GetNumRows(), GetNumCols(), GetNumNZElements(), d_res);
+    auto fc_mail = MajorIndexLocation();//TODO: __add__ remove all
+    auto fc_sil = SecondaryIndexLocation();
+    auto fc_gnnze = GetNumNZElements();
+    hipLaunchKernelGGL((_isValid<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_mail, fc_sil, GetNumRows(), GetNumCols(), fc_gnnze, d_res);
 
     CUDA_CALL(hipMemcpy(res, d_res, sizeof(long) * 4, hipMemcpyDeviceToHost));
 
@@ -2436,7 +2455,7 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
     int m = (int) GetNumRows();
     int n = (int) GetNumCols();
     int nnz = (int) GetNumNZElements();
-    hipsparseAction_t cpVals = HIPSPARSE_ACTION_NUMERIC;
+    //TODO: __add__ hipsparse hipsparseAction_t cpVals = HIPSPARSE_ACTION_NUMERIC;
     hipsparseIndexBase_t idxBase = HIPSPARSE_INDEX_BASE_ZERO;
 
     assert(GetFormat() & matrixFormatCompressed); // for now this only supports compressed formats
@@ -2452,6 +2471,7 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
     {
         if (nnz > 0)
         {
+	/*TODO: __add__
             if (sizeof(ElemType) == sizeof(float))
             {
                 HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const float*>(Data()), RowLocation(), ColLocation(),
@@ -2461,7 +2481,7 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
             {
                 HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const double*>(Data()), RowLocation(), ColLocation(),
                                                reinterpret_cast<double*>(c.Data()), c.ColLocation(), c.RowLocation(), cpVals, idxBase));
-            }
+            }*/
         }
         else
         {
@@ -2472,6 +2492,7 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
     {
         if (nnz > 0)
         {
+	/*TODO: __add__
             if (sizeof(ElemType) == sizeof(float))
             {
                 HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, n, m, nnz, reinterpret_cast<const float*>(this->Data()), this->ColLocation(), this->RowLocation(),
@@ -2481,7 +2502,7 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
             {
                 HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, n, m, nnz, reinterpret_cast<const double*>(this->Data()), this->ColLocation(), this->RowLocation(),
                                                reinterpret_cast<double*>(c.Data()), c.RowLocation(), c.ColLocation(), cpVals, idxBase));
-            }
+            }*/
         }
         else
         {
@@ -2642,7 +2663,9 @@ ElemType GPUSparseMatrix<ElemType>::SumOfElements() const
     ElemType* d_sum = TracingGPUMemoryAllocator::Allocate<ElemType>(GetComputeDeviceId(), 1);
     ElemType h_sum;
     // WARNING: THIS kernel is not the most efficient way!
-    hipLaunchKernelGGL((_reductionSum1024Threads<ElemType>), dim3(1), dim3(1024), 0, 0, NzValues(), d_sum, (LONG64) GetNumNZElements());
+    auto fc_nzv = NzValues(); //TODO: __add__
+    auto fc_gnnze = GetNumNZElements(); 
+    hipLaunchKernelGGL((_reductionSum1024Threads<ElemType>), dim3(1), dim3(1024), 0, 0, fc_nzv, d_sum, (LONG64) fc_gnnze);
     CUDA_CALL(hipMemcpy(&h_sum, d_sum, sizeof(ElemType), hipMemcpyDeviceToHost));
     TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), d_sum);
 
@@ -2659,7 +2682,9 @@ ElemType GPUSparseMatrix<ElemType>::FrobeniusNorm() const
     ElemType* d_sum = TracingGPUMemoryAllocator::Allocate<ElemType>(GetComputeDeviceId(), 1);
     ElemType h_sum = 0;
     // WARNING: THIS kernel is not the most efficient way!
-    hipLaunchKernelGGL((_reductionSum21024Threads<ElemType>), dim3(1), dim3(1024), 0, 0, NzValues(), d_sum, (int) GetNumNZElements());
+    auto fc_nzv = NzValues(); //TODO: __add__
+    auto fc_gnnze = GetNumNZElements();
+    hipLaunchKernelGGL((_reductionSum21024Threads<ElemType>), dim3(1), dim3(1024), 0, 0, fc_nzv, d_sum, (int) fc_gnnze);
     CUDA_CALL(hipMemcpy(&h_sum, d_sum, sizeof(ElemType), hipMemcpyDeviceToHost));
     TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), d_sum);
 
@@ -2678,7 +2703,9 @@ ElemType GPUSparseMatrix<ElemType>::MatrixNormInf() const
     ElemType* d_maxAbs = TracingGPUMemoryAllocator::Allocate<ElemType>(GetComputeDeviceId(), 1);
     ElemType h_maxAbs = 0;
     // WARNING: THIS kernel is not the most efficient way!
-    hipLaunchKernelGGL((_reductionMatrixNormInf1024Threads<ElemType>), dim3(1), dim3(1024), 0, 0, NzValues(), d_maxAbs, (int) GetNumNZElements());
+    auto fc_nzv = NzValues(); //TODO: __add__
+    auto fc_gnnze = GetNumNZElements();
+    hipLaunchKernelGGL((_reductionMatrixNormInf1024Threads<ElemType>), dim3(1), dim3(1024), 0, 0, fc_nzv, d_maxAbs, (int) fc_gnnze);
     CUDA_CALL(hipMemcpy(&h_maxAbs, d_maxAbs, sizeof(ElemType), hipMemcpyDeviceToHost));
     TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), d_maxAbs);
 

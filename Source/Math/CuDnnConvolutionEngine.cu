@@ -304,7 +304,7 @@ protected:
         }; 
         FindBestAlgo(batchSize, m_fwdAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Perform forward convolution operation.
-        HIPDNN_CALL(hipdnnConvolutionForward(*m_hipdnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
+       //TODO: __add__  HIPDNN_CALL(hipdnnConvolutionForward(*m_hipdnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
     }
 
     void BackwardDataCore(const Mat& srcGrad, const Mat& kernel, Mat& grad, bool accumulateGradient, Mat& workspace) override
@@ -557,11 +557,12 @@ private:
                 assert(calgo == 1);                                 // only one deterministic algorithm will be returned 
                 algo.MBSizeForCurrentAlgo = batchSize;
 		typename TAlgo::typeL sel_algo;
+		typename TAlgo::typeM algo_type;
 		#ifdef __HIP_PLATFORM_NVCC__
-		convert_type((*algoPerf).algo, &sel_algo);
+		convert_type((*algoPerf), &sel_algo);
 		#endif
 		#ifdef __HIP_PLATFORM_HCC__
-                convert_type((*algoPerf).fwd_algo, &sel_algo);
+                convert_type(algo_type, &sel_algo);
                 #endif
                 algo.selectedAlgo = sel_algo;               // deterministic algorithm is the first in the list  
                 algo.maxAlgo = algo.selectedAlgo;
@@ -609,11 +610,12 @@ private:
                 auto res = algoPerf;        // first returned algorithm is the fastest 
                 algo.MBSizeForCurrentAlgo = batchSize;
 		typename TAlgo::typeL sel_algo;
+		typename TAlgo::typeM algo_type;
 		#ifdef __HIP_PLATFORM_NVCC__
                 convert_type((*algoPerf).algo, &sel_algo);
                 #endif
                 #ifdef __HIP_PLATFORM_HCC__
-                convert_type((*algoPerf).fwd_algo, &sel_algo);
+                convert_type(algo_type, &sel_algo);
                 #endif
                 algo.selectedAlgo = sel_algo;
                 algo.maxAlgo = algo.selectedAlgo;
@@ -636,11 +638,12 @@ private:
                     auto res = algoPerf;    // first returned algorithm is the fastest 
                     algo.MBSizeForCurrentAlgo = batchSize;
                     typename TAlgo::typeL sel_algo;
+		    typename TAlgo::typeM algo_type;
 		    #ifdef __HIP_PLATFORM_NVCC__
                     convert_type((*algoPerf).algo, &sel_algo);
                     #endif
                     #ifdef __HIP_PLATFORM_HCC__
-                    convert_type((*algoPerf).fwd_algo, &sel_algo);
+                    convert_type(algo_type, &sel_algo);
                     #endif
 		    algo.selectedAlgo = sel_algo;
                     algo.maxAlgo = algo.selectedAlgo;
@@ -683,11 +686,12 @@ private:
     }
 
 private:
-    template <typename T, typename L>
+    template <typename T, typename L, typename M>
     struct ConvAlgoInfo
     {
         typedef T typeT;
 	typedef L typeL;
+	typedef M typeM;
         ConvAlgoInfo()
             : MBSizeForCurrentAlgo(0), MBSizeForCurrentWorkspace(0), maxMBSizeSeen(0),autotuningState(AutotuningState::Init), AlgoWorkspaceSize(0)
         {
@@ -699,14 +703,14 @@ private:
         size_t AlgoWorkspaceSize;           // maximum workspace size for any algorithm 
         size_t DeterministicAlgoWorkspaceSize;  // workspace size for deterministic algorithm 
         AutotuningState autotuningState;    // state of auto-tuning: Init, PendingTuning and Running 
-	#ifdef __HIP_PLATFORM_NVCC__
+/*	#ifdef __HIP_PLATFORM_NVCC__
         decltype(static_cast<L>(T::algo)) selectedAlgo;     // currently selected algorithm 
         decltype(static_cast<L>(T::algo)) maxAlgo;          // algorithm that was selected when the current workspace is allocated 
 	#endif
-
+*/
 	#ifdef __HIP_PLATFORM_HCC__
-        decltype(static_cast<L>(T::fwd_algo)) selectedAlgo;     // currently selected algorithm 
-        decltype(static_cast<L>(T::fwd_algo)) maxAlgo;          // algorithm that was selected when the current workspace is allocated 
+        L selectedAlgo;     // currently selected algorithm 
+        L maxAlgo;          // algorithm that was selected when the current workspace is allocated 
         #endif
 
         bool NeedAutotuning(size_t batchSize)
@@ -732,11 +736,16 @@ private:
     // Pooling specific.
     std::unique_ptr<CuDnnPool> m_pool;
 
-    ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t, hipdnnConvolutionFwdAlgo_t> m_fwdAlgo;
-    ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t, hipdnnConvolutionFwdAlgo_t> m_backDataAlgo;
-    ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t, hipdnnConvolutionFwdAlgo_t> m_backFiltAlgo;
-    //ConvAlgoInfo<hipdnnConvolutionBwdDataAlgoPerf_t, hipdnnConvolutionBwdDataAlgo_t> m_backDataAlgo; //TODO:__add__
-    //ConvAlgoInfo<hipdnnConvolutionBwdFilterAlgoPerf_t, hipdnnConvolutionBwdFilterAlgo_t> m_backFiltAlgo;
+    #ifdef __HIP_PLATFORM_NVCC__
+    ConvAlgoInfo<decltype(hipdnnConvolutionFwdAlgoPerf_t::algo), hipdnnConvolutionFwdAlgo_t> m_fwdAlgo;
+    ConvAlgoInfo<decltype(hipdnnConvolutionBwdDataAlgoPerf_t::algo), hipdnnConvolutionBwdDataAlgo_t> m_backDataAlgo;
+    ConvAlgoInfo<decltype(hipdnnConvolutionBwdFilterAlgoPerf_t::algo), hipdnnConvolutionBwdFilterAlgo_t> m_backFiltAlgo;
+    #endif
+    #ifdef __HIP_PLATFORM_HCC__
+    ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t, hipdnnConvolutionFwdAlgo_t, decltype(hipdnnConvolutionFwdAlgoPerf_t::fwd_algo)> m_fwdAlgo;
+    ConvAlgoInfo<hipdnnConvolutionBwdDataAlgoPerf_t, hipdnnConvolutionBwdDataAlgo_t, decltype(hipdnnConvolutionBwdDataAlgoPerf_t::bwd_data_algo)> m_backDataAlgo; //TODO:__add__
+    ConvAlgoInfo<hipdnnConvolutionBwdFilterAlgoPerf_t, hipdnnConvolutionBwdFilterAlgo_t, decltype(hipdnnConvolutionBwdFilterAlgoPerf_t::bwd_weights_algo)> m_backFiltAlgo;
+    #endif
 
     // Flag indicating whether only deterministic algorithms should be used.
     bool m_forceDeterministicAlgorithms;

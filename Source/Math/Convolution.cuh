@@ -290,7 +290,7 @@ __global__ void kMaxROIPoolingForward(const int totalIterations,
 
         bool isempty = (hend <= hstart) || (wend <= wstart);
         // Define an empty pooling region to be zero
-        ElemType maxval = isempty ? (ElemType)0 : -CUDART_INF_F;
+        ElemType maxval = isempty ? (ElemType)0 :  -(__int_as_float(0x7f800000));//TODO: __add__ -CUDART_INF_F;
         int maxidx = -1;
 
         int imgIdx = n / numROIs;

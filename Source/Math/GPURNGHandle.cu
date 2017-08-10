@@ -19,7 +19,7 @@ GPURNGHandle::GPURNGHandle(int deviceId, uint64_t seed, uint64_t offset)
         fprintf(stderr, "(GPU): creating hiprng object with seed %llu\n", cudaSeed);
     }
 
-    HIPRNG_CALL(hiprngCreateGenerator(&m_generator, HIPRNG_RNG_PSEUDO_XORWOW));
+    //TODO: __add__HIPRNG_CALL(hiprngCreateGenerator(&m_generator, HIPRNG_RNG_PSEUDO_XORWOW));
     HIPRNG_CALL(hiprngSetPseudoRandomGeneratorSeed(m_generator, cudaSeed));
     //HIPRNG_CALL(hiprngSetGeneratorOrdering(m_generator, HIPRNG_ORDERING_PSEUDO_SEEDED));
     HIPRNG_CALL(hiprngSetGeneratorOffset(m_generator, offset));
