@@ -559,7 +559,7 @@ private:
 		typename TAlgo::typeL sel_algo;
 		typename TAlgo::typeM algo_type;
 		#ifdef __HIP_PLATFORM_NVCC__
-		convert_type((*algoPerf), &sel_algo);
+		convert_type(algo_type, &sel_algo);
 		#endif
 		#ifdef __HIP_PLATFORM_HCC__
                 convert_type(algo_type, &sel_algo);
@@ -640,7 +640,7 @@ private:
                     typename TAlgo::typeL sel_algo;
 		    typename TAlgo::typeM algo_type;
 		    #ifdef __HIP_PLATFORM_NVCC__
-                    convert_type((*algoPerf).algo, &sel_algo);
+                    convert_type(algo_type, &sel_algo);
                     #endif
                     #ifdef __HIP_PLATFORM_HCC__
                     convert_type(algo_type, &sel_algo);
@@ -703,15 +703,15 @@ private:
         size_t AlgoWorkspaceSize;           // maximum workspace size for any algorithm 
         size_t DeterministicAlgoWorkspaceSize;  // workspace size for deterministic algorithm 
         AutotuningState autotuningState;    // state of auto-tuning: Init, PendingTuning and Running 
-/*	#ifdef __HIP_PLATFORM_NVCC__
+	/*#ifdef __HIP_PLATFORM_NVCC__
         decltype(static_cast<L>(T::algo)) selectedAlgo;     // currently selected algorithm 
         decltype(static_cast<L>(T::algo)) maxAlgo;          // algorithm that was selected when the current workspace is allocated 
 	#endif
-*/
-	#ifdef __HIP_PLATFORM_HCC__
+
+	#ifdef __HIP_PLATFORM_HCC__*/
         L selectedAlgo;     // currently selected algorithm 
         L maxAlgo;          // algorithm that was selected when the current workspace is allocated 
-        #endif
+        //#endif
 
         bool NeedAutotuning(size_t batchSize)
         {
@@ -737,9 +737,9 @@ private:
     std::unique_ptr<CuDnnPool> m_pool;
 
     #ifdef __HIP_PLATFORM_NVCC__
-    ConvAlgoInfo<decltype(hipdnnConvolutionFwdAlgoPerf_t::algo), hipdnnConvolutionFwdAlgo_t> m_fwdAlgo;
-    ConvAlgoInfo<decltype(hipdnnConvolutionBwdDataAlgoPerf_t::algo), hipdnnConvolutionBwdDataAlgo_t> m_backDataAlgo;
-    ConvAlgoInfo<decltype(hipdnnConvolutionBwdFilterAlgoPerf_t::algo), hipdnnConvolutionBwdFilterAlgo_t> m_backFiltAlgo;
+    ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t, hipdnnConvolutionFwdAlgo_t, decltype(hipdnnConvolutionFwdAlgoPerf_t::algo)> m_fwdAlgo;
+    ConvAlgoInfo<hipdnnConvolutionBwdDataAlgoPerf_t, hipdnnConvolutionBwdDataAlgo_t, decltype(hipdnnConvolutionBwdDataAlgoPerf_t::algo)> m_backDataAlgo;
+    ConvAlgoInfo<hipdnnConvolutionBwdFilterAlgoPerf_t, hipdnnConvolutionBwdFilterAlgo_t, decltype(hipdnnConvolutionBwdFilterAlgoPerf_t::algo)> m_backFiltAlgo;
     #endif
     #ifdef __HIP_PLATFORM_HCC__
     ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t, hipdnnConvolutionFwdAlgo_t, decltype(hipdnnConvolutionFwdAlgoPerf_t::fwd_algo)> m_fwdAlgo;

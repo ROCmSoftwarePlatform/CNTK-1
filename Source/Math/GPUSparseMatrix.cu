@@ -12,9 +12,7 @@
 #include "GPUSparseMatrix.h"
 #include "GPUMatrix.h"
 #include <hip/hip_runtime.h>
-#ifdef __HIP_PLATFORM_NVCC__
-#include <hipsparse_v2.h>
-#endif
+//#include <hipsparse_v2.h>
 #include "hipsparse.h"
 #include "hipblas.h"
 #include "GPUMatrixCUDAKernels.cuh"
@@ -1593,7 +1591,7 @@ void GPUSparseMatrix<ElemType>::FSAdagrad(
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
     auto fc_data = Data(); //TODO: __add__  remove all
     auto fc_cor2bi = ColOrRow2BlockId();
-    hipLaunchKernel(HIP_KERNEL_NAME(_fsadagrad4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
+    hipLaunchKernelGGL((_fsadagrad4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
         n, fc_data, fc_cor2bi, GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, unitGainMomentum);
@@ -1630,7 +1628,7 @@ void GPUSparseMatrix<ElemType>::Adam(
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
     auto fc_data = Data(); //TODO: __add__ remove
     auto fc_cor2bi = ColOrRow2BlockId();
-    hipLaunchKernel(HIP_KERNEL_NAME(_adam4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
+    hipLaunchKernelGGL((_adam4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
         n, fc_data, fc_cor2bi, GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, epsilon, unitGainMomentum, adamax);
@@ -1673,7 +1671,7 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
 
 	auto fc_data = Data(); //TODO: __add__ remove
 	auto fc_cor2bi = ColOrRow2BlockId();
-        hipLaunchKernel(HIP_KERNEL_NAME(_rmsprop_init4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
+        hipLaunchKernelGGL((_rmsprop_init4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
             avars, signs, steps, 
             fc_data, fc_cor2bi, GetNumRows(),
             n);
@@ -1708,7 +1706,7 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
 
     auto fc_data = Data(); //TODO: __add__ remove
     auto fc_cor2bi = ColOrRow2BlockId();
-    hipLaunchKernel(HIP_KERNEL_NAME(_rmsprop4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
+    hipLaunchKernelGGL((_rmsprop4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
         avars, signs, steps,
         fc_data, fc_cor2bi, GetNumRows(),
         n,
@@ -1755,7 +1753,7 @@ void GPUSparseMatrix<ElemType>::AdaDelta(GPUMatrix<ElemType>&c, GPUMatrix<ElemTy
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
     auto fc_data = Data(); //TODO: __add__ remove
     auto fc_cor2bi = ColOrRow2BlockId();
-    hipLaunchKernel(HIP_KERNEL_NAME(_adadelta4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
+    hipLaunchKernelGGL((_adadelta4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
         n, fc_data, fc_cor2bi, GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
         learningRate, rho, epsilon);
