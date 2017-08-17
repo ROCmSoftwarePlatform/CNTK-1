@@ -68,11 +68,11 @@ void MatrixQuantizerGPU<ElemType>::SyncStream(hipStream_t stream)
 template <class ElemType>
 void MatrixQuantizerGPU<ElemType>::SyncEvent(hipEvent_t ev)
 {
-    auto rc = cudaEventQuery(ev);
+    auto rc = hipEventQuery(ev);
     if (rc != hipErrorNotReady)
     {
         // if Event is ready then no need to wait
-        rc || "cudaEventQuery failed";
+        rc || "hipEventQuery failed";
         return;
     }
     // we must wait

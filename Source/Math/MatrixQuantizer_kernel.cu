@@ -1,11 +1,12 @@
-#include "hip/hip_runtime.h"
 #ifndef __MATRIX_QUANTIZER_KERNEL_CUH__
 #define __MATRIX_QUANTIZER_KERNEL_CUH__
 #include <float.h>
 #include <cuda.h>
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
+#ifdef __HIP_PLATFORM_NVCC__
 #include <device_launch_parameters.h>
+#endif
 
 #include "ValueQuantizer.h"
 #include "ColumnQuantizer.h"
