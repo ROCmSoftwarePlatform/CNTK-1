@@ -34,12 +34,13 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     DECL float x##_(float f)    \
     {                           \
         return x##f(f);         \
-    }                           \
+    }                           
+/*
     DECL double x##_(double f)  \
     {                           \
         return x(f);            \
     }
-
+*///TODO: __add__ this when ambiguity is resolved
 OverloadUnaryMathFns(exp);
 OverloadUnaryMathFns(log);
 OverloadUnaryMathFns(tanh);
@@ -57,12 +58,13 @@ OverloadUnaryMathFns(log1p);
     DECL float x##_(float f, float y)    \
     {                                    \
         return x##f(f, y);               \
-    }                                    \
+    }                                    
+/*
     DECL double x##_(double f, double y) \
     {                                    \
         return x(f, y);                  \
     }
-
+*///TODO:  __add__ this when ambiguity is resolved
 // Because we compile with fast math the following produces nan for negative numbers raised to integer power.
 // To avoid this we define safepow_ further below.
 // Is there an nvcc pragma to disable fast math temporarily? Something like 

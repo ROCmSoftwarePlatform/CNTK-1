@@ -14,7 +14,7 @@ cuda_path=
 cuda_check=include/cuda.h
 enable_cuda=
 
-hip_path=
+hip_path=/opt/rocm/hip
 hip_check=include/hip/hip_runtime_api.h
 enable_hip=
 

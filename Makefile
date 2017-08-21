@@ -232,11 +232,19 @@ endif
 
 ifeq ($(HIP_PLATFORM), hcc)
   LIBS_LIST += hipblas_hcc hip_hcc hiprng_hcc hipsparse_hcc
+  INCLUDEPATH += /opt/rocm/miopen/include/
 endif
 
   ifndef CUB_PATH
     $(info defaulting CUB_PATH to /usr/local/cub-1.4.1)
     CUB_PATH=/usr/local/cub-hip
+  endif
+
+  ifdef HIPDNN_PATH
+    INCLUDEPATH += $(HIPDNN_PATH)/include
+    LIBPATH += /opt/rocm/lib64
+    LIBS_LIST += hipDNN
+    COMMON_FLAGS +=-DUSE_HIPDNN
   endif
 
   DEVICE = gpu
