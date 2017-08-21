@@ -21,7 +21,7 @@
 #ifndef CPUONLY
 #include <hip/hip_runtime_api.h>
 #ifdef __HIP_PLATFORM_NVCC__
-#pragma comment(lib, "hiprt.lib")
+#pragma comment(lib, "cudart.lib")
 #include <nvml.h>                // note: expected at "c:\Program Files\NVIDIA Corporation\GDK\gdk_win7_amd64_release\nvml\include" (Windows) and /the path you installed deployment kit/usr/include/nvidia/gdk (Linux)
 #pragma comment(lib, "nvml.lib") // note: expected at "c:\Program Files\NVIDIA Corporation\GDK\gdk_win7_amd64_release\nvml\lib" (Windows) and /the path you installed deployment kit/usr/include/nvidia/gdk (Linux)
 #endif

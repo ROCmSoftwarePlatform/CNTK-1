@@ -1,4 +1,4 @@
-// hiplib.cpp -- all CUDA calls (but not hipblas) are encapsulated here
+// cudalib.cpp -- all CUDA calls (but not hipblas) are encapsulated here
 // All actual CUDA API calls go here, to keep the header out of our other headers.
 //
 // F. Seide, V-hansu
@@ -7,7 +7,7 @@
 
 #include "Basics.h"
 #include <hip/hip_runtime_api.h> // for CUDA API
-#ifdef __HIP_PLATFORM_NVCc__
+#ifdef __HIP_PLATFORM_NVCC__
 #include <cuda.h>             // for device API
 #endif
 #include "cudalib.h"
@@ -19,12 +19,12 @@
 #undef NOMULTIDEVICE // define this to disable any context/driver stuff
 
 #ifndef NOMULTIDEVICE
-#pragma comment(lib, "hip.lib") // link CUDA device API
+#pragma comment(lib, "cuda.lib") // link CUDA device API
 #endif
-#pragma comment(lib, "hiprt.lib") // link CUDA runtime
+#pragma comment(lib, "cudart.lib") // link CUDA runtime
 #pragma comment(lib, "hipblas.lib")
 
-namespace msra { namespace hip {
+namespace msra { namespace cuda {
 
 static int devicesallocated = -1; // -1 means not initialized
 

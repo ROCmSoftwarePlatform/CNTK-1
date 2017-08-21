@@ -25,7 +25,7 @@
 #     If not specified, GPU will not be enabled
 #   CUB_PATH= path to NVIDIA CUB installation, so $(CUB_PATH)/cub/cub.cuh exists
 #     defaults to /usr/local/cub-1.4.1
-#   HIPDNN_PATH= path to NVIDIA cuDNN installation so $(HIPDNN_PATH)/cuda/include/hipDNN.h exists
+#   CUDNN_PATH= path to NVIDIA cuDNN installation so $(CUDNN_PATH)/cuda/include/cudnn.h exists
 #     CuDNN version needs to be 5.0 or higher.
 #   KALDI_PATH= Path to Kaldi
 #     If not specified, Kaldi plugins will not be built
@@ -48,7 +48,7 @@
 #   MPI_PATH= path to MPI installation, so $(MPI_PATH) exists
 #     defaults to /usr/local/mpi
 # These can be overridden on the command line, e.g. make BUILDTYPE=debug
-# TODO: __add__ $(SOURCEDIR)/Math/CuDnnRNN.cpp after CuDnnConvolutionEngine.cu
+
 # TODO: Build static libraries for common dependencies that are shared by multiple 
 # targets, e.g. eval and CNTK.
 
@@ -168,11 +168,11 @@ endif
 #  LIBS_LIST += hipblas cudart cuda hiprng cusparse nvidia-ml
 #
 ## Set up cuDNN if needed
-#  ifdef HIPDNN_PATH
-#    INCLUDEPATH += $(HIPDNN_PATH)/cuda/include
-#    LIBPATH += $(HIPDNN_PATH)/cuda/lib64
-#    LIBS_LIST += hipdnn
-#    COMMON_FLAGS +=-DUSE_HIPDNN
+#  ifdef CUDNN_PATH
+#    INCLUDEPATH += $(CUDNN_PATH)/cuda/include
+#    LIBPATH += $(CUDNN_PATH)/cuda/lib64
+#    LIBS_LIST += cudnn
+#    COMMON_FLAGS +=-DUSE_CUDNN
 #  endif
 #
 ## Set up NCCL if needed
@@ -203,17 +203,23 @@ ifeq ($(HIP_PLATFORM), nvcc)
 
   INCLUDEPATH+=$(GDK_INCLUDE_PATH)
   INCLUDEPATH += $(CUDA_PATH)/include
-  INCLUDEPATH += /usr/local/cudnn-6.0/cuda/include
   LIBPATH += $(CUDA_PATH)/lib64
-  LIBS_LIST += hipblas_nvcc hip_nvcc hiprng_nvcc cudart hipdnn cusparse nvidia-ml
+  LIBS_LIST += hipblas_nvcc hip_nvcc hiprng_nvcc cudart hipsparse_nvcc nvidia-ml
 
   # Set up cuDNN if needed
-#  ifdef HIPDNN_PATH
-#    INCLUDEPATH += $(HIPDNN_PATH)/cuda/include
-#    LIBPATH += $(HIPDNN_PATH)/cuda/lib64
-#    LIBS_LIST += hipdnn
-#    COMMON_FLAGS +=-DUSE_HIPDNN
-#  endif
+  ifdef CUDNN_PATH
+    INCLUDEPATH += $(CUDNN_PATH)/cuda/include
+    LIBPATH += $(CUDNN_PATH)/cuda/lib64
+    LIBS_LIST += cudnn
+    COMMON_FLAGS +=-DUSE_CUDNN
+  endif
+
+  ifdef HIPDNN_PATH
+    INCLUDEPATH += $(HIPDNN_PATH)/include
+    LIBPATH += /opt/rocm/lib64
+    LIBS_LIST += hipDNN
+    COMMON_FLAGS +=-DUSE_HIPDNN
+  endif
 
 # Set up NCCL if needed
   ifdef NCCL_PATH
@@ -225,9 +231,7 @@ ifeq ($(HIP_PLATFORM), nvcc)
 endif
 
 ifeq ($(HIP_PLATFORM), hcc)
-  LIBS_LIST += hipblas_hcc hip_hcc hiprng_hcc hipsparse_hcc MIOpen
-  INCLUDEPATH += /opt/rocm/hcc-1.0/include/
-  INCLUDEPATH += /opt/rocm/miopen/include/
+  LIBS_LIST += hipblas_hcc hip_hcc hiprng_hcc hipsparse_hcc
 endif
 
   ifndef CUB_PATH
@@ -245,7 +249,6 @@ endif
   INCLUDEPATH += /opt/rocm/hcblas/include/
   INCLUDEPATH += /opt/rocm/hcrng/include/
   INCLUDEPATH += /opt/rocm/hcsparse/include/
-  INCLUDEPATH += /opt/rocm/hipdnn/include/
   LIBPATH += /opt/rocm/lib64
 #  LIBS_LIST += hipblas cudart cuda hiprng cusparse nvidia-ml
 
@@ -492,6 +495,7 @@ MATH_SRC +=\
 	$(SOURCEDIR)/Math/CuDnnBatchNormalization.cu \
 	$(SOURCEDIR)/Math/CuDnnCommon.cu \
 	$(SOURCEDIR)/Math/CuDnnConvolutionEngine.cu \
+	$(SOURCEDIR)/Math/CuDnnRNN.cpp \
 	$(SOURCEDIR)/Math/GPUDataTransferer.cpp \
 	$(SOURCEDIR)/Math/GPUMatrix.cu \
 	$(SOURCEDIR)/Math/GPUSparseMatrix.cu \
