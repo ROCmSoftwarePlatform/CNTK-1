@@ -231,7 +231,7 @@ ifeq ($(HIP_PLATFORM), nvcc)
 endif
 
 ifeq ($(HIP_PLATFORM), hcc)
-  LIBS_LIST += hipblas_hcc hip_hcc hiprng_hcc hipsparse_hcc
+  LIBS_LIST += hipblas_hcc hip_hcc hiprng_hcc hipsparse_hcc MIOpen
   INCLUDEPATH += /opt/rocm/miopen/include/
 endif
 

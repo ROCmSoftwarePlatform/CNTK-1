@@ -55,14 +55,14 @@ public:
         // Set map count(aka K) dimension.
         dims[0] = (int)mapCount;
         dims[1] = (int)filt[filt_size - 1];
-        //TODO: __add__ HIPDNN_CALL(hipdnnSetFilterNdDescriptor(m_kernel, dataType, FILTER_FORMAT, (int)dim_size, dims.data()));
+        HIPDNN_CALL(hipdnnSetFilterNdDescriptor(m_kernel, dataType, FILTER_FORMAT, (int)dim_size, dims.data()));
     }
 
     ~CuDnnKernel()
     {
         if (m_kernel != nullptr)
         {
-            //TODO: __add__ hipdnnDestroyFilterDescriptor(m_kernel);
+             hipdnnDestroyFilterDescriptor(m_kernel);
             m_kernel = nullptr;
         }
     }
@@ -100,9 +100,9 @@ public:
             pad[dim_size - 1 - i] = geometry.GetLowerPad(i);
         }
         SmallVector<int> upscale(dim_size, 1);
-        /*TODO: __add__ HIPDNN_CALL(hipdnnSetConvolutionNdDescriptor(m_conv, (int)dim_size, pad.data(),
+        HIPDNN_CALL(hipdnnSetConvolutionNdDescriptor(m_conv, (int)dim_size, pad.data(),
                                                    stride.data(), upscale.data(),
-                                                   HIPDNN_CROSS_CORRELATION, dataType));*/
+                                                   HIPDNN_CROSS_CORRELATION, dataType));
     }
 
     ~CuDnnConv()
@@ -156,10 +156,10 @@ public:
         // deterministic maxpool is not working when kernel size > stride size in cuDNN. We ignore this flag for now. 
         if (forceDeterministicAlgorithms) {}
         // Must use HIPDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING to get the same results as in reference engine.
-        /*TODO: __add__ HIPDNN_CALL(hipdnnSetPoolingNdDescriptor(m_pool,
+        HIPDNN_CALL(hipdnnSetPoolingNdDescriptor(m_pool,
                                                kind == PoolKind::Max ? HIPDNN_POOLING_MAX : poolMode,
                                                HIPDNN_PROPAGATE_NAN,
-                                               (int)dim_size, dims.data(), pad.data(), stride.data()));*/
+                                               (int)dim_size, dims.data(), pad.data(), stride.data()));
     }
 
     ~CuDnnPool()
@@ -304,7 +304,7 @@ protected:
         }; 
         FindBestAlgo(batchSize, m_fwdAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Perform forward convolution operation.
-       //TODO: __add__  HIPDNN_CALL(hipdnnConvolutionForward(*m_hipdnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
+       HIPDNN_CALL(hipdnnConvolutionForward(*m_hipdnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
     }
 
     void BackwardDataCore(const Mat& srcGrad, const Mat& kernel, Mat& grad, bool accumulateGradient, Mat& workspace) override
@@ -372,7 +372,7 @@ protected:
         }; 
         FindBestAlgo(batchSize, m_backDataAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Compute gradients with respect to the output tensor (data).
-        //TODO: __add__ HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_hipdnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, ptr(grad)));
+        HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_hipdnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, ptr(grad)));
     }
 
     void BackwardKernelCore(const Mat& srcGrad, const Mat& in, Mat& kernelGrad, bool accumulateGradient, bool /*allowReuse*/, Mat& workspace) override

@@ -771,7 +771,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AddWithRowSliceValuesOf(const GPUMatri
     SyncGuard syncGuard;
     auto fc_data = Data(); //TODO: __add__ remove this
     auto fc_gnr = GetNumRows(); //TODO: __add__ remove this
-    hipLaunchKernelGGL((_addWithRowSliceValuesOf<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, fc_data, a.Data(), N, (CUDA_LONG) startIndex, (CUDA_LONG) GetNumRows(), (CUDA_LONG) a.GetNumRows());
+    hipLaunchKernelGGL((_addWithRowSliceValuesOf<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, fc_data, a.Data(), N, (CUDA_LONG) startIndex, (CUDA_LONG) fc_gnr, (CUDA_LONG) a.GetNumRows());
     return *this;
 }
 

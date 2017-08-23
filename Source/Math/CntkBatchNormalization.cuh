@@ -22,7 +22,7 @@
 #endif
 
 #ifdef __HIP_PLATFORM_HCC__ //TODO: __add__ remove when CUB is integrated
-#define CUB_PTX_WARP_THREADS 64
+#define CUB_PTX_WARP_THREADS 32
 #endif
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -948,7 +948,7 @@ __global__ void kComputeSpatialScaleAndBiasGradients(int vectorSize, int spatial
         }
     }
     __syncthreads();
-    #ifdef __HIP_PLATFORM_NVCC__ //TODO: __add__ 
+    #ifdef __HIP_PLATFORM_NVCC__ //TODO: __add__ remove platform dependency 
     using BlockReduce = cub::BlockReduce<ElemType, BlockDimX, cub::BLOCK_REDUCE_WARP_REDUCTIONS, BlockDimY>;
     // Note: must use separate temp storages for each reduction.
     __shared__ typename BlockReduce::TempStorage tmp1;

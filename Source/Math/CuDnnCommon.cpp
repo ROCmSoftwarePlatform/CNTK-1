@@ -55,7 +55,7 @@ void CuDnnTensor::Set(const TensorShape& src, hipdnnDataType_t dataType)
     // Set "minibatch"(aka N) dimension.
     dims[0] = 1;
     strides[0] = strides[1] * dims[1];
-    //TODO:__add__ HIPDNN_CALL(hipdnnSetTensorNdDescriptor(m_tensor, dataType, (int)dims.size(), dims.data(), strides.data()));
+    HIPDNN_CALL(hipdnnSetTensorNdDescriptor(m_tensor, dataType, (int)dims.size(), dims.data(), strides.data()));
 }
 
 void CuDnnTensor::UpdateBatchSize(size_t batchSize)
@@ -67,10 +67,10 @@ void CuDnnTensor::UpdateBatchSize(size_t batchSize)
     int nbDims = 0;
     hipdnnDataType_t dataType;
     // According to NVIDIA, Get/Set functions are very fast so it's safe to call them in a loop.
-    //TODO:__add__ HIPDNN_CALL(hipdnnGetTensorNdDescriptor(m_tensor, MaxDims, &dataType, &nbDims, dims, strides));
+    HIPDNN_CALL(hipdnnGetTensorNdDescriptor(m_tensor, MaxDims, &dataType, &nbDims, dims, strides));
     assert(nbDims <= MaxDims);
     dims[0] = (int)batchSize;
-    //TODO: __add__ HIPDNN_CALL(hipdnnSetTensorNdDescriptor(m_tensor, dataType, nbDims, dims, strides));
+    HIPDNN_CALL(hipdnnSetTensorNdDescriptor(m_tensor, dataType, nbDims, dims, strides));
 }
 
 template <typename ElemType>
