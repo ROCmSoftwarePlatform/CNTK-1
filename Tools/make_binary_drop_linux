@@ -77,7 +77,7 @@ case $targetConfiguration in
 esac
 
 [[ $releaseTag = unknown ]] || [[ $releaseTag =~ ^[1-9][0-9a-z-]*$ ]] || {
-  echo '--release-tag $releaseTag' option does not match expected format.
+  echo \'--release-tag $releaseTag\' option does not match expected format.
   exit 1
 }
 
@@ -214,6 +214,10 @@ cp -pr Examples $baseDropPath
 # Copy Tutorials
 echo "Copying Tutorials..." >&3
 cp -pr Tutorials $baseDropPath
+
+# Copy Manual
+echo "Copying Manual..." >&3
+cp -pr Manual $baseDropPath
 
 # Copy Scripts (Scripts folder from the root of the Repo)
 echo "Copying Scripts..." >&3

@@ -1305,7 +1305,7 @@ class Function(cntk_py.Function):
          >>> learner = cntk.sgd(model.parameters, cntk.learning_rate_schedule(0.1, cntk.UnitType.minibatch))
          >>> progress = criterion.train((X, Y), minibatch_size=25, max_epochs=2, epoch_size=125, parameter_learners=[learner])
          >>> print("%.2f" % progress.epoch_summaries[-1].loss) # get the final epoch's loss value
-         0.76
+         0.68
 
         Returns:
          An object `progress` with `progress.epoch_summaries` and `progress.updates` being the progressions of av loss, av metric, and number of labels
@@ -1422,6 +1422,9 @@ class Function(cntk_py.Function):
             ValueError('callbacks list must only contain objects of type ProgressWriter')
         progress_writers = callbacks or []
         evaluator = Evaluator(output, progress_writers + [collector])
+
+        if minibatch_source.is_infinite():
+            raise ValueError("minibatch_source must have a limited number of samples or sweeps.")
         # evaluation loop
         while True:
             data = minibatch_source.next_minibatch(minibatch_size) # fetch minibatch
@@ -1618,8 +1621,12 @@ class UserFunction(Function):
         name (str): name of this function
     '''
 
-    def __init__(self, inputs, as_numpy=True, name=''):
-        super(UserFunction, self).__init__(inputs, name)
+    def __init__(self, inputs, as_numpy=True, attributes=None, name=''):
+        if  attributes is None:
+            super(UserFunction, self).__init__(inputs, name)
+        else:
+            attributes = _py_dict_to_cntk_dict(attributes)
+            super(UserFunction, self).__init__(inputs, attributes, name)
         self.set_native(False)
         self.as_numpy = as_numpy
 

@@ -159,42 +159,36 @@ function OpNvidiaCub141(
     $targetPath = join-path $targetFolder $prodSubDir
     $envVar = "CUB_PATH";
     $envValue = $targetPath
-    $downloadSource = "https://github.com/NVlabs/cub/archive/1.4.1.zip";
-    $expectedHash = "F464EDA366E4DFE0C1D9AE2A6BBC22C5804CF131F8A67974C01FAE4AE8213E8B"
+    $downloadSource = "https://github.com/NVlabs/cub/archive/1.4.1.zip"
 
     @( @{ShortName = "CUB141"; VerifyInfo = "Checking for $prodName in $targetPath"; ActionInfo = "Installing $prodName";
          Verification = @( @{Function = "VerifyDirectory"; Path = "$targetPath" },
                            @{Function = "VerifyEnvironmentAndData"; EnvVar = $envVar; Content = $envValue } );
-         Download = @( @{Function = "Download"; Method = "WebRequest"; Source = $downloadSource; Destination = "$cache\$prodFile"; ExpectedHash = $expectedHash } );
+         Download = @( @{Function = "Download"; Method = "WebRequest"; Source = $downloadSource; Destination = "$cache\$prodFile" } );
          Action = @( @{Function = "ExtractAllFromZip"; zipFileName = "$cache\$prodFile"; destination = "$targetFolder"; destinationFolder = $prodSubDir; zipSubTree= $prodSubDir },
                      @{Function = "SetEnvironmentVariable"; EnvVar= $envVar; Content = $envValue } );
          } )
 }
 
-function OpNVidiaCudnn5180(
+function OpNVidiaCudnn6080(
     [parameter(Mandatory=$true)][string] $cache,
     [parameter(Mandatory=$true)][string] $targetFolder)
 {
-    $prodName = "NVidia HIPDNN 5.1 for CUDA 8.0"
-    $hipdnnWin7 = "hipdnn-8.0-windows7-x64-v5.1.zip"
-    $hipdnnWin10 = "hipdnn-8.0-windows10-x64-v5.1.zip"
+    $prodName = "NVidia CUDNN 6.0 for CUDA 8.0"
+    $cudnnWin = "cudnn-8.0-windows10-x64-v6.0.zip"
 
-    $prodSubDir =  "hipdnn-8.0-v5.1"
+    $prodSubDir =  "cudnn-8.0-v6.0"
     $targetPath = join-path $targetFolder $prodSubDir
     $envVar = "HIPDNN_PATH"
     $envValue = join-path $targetPath "cuda"
-    $downloadSource = "http://developer.download.nvidia.com/compute/redist/hipdnn/v5.1"
-    $expectedHashWin7 = ""
-    $expectedHashWin10 = "BE75CA61365BACE03873B47C77930025FFEE7676FBEF0DC03D3E180700AF014B"
+    $downloadSource = "http://developer.download.nvidia.com/compute/redist/cudnn/v6.0"
 
-    @( @{ShortName = "HIPDNN5180"; VerifyInfo = "Checking for $prodName in $targetPath"; ActionInfo = "Installing $prodName";
+    @( @{ShortName = "CUDNN6080"; VerifyInfo = "Checking for $prodName in $targetPath"; ActionInfo = "Installing $prodName";
          Verification = @( @{Function = "VerifyDirectory"; Path = $targetPath },
                            @{Function = "VerifyDirectory"; Path = $envValue },
                            @{Function = "VerifyEnvironmentAndData"; EnvVar = $envVar; Content = $envValue } );
-         Download = @( @{Function = "DownloadForPlatform"; Method = "WebRequest"; Platform = "^Microsoft Windows 7"; Source = "$downloadSource/$hipdnnWin7"; Destination = "$cache\$hipdnnWin7"; ExpectedHash = $expectedHashWin7 },
-                       @{Function = "DownloadForPlatform"; Method = "WebRequest"; Platform = "^Microsoft Windows (8|10|Server 2008 R2|Server 2012 R2)"; Source = "$downloadSource/$hipdnnWin10"; Destination = "$cache\$hipdnnWin10"; ExpectedHash = $expectedHashWin10 } );
-         Action = @( @{Function = "ExtractAllFromZipForPlatform"; Platform = "^Microsoft Windows 7"; zipFileName = "$cache\$hipdnnWin10"; destination = $targetFolder; destinationFolder = $prodSubDir },
-                     @{Function = "ExtractAllFromZipForPlatform"; Platform = "^Microsoft Windows (8|10|Server 2008 R2|Server 2012 R2)"; zipFileName = "$cache\$hipdnnWin10"; destination = $targetFolder; destinationFolder = $prodSubDir },
+         Download = @( @{Function = "Download"; Method = "WebRequest"; Source = "$downloadSource/$cudnnWin"; Destination = "$cache\$cudnnWin" } );
+         Action = @( @{Function = "ExtractAllFromZip"; zipFileName = "$cache\$cudnnWin"; destination = $targetFolder; destinationFolder = $prodSubDir },
                      @{Function = "SetEnvironmentVariable"; EnvVar = $envVar; Content  = $envValue } );
          })
 }
