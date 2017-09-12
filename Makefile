@@ -204,7 +204,7 @@ ifeq ($(HIP_PLATFORM), nvcc)
   INCLUDEPATH+=$(GDK_INCLUDE_PATH)
   INCLUDEPATH += $(CUDA_PATH)/include
   LIBPATH += $(CUDA_PATH)/lib64
-  LIBS_LIST += hipblas_nvcc hip_nvcc hiprng_nvcc cudart hipsparse_nvcc nvidia-ml
+  LIBS_LIST += hipblas hip_nvcc hiprng_nvcc cudart hipsparse_nvcc nvidia-ml
 
   # Set up cuDNN if needed
   ifdef CUDNN_PATH

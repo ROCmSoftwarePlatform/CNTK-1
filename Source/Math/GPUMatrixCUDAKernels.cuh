@@ -49,7 +49,7 @@
 #define IDX2C(i, j, ld) (((j) * (ld)) + (i)) // 0 based indexing
 
 // On older GPUs, CUDA atomicAdd() only exists for 'float'. This is the 'double' version.
-//#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600 //TODO: __mcw_cuda__ find perfect match and replace
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600 //TODO: __mcw_cuda__ find perfect match and replace
 //#ifdef __HIP_DEVICE_COMPILE__
 static __inline__ __device__ double atomicAdd(double* address, double val)
 {
@@ -62,7 +62,7 @@ static __inline__ __device__ double atomicAdd(double* address, double val)
     } while (assumed != old);
     return __longlong_as_double(old);
 }
-//#endif
+#endif
 
 // TODO: replace this with TensorOps.h LogAdd(). It differs in using ElemType throughout, while this one seems to use 'double' versions of exp() and log().
 // The 'k' in the name is to avoid naming conflicts with various versions of logadd() that are defined throughout the codebase.

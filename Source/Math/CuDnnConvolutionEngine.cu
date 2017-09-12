@@ -566,7 +566,11 @@ private:
                 workspace.Resize((algo.DeterministicAlgoWorkspaceSize + sizeof(ElemType) - 1) / sizeof(ElemType), 1, 0, false);
                 HIPDNN_CALL(deterministicFinder(calgo, algoPerf));
                 assert(calgo == 1);                                 // only one deterministic algorithm will be returned
-                algo.RecordAlgoBatchSizeWorkspaceSize(true, (*algoPerf).algo, batchSize, (*algoPerf).memory);
+		typename TAlgo::typeL sel_algo;
+		typename TAlgo::typeM newAlgo;
+		newAlgo = (*algoPerf).algo ;
+                convert_type(newAlgo, &sel_algo);
+                algo.RecordAlgoBatchSizeWorkspaceSize(true, sel_algo, batchSize, (*algoPerf).memory);
                 algo.autotuningState = AutotuningState::Running;    // no further need for tuning since this is deterministic, directly enter running state
             }            
             else
@@ -611,7 +615,11 @@ private:
                 HIPDNN_CALL(finder(calgo, algoPerf));
                 assert(calgo > 0);
                 auto res = algoPerf;        // first returned algorithm is the fastest
-                algo.RecordAlgoBatchSizeWorkspaceSize(true, (*res).algo, batchSize, (*res).memory);
+		typename TAlgo::typeL sel_algo;
+                typename TAlgo::typeM newAlgo;
+                newAlgo = (*res).algo ;
+                convert_type(newAlgo, &sel_algo);
+                algo.RecordAlgoBatchSizeWorkspaceSize(true, sel_algo, batchSize, (*res).memory);
                 algo.autotuningState = AutotuningState::Running;
                 if (algo.MaxAlgoWorkspaceSize < curSize)   // need to shrink the workspace
                     workspace.Resize((curSize + sizeof(ElemType) - 1) / sizeof(ElemType), 1, 0, false);
@@ -628,7 +636,11 @@ private:
                     HIPDNN_CALL(finder(calgo, algoPerf));
                     assert(calgo > 0);
                     auto res = algoPerf;    // first returned algorithm is the fastest
-                    algo.RecordAlgoBatchSizeWorkspaceSize(true, (*res).algo, batchSize, (*res).memory);
+		    typename TAlgo::typeL sel_algo;
+                    typename TAlgo::typeM newAlgo;
+                    newAlgo = (*res).algo ;
+                    convert_type(newAlgo, &sel_algo);
+                    algo.RecordAlgoBatchSizeWorkspaceSize(true, sel_algo, batchSize, (*res).memory);
                     algo.autotuningState = AutotuningState::Running;
                 }
                 catch (...)
@@ -686,8 +698,8 @@ private:
         size_t DeterministicAlgoWorkspaceSize;  // workspace size for deterministic algorithm
 
         AutotuningState autotuningState;    // state of auto-tuning: Init, PendingTuning and Running
-        decltype(T::algo) selectedAlgo;     // currently selected algorithm
-        decltype(T::algo) maxAlgo;          // algorithm that was selected when the current workspace is allocated
+        L selectedAlgo;     // currently selected algorithm
+        L maxAlgo;          // algorithm that was selected when the current workspace is allocated
 
         bool NeedAutotuning(size_t batchSize, size_t workspaceSize)
         {
