@@ -158,7 +158,12 @@ public:
 
         if (kind == PoolKind::Max)
         {
+	    #ifdef __HIP_PLATFORM_NVCC__
             if (forceDeterministicAlgorithms && (cudnnGetVersion() >= 6000))
+	    #endif
+	    #ifdef __HIP_PLATFORM_HCC__
+	    if (forceDeterministicAlgorithms)
+	    #endif
                 poolMode = HIPDNN_POOLING_MAX_DETERMINISTIC;
             else
                 poolMode = HIPDNN_POOLING_MAX;
@@ -525,6 +530,20 @@ private:
         hipdnnStatus_t status_hipdnn;
         status_hipdnn = miopenTohipConvolutionBwdFilterAlgo(in, out);
     }
+
+
+    void algomatch(miopenConvFwdAlgorithm_t* newalgo, hipdnnConvolutionFwdAlgoPerf_t* algotype)
+    {
+		*newalgo = (*algotype).fwd_algo ;
+    }
+    void algomatch(miopenConvBwdDataAlgorithm_t* newalgo, hipdnnConvolutionFwdAlgoPerf_t* algotype)
+    {
+                *newalgo = (*algotype).bwd_data_algo ;
+    }
+    void algomatch(miopenConvBwdWeightsAlgorithm_t* newalgo, hipdnnConvolutionFwdAlgoPerf_t* algotype)
+    {
+                *newalgo = (*algotype).bwd_weights_algo ;
+    }
     #endif
 
     template <typename TAlgo, typename TWorkspaceSizeFinder, typename TDeterministicFinder, typename TFinder, typename TStaticFinder>
@@ -568,7 +587,12 @@ private:
                 assert(calgo == 1);                                 // only one deterministic algorithm will be returned
 		typename TAlgo::typeL sel_algo;
 		typename TAlgo::typeM newAlgo;
+		#ifdef __HIP_PLATFORM_NVCC__
 		newAlgo = (*algoPerf).algo ;
+		#endif
+		#ifdef __HIP_PLATFORM_HCC__
+		algomatch(&newAlgo, algoPerf);
+		#endif
                 convert_type(newAlgo, &sel_algo);
                 algo.RecordAlgoBatchSizeWorkspaceSize(true, sel_algo, batchSize, (*algoPerf).memory);
                 algo.autotuningState = AutotuningState::Running;    // no further need for tuning since this is deterministic, directly enter running state
@@ -617,7 +641,12 @@ private:
                 auto res = algoPerf;        // first returned algorithm is the fastest
 		typename TAlgo::typeL sel_algo;
                 typename TAlgo::typeM newAlgo;
+		#ifdef __HIP_PLATFORM_NVCC__
                 newAlgo = (*res).algo ;
+                #endif
+		#ifdef  __HIP_PLATFORM_HCC__
+                algomatch(&newAlgo, res);
+                #endif
                 convert_type(newAlgo, &sel_algo);
                 algo.RecordAlgoBatchSizeWorkspaceSize(true, sel_algo, batchSize, (*res).memory);
                 algo.autotuningState = AutotuningState::Running;
@@ -638,7 +667,12 @@ private:
                     auto res = algoPerf;    // first returned algorithm is the fastest
 		    typename TAlgo::typeL sel_algo;
                     typename TAlgo::typeM newAlgo;
+                    #ifdef __HIP_PLATFORM_NVCC__
                     newAlgo = (*res).algo ;
+                    #endif
+		    #ifdef __HIP_PLATFORM_HCC__
+                    algomatch(&newAlgo, res);
+                    #endif
                     convert_type(newAlgo, &sel_algo);
                     algo.RecordAlgoBatchSizeWorkspaceSize(true, sel_algo, batchSize, (*res).memory);
                     algo.autotuningState = AutotuningState::Running;

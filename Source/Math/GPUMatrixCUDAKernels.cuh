@@ -48,9 +48,24 @@
 
 #define IDX2C(i, j, ld) (((j) * (ld)) + (i)) // 0 based indexing
 
+#ifdef __HIP_PLATFORM_NVCC__
 // On older GPUs, CUDA atomicAdd() only exists for 'float'. This is the 'double' version.
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600 //TODO: __mcw_cuda__ find perfect match and replace
-//#ifdef __HIP_DEVICE_COMPILE__
+static __inline__ __device__ double atomicAdd(double* address, double val)
+{
+    unsigned long long int* address_as_ull = (unsigned long long int*) address;
+    unsigned long long int old = *address_as_ull, assumed;
+    do
+    {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed, __double_as_longlong(val + __longlong_as_double(assumed)));
+    } while (assumed != old);
+    return __longlong_as_double(old);
+}
+#endif
+#endif
+
+#ifdef __HIP_PLATFORM_HCC__
 static __inline__ __device__ double atomicAdd(double* address, double val)
 {
     unsigned long long int* address_as_ull = (unsigned long long int*) address;
@@ -3268,7 +3283,7 @@ __global__ void _adjustCol2BlockId(
     ElemType* newNZ,
     GPUSPARSE_INDEX_TYPE* newBlockId2Col)
 {
-    CUDA_LONG id = blockDim.x * blockIdx.x + threadIdx.x;
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= numCols)
         return;
 
