@@ -19,7 +19,10 @@
 #include <iostream> // for cout/cerr
 #include <memory>   // for unique_ptr
 #include <limits.h> // for ULONG_MAX
+#ifdef HIP_COMPILE
 #include "hip/hip_runtime_api.h"
+#endif
+
 //#include "CPUMatrix.h"
 //#include "CPUSparseMatrix.h"
 //#include "GPUSparseMatrix.h"
@@ -28,18 +31,19 @@
 #include <unistd.h>
 #endif
 
-#ifdef __HIP_PLATFORM_NVCC__
 // predeclare hipblasHandle_t
 struct cublasContext;
 typedef struct cublasContext* cublasHandle_t;
-typedef cublasHandle_t hipblasHandle_t;
 struct CUstream_st;
 typedef struct CUstream_st* hipStream_t;
-#endif
 
-#ifdef __HIP_PLATFORM_HCC__
+#ifdef HIP_COMPILE
+#ifdef __HIP_PLATFORM_NVCC__
+typedef cublasHandle_t hipblasHandle_t;
+#elif defined __HIP_PLATFORM_HCC__
 typedef struct Hcblaslibrary *hcblasHandle_t;
 typedef hcblasHandle_t hipblasHandle_t;
+#endif
 #endif
 
 #ifdef _WIN32
@@ -63,9 +67,15 @@ typedef hcblasHandle_t hipblasHandle_t;
 #define MAX_GPUS 16
 #endif
 
+#ifdef CUDA_COMPILE
+// Stream management functions
+void MATH_API SetStream(cudaStream_t stream);
+cudaStream_t MATH_API GetStream();
+#elif defined HIP_COMPILE
 // Stream management functions
 void MATH_API SetStream(hipStream_t stream);
 hipStream_t MATH_API GetStream();
+#endif
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -82,7 +92,11 @@ private:
 
     bool m_forceSync;
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
+    cudaEvent_t m_done;
+#elif defined HIP_COMPILE
     hipEvent_t m_done;
+#endif
 #endif
 
 public:
@@ -171,8 +185,13 @@ public:
     static const int MaxGpus = MAX_GPUS;
 
 private:
+#ifdef CUDA_COMPILE
+    static cublasHandle_t s_cuHandle[MaxGpus];
+    static void* s_curandGenerator;
+#elif defined HIP_COMPILE
     static hipblasHandle_t s_cuHandle[MaxGpus];
     static void* s_hiprngGenerator;
+#endif
 
 // Have to use disable the warning to avoid issues with __declspec(dllexport) on Windows (C4251).
 // Also, NVCC FE corresponding warning has to be disabled, see MathCUDA.vcxproj.
@@ -180,7 +199,7 @@ private:
 #pragma warning(push)
 #pragma warning(disable : 4251)
     mutable std::unique_ptr<conc_stack<std::unique_ptr<GPUMatrix<ElemType>>>> m_workspace;
-    mutable std::shared_ptr<CuDnnRNNExecutor<ElemType>> m_rnnExecutor; // for hipdnn5 RNN
+    mutable std::shared_ptr<CuDnnRNNExecutor<ElemType>> m_rnnExecutor; // for cudnn5 RNN
 #pragma warning(pop)
 
 private:
@@ -207,7 +226,11 @@ public:
     static void SetDevice(DEVICEID_TYPE deviceId);
     DEVICEID_TYPE PrepareDevice(DEVICEID_TYPE deviceId = -1) const;
 
+#ifdef CUDA_COMPILE
+    static cublasHandle_t GetCublasHandle(int computeDevice = -1);
+#elif defined HIP_COMPILE
     static hipblasHandle_t GetCublasHandle(int computeDevice = -1);
+#endif
     ElemType* CopyToArray() const;                                              // allocated by the callee but need to be deleted by the caller
     size_t CopyToArray(ElemType*& arrayCopyTo, size_t& currentArraySize) const; // allocated by the callee but need to be deleted by the caller
     void CopySection(size_t numRows, size_t numCols, ElemType* dst, size_t colStride) const;
@@ -674,7 +697,9 @@ typedef GPUMatrix<float> GPUSingleMatrix;
 
 #ifndef CPUONLY
 
-#include <hip/hip_runtime.h>
+#ifdef CUDA_COMPILE
+#include <cuda_runtime.h>
+#endif
 
 // -----------------------------------------------------------------------
 // Error handling
@@ -697,7 +722,11 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
                 strcpy(hostname, "?");
 #endif
             int currentCudaDevice;
+#ifdef CUDA_COMPILE
+	    cudaGetDevice(&currentCudaDevice);
+#elif defined HIP_COMPILE
             hipGetDevice(&currentCudaDevice);
+#endif
             Microsoft::MSR::CNTK::RuntimeError("%s failure %d: %s ; GPU=%d ; hostname=%s ; expr=%s%s", libName, (int)retCode, CudaErrString(retCode), currentCudaDevice, hostname ? hostname : "?", exprString, msg);
         }
         catch (const std::exception& e) // catch, log, and rethrow since CUDA code sometimes hangs in destruction, so we'd never get to see the error
@@ -708,11 +737,20 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
     }
 }
 
-#define CUDA_CALL(expr)     (CudaCall((expr), #expr, "CUDA",     hipSuccess))
+#ifdef CUDA_COMPILE
+#define CUDA_CALL(expr)     (CudaCall((expr), #expr, "CUDA",     cudaSuccess))
+#define CUBLAS_CALL(expr)   (CudaCall((expr), #expr, "CUBLAS",   CUBLAS_STATUS_SUCCESS))
+#define CUSPARSE_CALL(expr) (CudaCall((expr), #expr, "CUSPARSE", CUSPARSE_STATUS_SUCCESS))
+#define CURAND_CALL(expr)   (CudaCall((expr), #expr, "CURAND",   CURAND_STATUS_SUCCESS))
+#define CUDNN_CALL(expr)    (CudaCall((expr), #expr, "cuDNN",    CUDNN_STATUS_SUCCESS))
+#define CUDNN_CALL2(expr,m) (CudaCall((expr), #expr, "cuDNN", CUDNN_STATUS_SUCCESS, m))
+#elif defined HIP_COMPILE
+#define CUDA_CALL(expr)     (CudaCall((expr), #expr, "HIP",     hipSuccess))
 #define HIPBLAS_CALL(expr)   (CudaCall((expr), #expr, "HIPBLAS",   HIPBLAS_STATUS_SUCCESS))
 #define HIPSPARSE_CALL(expr) (CudaCall((expr), #expr, "HIPSPARSE", HIPSPARSE_STATUS_SUCCESS))
 #define HIPRNG_CALL(expr)   (CudaCall((expr), #expr, "HIPRNG",   HIPRNG_STATUS_SUCCESS))
-#define HIPDNN_CALL(expr)    (CudaCall((expr), #expr, "cuDNN",    HIPDNN_STATUS_SUCCESS))
-#define HIPDNN_CALL2(expr,m) (CudaCall((expr), #expr, "cuDNN",    HIPDNN_STATUS_SUCCESS, m))
+#define HIPDNN_CALL(expr)    (CudaCall((expr), #expr, "HIPDNN",    HIPDNN_STATUS_SUCCESS))
+#define HIPDNN_CALL2(expr,m) (CudaCall((expr), #expr, "HIPDNN",    HIPDNN_STATUS_SUCCESS, m))
+#endif
 
 #endif // CPUONLY

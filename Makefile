@@ -101,7 +101,7 @@ SOURCEDIR:= Source
 INCLUDEPATH:= $(addprefix $(SOURCEDIR)/, Common/Include CNTKv2LibraryDll CNTKv2LibraryDll/API CNTKv2LibraryDll/proto ../Examples/Extensibility/CPP Math CNTK ActionsLib ComputationNetworkLib SGDLib SequenceTrainingLib CNTK/BrainScript Readers/ReaderLib PerformanceProfilerDll)
 INCLUDEPATH+=$(PROTOBUF_PATH)/include
 # COMMON_FLAGS include settings that are passed both to HIPCC and C++ compilers.
-COMMON_FLAGS:= -DHAS_MPI=$(HAS_MPI) -D_POSIX_SOURCE -D_XOPEN_SOURCE=600 -D__USE_XOPEN2K -std=c++11
+COMMON_FLAGS:= -DHAS_MPI=$(HAS_MPI) -D_POSIX_SOURCE -D_XOPEN_SOURCE=600 -D__USE_XOPEN2K -std=c++11 -g -DHIP_COMPILE
 
 CXXFLAGS:= $(SSE_FLAGS) -std=c++0x -fopenmp -fpermissive -fPIC -Werror -fcheck-new
 ifeq ($(HIP_PLATFORM), nvcc)
@@ -204,7 +204,7 @@ ifeq ($(HIP_PLATFORM), nvcc)
   INCLUDEPATH+=$(GDK_INCLUDE_PATH)
   INCLUDEPATH += $(CUDA_PATH)/include
   LIBPATH += $(CUDA_PATH)/lib64
-  LIBS_LIST += hipblas hip_nvcc hiprng_nvcc cudart hipsparse_nvcc nvidia-ml
+  LIBS_LIST += hipblas hip_nvcc hiprng cudart hipsparse nvidia-ml cusparse
 
   # Set up cuDNN if needed
   ifdef CUDNN_PATH

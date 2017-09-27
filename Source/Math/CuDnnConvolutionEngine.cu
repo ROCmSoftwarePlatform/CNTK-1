@@ -17,7 +17,7 @@
 template <>
 const char* CudaErrString<hipdnnStatus_t>(hipdnnStatus_t x)
 {
-    return (const char*)0;//TODO:__add__ hipdnnGetErrorString(x);
+    return hipdnnGetErrorString(x);
 }
 
 // A note on the formats: CNTK originally used NHWC for input/output tensors and CHWN for kernels.
@@ -133,7 +133,7 @@ public:
     CuDnnPool(const ConvolveGeometry& geometry, PoolKind kind, bool forceDeterministicAlgorithms, bool poolIncludePad)
         : m_pool(nullptr)
     {
-        assert(kind == PoolKind::Max || kind == PoolKind::Average);
+        assert(bool(kind == PoolKind::Max || kind == PoolKind::Average));
 
         HIPDNN_CALL(hipdnnCreatePoolingDescriptor(&m_pool));
         // Set cuDNN pooling parameters. cuDNN uses row-major format while TensorShape - column-major
@@ -215,7 +215,7 @@ public:
                            size_t maxTempMemSizeInSamples, PoolKind poolKind, bool forceDeterministicAlgorithms,
                            bool poolIncludePad, bool inputHasFreeDimension)
         : Base(geometry, deviceId, imageLayout, maxTempMemSizeInSamples, poolKind, poolIncludePad),
-          m_hipdnn(CuDnn::Instance()),
+          m_cudnn(CuDnn::Instance()),
           m_dataType(CuDnnTensor::GetDataType<ElemType>()),
           m_forceDeterministicAlgorithms(forceDeterministicAlgorithms),
           m_inputHasFreeDimension(inputHasFreeDimension)
@@ -272,14 +272,14 @@ protected:
         // Find best algo and allocate temp buffer, if needed.
         auto finder = [&,this](int& calgo, hipdnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
-            return hipdnnFindConvolutionForwardAlgorithmEx(*m_hipdnn, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_outT, ptr(out), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+            return hipdnnFindConvolutionForwardAlgorithmEx(*m_cudnn, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_outT, ptr(out), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
         };
         // Find max Memory needed while running static finder. Workaround for hipdnnFind fail. Number of algo is constant as in hipdnn 5.1
         auto staticFinder = [&,this](hipdnnConvolutionFwdAlgo_t& algo, bool noMem) -> hipdnnStatus_t
         {
             if(!noMem)
-                return hipdnnGetConvolutionForwardAlgorithm(*m_hipdnn, m_inT, *m_kernelT, *m_conv, m_outT, HIPDNN_CONVOLUTION_FWD_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
-            return hipdnnGetConvolutionForwardAlgorithm(*m_hipdnn, m_inT, *m_kernelT, *m_conv, m_outT, HIPDNN_CONVOLUTION_FWD_NO_WORKSPACE, 0, &algo);
+                return hipdnnGetConvolutionForwardAlgorithm(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, HIPDNN_CONVOLUTION_FWD_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
+            return hipdnnGetConvolutionForwardAlgorithm(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, HIPDNN_CONVOLUTION_FWD_NO_WORKSPACE, 0, &algo);
         };
         // find deterministic algorithm 
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
@@ -306,7 +306,7 @@ protected:
             hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;
             for (int i = 0; i < MaxAlgoCount; i++)
             {
-                auto err0 = hipdnnGetConvolutionForwardWorkspaceSize(*m_hipdnn, m_inT, *m_kernelT, *m_conv, m_outT, (hipdnnConvolutionFwdAlgo_t)i, &tmpSize);
+                auto err0 = hipdnnGetConvolutionForwardWorkspaceSize(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, (hipdnnConvolutionFwdAlgo_t)i, &tmpSize);
                 if (err0 == HIPDNN_STATUS_SUCCESS)
                 {
                     if (m_fwdAlgo.MaxAlgoWorkspaceSize < tmpSize)
@@ -320,7 +320,7 @@ protected:
         };
         FindBestAlgo(batchSize, m_fwdAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Perform forward convolution operation.
-       HIPDNN_CALL(hipdnnConvolutionForward(*m_hipdnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
+       HIPDNN_CALL(hipdnnConvolutionForward(*m_cudnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
     }
 
     void BackwardDataCore(const Mat& srcGrad, const Mat& kernel, Mat& grad, bool accumulateGradient, Mat& workspace) override
@@ -335,19 +335,19 @@ protected:
                 // hipdnnFindConvolutionBackwardDataAlgorithmEx will overwrite the output buffer, thus we create a temporary buffer here
                 // note this memory allocation might fail, so use try...catch for safety 
                 auto gradReplace = Matrix<ElemType>((grad.BufferSize() + sizeof(ElemType) - 1)/sizeof(ElemType), 1, m_deviceId);
-                result = hipdnnFindConvolutionBackwardDataAlgorithmEx(*m_hipdnn, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_inT, ptr(gradReplace), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+                result = hipdnnFindConvolutionBackwardDataAlgorithmEx(*m_cudnn, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_inT, ptr(gradReplace), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
                 gradReplace.ReleaseMemory();
             }
             else
-                result = hipdnnFindConvolutionBackwardDataAlgorithmEx(*m_hipdnn, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_inT, ptr(grad), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+                result = hipdnnFindConvolutionBackwardDataAlgorithmEx(*m_cudnn, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_inT, ptr(grad), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
             return result;
         };
         // Find max Memory needed while running static finder. Workaround for hipdnnFind fail. Number of algo is constant as in hipdnn 5.1
         auto staticFinder = [&,this](hipdnnConvolutionBwdDataAlgo_t& algo, bool noMem) -> hipdnnStatus_t
         {
             if(!noMem)
-                return hipdnnGetConvolutionBackwardDataAlgorithm(*m_hipdnn, *m_kernelT, m_outT, *m_conv, m_inT, HIPDNN_CONVOLUTION_BWD_DATA_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
-            return hipdnnGetConvolutionBackwardDataAlgorithm(*m_hipdnn, *m_kernelT, m_outT, *m_conv, m_inT, HIPDNN_CONVOLUTION_BWD_DATA_NO_WORKSPACE, 0, &algo);
+                return hipdnnGetConvolutionBackwardDataAlgorithm(*m_cudnn, *m_kernelT, m_outT, *m_conv, m_inT, HIPDNN_CONVOLUTION_BWD_DATA_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
+            return hipdnnGetConvolutionBackwardDataAlgorithm(*m_cudnn, *m_kernelT, m_outT, *m_conv, m_inT, HIPDNN_CONVOLUTION_BWD_DATA_NO_WORKSPACE, 0, &algo);
         };
         // find deterministic algorithm 
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
@@ -374,7 +374,7 @@ protected:
             hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;
             for (int i = 0; i < MaxAlgoCount; i++)
             {
-                auto err0 = hipdnnGetConvolutionBackwardDataWorkspaceSize(*m_hipdnn, *m_kernelT, m_outT, *m_conv, m_inT, (hipdnnConvolutionBwdDataAlgo_t)i, &tmpSize);
+                auto err0 = hipdnnGetConvolutionBackwardDataWorkspaceSize(*m_cudnn, *m_kernelT, m_outT, *m_conv, m_inT, (hipdnnConvolutionBwdDataAlgo_t)i, &tmpSize);
                 if (err0 == HIPDNN_STATUS_SUCCESS)
                 {
                     if (m_backDataAlgo.MaxAlgoWorkspaceSize < tmpSize)
@@ -388,7 +388,7 @@ protected:
         };
         FindBestAlgo(batchSize, m_backDataAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Compute gradients with respect to the output tensor (data).
-        HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_hipdnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, ptr(grad)));
+        HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_cudnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, ptr(grad)));
     }
 
     void BackwardKernelCore(const Mat& srcGrad, const Mat& in, Mat& kernelGrad, bool accumulateGradient, bool /*allowReuse*/, Mat& workspace) override
@@ -403,19 +403,19 @@ protected:
                 // hipdnnFindConvolutionBackwardFilterAlgorithmEx will overwrite the output buffer, thus we create a temporary buffer here
                 // note this memory allocation might fail, so use try...catch for safety 
                 auto kernelGradReplace = Matrix<ElemType>((kernelGrad.BufferSize() + sizeof(ElemType) - 1)/sizeof(ElemType), 1, m_deviceId);
-                result = hipdnnFindConvolutionBackwardFilterAlgorithmEx(*m_hipdnn, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, *m_kernelT, ptr(kernelGradReplace), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+                result = hipdnnFindConvolutionBackwardFilterAlgorithmEx(*m_cudnn, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, *m_kernelT, ptr(kernelGradReplace), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
                 kernelGradReplace.ReleaseMemory();
             }
             else
-                result = hipdnnFindConvolutionBackwardFilterAlgorithmEx(*m_hipdnn, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, *m_kernelT, ptr(kernelGrad), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+                result = hipdnnFindConvolutionBackwardFilterAlgorithmEx(*m_cudnn, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, *m_kernelT, ptr(kernelGrad), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
             return result;
         };
         // Find max Memory needed while running static finder. Workaround for hipdnnFind fail. Number of algo is constant as in hipdnn 5.1
         auto staticFinder = [&,this](hipdnnConvolutionBwdFilterAlgo_t& algo, bool noMem) -> hipdnnStatus_t
         {
             if(!noMem)
-                return hipdnnGetConvolutionBackwardFilterAlgorithm(*m_hipdnn, m_inT, m_outT, *m_conv, *m_kernelT, HIPDNN_CONVOLUTION_BWD_FILTER_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
-            return hipdnnGetConvolutionBackwardFilterAlgorithm(*m_hipdnn, m_inT, m_outT, *m_conv, *m_kernelT, HIPDNN_CONVOLUTION_BWD_FILTER_NO_WORKSPACE, 0, &algo);
+                return hipdnnGetConvolutionBackwardFilterAlgorithm(*m_cudnn, m_inT, m_outT, *m_conv, *m_kernelT, HIPDNN_CONVOLUTION_BWD_FILTER_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
+            return hipdnnGetConvolutionBackwardFilterAlgorithm(*m_cudnn, m_inT, m_outT, *m_conv, *m_kernelT, HIPDNN_CONVOLUTION_BWD_FILTER_NO_WORKSPACE, 0, &algo);
         };
         // find deterministic algorithm 
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount])->hipdnnStatus_t
@@ -442,7 +442,7 @@ protected:
             hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;
             for (int i = 0; i < MaxAlgoCount; i++)
             {
-                auto err0 = hipdnnGetConvolutionBackwardFilterWorkspaceSize(*m_hipdnn, m_inT, m_outT, *m_conv, *m_kernelT, (hipdnnConvolutionBwdFilterAlgo_t)i, &tmpSize);
+                auto err0 = hipdnnGetConvolutionBackwardFilterWorkspaceSize(*m_cudnn, m_inT, m_outT, *m_conv, *m_kernelT, (hipdnnConvolutionBwdFilterAlgo_t)i, &tmpSize);
                 if (err0 == HIPDNN_STATUS_SUCCESS)
                 {
                     if (m_backFiltAlgo.MaxAlgoWorkspaceSize < tmpSize)
@@ -456,7 +456,7 @@ protected:
         };
         FindBestAlgo(batchSize, m_backFiltAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Compute gradients with respect to the output tensor (data).
-        //TODO: __change__ HIPDNN_CALL(hipdnnConvolutionBackwardFilter(*m_hipdnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
+        HIPDNN_CALL(hipdnnConvolutionBackwardFilter(*m_cudnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
     }
 
     void EnsurePoolingInitialized() override
@@ -470,7 +470,7 @@ protected:
         size_t batchSize = in.GetNumCols();
         m_inT.UpdateBatchSize(batchSize);
         m_outT.UpdateBatchSize(batchSize);
-        HIPDNN_CALL(hipdnnPoolingForward(*m_hipdnn, *(m_pool), &C::One, m_inT, ptr(in), &C::Zero, m_outT, ptr(out)));
+        HIPDNN_CALL(hipdnnPoolingForward(*m_cudnn, *(m_pool), &C::One, m_inT, ptr(in), &C::Zero, m_outT, ptr(out)));
     }
 
     void BackwardPoolingCore(const Mat& out, const Mat& srcGrad, const Mat& in, Mat& grad, bool accumulateGradient) override
@@ -478,7 +478,7 @@ protected:
         size_t batchSize = in.GetNumCols();
         m_inT.UpdateBatchSize(batchSize);
         m_outT.UpdateBatchSize(batchSize);
-        HIPDNN_CALL(hipdnnPoolingBackward(*m_hipdnn, *(m_pool), &C::One, m_outT, ptr(out), m_outT, ptr(srcGrad),
+        HIPDNN_CALL(hipdnnPoolingBackward(*m_cudnn, *(m_pool), &C::One, m_outT, ptr(out), m_outT, ptr(srcGrad),
                                         m_inT, ptr(in), accumulateGradient ? &C::One : &C::Zero, m_inT, ptr(grad)));
     }
 
@@ -765,7 +765,7 @@ private:
         }
     };
 
-    CuDnn::ptr_t m_hipdnn;
+    CuDnn::ptr_t m_cudnn;
     hipdnnDataType_t m_dataType;
     CuDnnTensor m_inT;
     CuDnnTensor m_outT;

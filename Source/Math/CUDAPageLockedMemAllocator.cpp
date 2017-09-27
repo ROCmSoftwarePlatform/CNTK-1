@@ -2,18 +2,30 @@
 #include "CUDAPageLockedMemAllocator.h"
 #include "BestGpu.h" // for CPUONLY
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
+#include <cuda_runtime_api.h>
+#elif defined HIP_COMPILE
 #include <hip/hip_runtime_api.h>
-#endif
+#endif // cuda-hip compile
+#endif // cpuonly
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 #ifndef CPUONLY
 
+#ifdef CUDA_COMPILE
+inline static void CheckCudaReturnCode(cudaError_t rc, const char* msg)
+{
+    if (rc != cudaSuccess)
+        RuntimeError("%s: %s (cuda error %d)", msg, cudaGetErrorString(rc), (int)rc);
+}
+#elif defined HIP_COMPILE
 inline static void CheckCudaReturnCode(hipError_t rc, const char* msg)
 {
     if (rc != hipSuccess)
         RuntimeError("%s: %s (hip error %d)", msg, hipGetErrorString(rc), (int)rc);
 }
+#endif
 
 CUDAPageLockedMemAllocator::CUDAPageLockedMemAllocator(int deviceID)
     : m_deviceID(deviceID)
@@ -23,17 +35,29 @@ CUDAPageLockedMemAllocator::CUDAPageLockedMemAllocator(int deviceID)
 void* CUDAPageLockedMemAllocator::Malloc(size_t size, int deviceId)
 {
     void* p = nullptr;
+#ifdef CUDA_COMPILE
+    CheckCudaReturnCode(cudaSetDevice(deviceId), "Cannot set cuda device");
+
+    // Note: I ask for cudaHostAllocDefault but cudaHostGetFlags() shows that it is allocated as 'cudaHostAllocMapped'
+    CheckCudaReturnCode(cudaHostAlloc(&p, size, cudaHostAllocDefault), "Malloc in CUDAPageLockedMemAllocator failed");
+#elif defined HIP_COMPILE
     CheckCudaReturnCode(hipSetDevice(deviceId), "Cannot set hip device");
 
     // Note: I ask for hipHostAllocDefault but hipHostGetFlags() shows that it is allocated as 'hipHostAllocMapped'
     CheckCudaReturnCode(hipHostMalloc(&p, size, hipHostMallocDefault), "Malloc in CUDAPageLockedMemAllocator failed");
+#endif
     return p;
 }
 
 void CUDAPageLockedMemAllocator::Free(void* p, int deviceId)
 {
+#ifdef CUDA_COMPILE
+    CheckCudaReturnCode(cudaSetDevice(deviceId), "Cannot set cuda device");
+    CheckCudaReturnCode(cudaFreeHost(p), "Free in CUDAPageLockedMemAllocator failed");
+#elif defined HIP_COMPILE
     CheckCudaReturnCode(hipSetDevice(deviceId), "Cannot set hip device");
     CheckCudaReturnCode(hipHostFree(p), "Free in CUDAPageLockedMemAllocator failed");
+#endif
 }
 
 void* CUDAPageLockedMemAllocator::Malloc(size_t size)

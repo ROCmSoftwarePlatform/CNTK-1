@@ -19,30 +19,71 @@ template<class ElemType>
 class CuDnnTensorDescriptor
 {
 private:
+#ifdef CUDA_COMPILE
+    cudnnTensorDescriptor_t m_tensorDesc;
+#elif defined HIP_COMPILE
     hipdnnTensorDescriptor_t m_tensorDesc;
+#endif
 public:
     CuDnnTensorDescriptor(size_t hiddenSize, size_t miniBatch, size_t numLayers) : m_tensorDesc(nullptr)
     {
+#ifdef CUDA_COMPILE
+	cudnnDataType_t m_dataType = CuDnnTensor::GetDataType<ElemType>();
+        int dimA[3] = { (int)hiddenSize, (int)miniBatch, (int)numLayers };
+        int strideA[3] = { 1, dimA[0], dimA[0] * dimA[1] };
+        CUDNN_CALL(cudnnCreateTensorDescriptor(&m_tensorDesc));
+	CUDNN_CALL(cudnnSetTensorNdDescriptor(m_tensorDesc, m_dataType, 3, dimA, strideA));
+#elif defined HIP_COMPILE
         hipdnnDataType_t m_dataType = CuDnnTensor::GetDataType<ElemType>();
         int dimA[3] = { (int)hiddenSize, (int)miniBatch, (int)numLayers };
         int strideA[3] = { 1, dimA[0], dimA[0] * dimA[1] };
         HIPDNN_CALL(hipdnnCreateTensorDescriptor(&m_tensorDesc));
         HIPDNN_CALL(hipdnnSetTensorNdDescriptor(m_tensorDesc, m_dataType, 3, dimA, strideA));
+#endif
     }
 
     ~CuDnnTensorDescriptor()
     {
+#ifdef CUDA_COMPILE
+	cudnnDestroyTensorDescriptor(m_tensorDesc);
+#elif defined HIP_COMPILE
         hipdnnDestroyTensorDescriptor(m_tensorDesc);
+#endif
     }
 
+#ifdef CUDA_COMPILE
+    operator cudnnTensorDescriptor_t() const
+    {
+        return m_tensorDesc;
+    }
+#elif defined HIP_COMPILE
     operator hipdnnTensorDescriptor_t() const
     {
         return m_tensorDesc;
     }
+#endif
 
     DISABLE_COPY_AND_MOVE(CuDnnTensorDescriptor);
 };
 
+#ifdef CUDA_COMPILE
+template <class ElemType>
+void CuDnnRNNExecutor<ElemType>::SetDescriptors(size_t dim, const vector<size_t>& numSequencesForFrame, vector<cudnnTensorDescriptor_t>& descriptors)
+{
+    for (size_t i = 0; i < numSequencesForFrame.size(); i++)
+    {
+        if (descriptors.size() <= i)
+        {
+            descriptors.push_back(cudnnTensorDescriptor_t());
+            CUDNN_CALL(cudnnCreateTensorDescriptor(&descriptors[i]));
+        }
+        // these dimensions are what CUDNN expects: (the minibatch dimension, the data dimension, and the number 1 (because each descriptor describes one frame of data)
+        int dims[3] = { (int)numSequencesForFrame[i], (int)dim, 1 };
+        int strides[3] = { dims[2] * dims[1], dims[2], 1 };
+        CUDNN_CALL(cudnnSetTensorNdDescriptor(descriptors[i], m_dataType, 3, dims, strides));
+    }
+}
+#elif defined HIP_COMPILE
 template <class ElemType>
 void CuDnnRNNExecutor<ElemType>::SetDescriptors(size_t dim, const vector<size_t>& numSequencesForFrame, vector<hipdnnTensorDescriptor_t>& descriptors)
 {
@@ -59,6 +100,7 @@ void CuDnnRNNExecutor<ElemType>::SetDescriptors(size_t dim, const vector<size_t>
         HIPDNN_CALL(hipdnnSetTensorNdDescriptor(descriptors[i], m_dataType, 3, dims, strides));
     }
 }
+#endif
 
 template <class ElemType>
 void CuDnnRNNExecutor<ElemType>::ForwardCore(
@@ -85,10 +127,17 @@ void CuDnnRNNExecutor<ElemType>::ForwardCore(
     size_t workSize;
     size_t reserveSize;
 
+#ifdef CUDA_COMPILE
     // Need for every pass
-    HIPDNN_CALL(hipdnnGetRNNWorkspaceSize(*m_hipdnn, *m_rnnT, (int)m_seqLength, xDesc.data(), &workSize));
+    CUDNN_CALL(cudnnGetRNNWorkspaceSize(*m_cudnn, *m_rnnT, (int)m_seqLength, xDesc.data(), &workSize));
     // Only needed in training, can't be touched between passes.
-    HIPDNN_CALL(hipdnnGetRNNTrainingReserveSize(*m_hipdnn, *m_rnnT, (int)m_seqLength, xDesc.data(), &reserveSize));
+    CUDNN_CALL(cudnnGetRNNTrainingReserveSize(*m_cudnn, *m_rnnT, (int)m_seqLength, xDesc.data(), &reserveSize));
+#elif defined HIP_COMPILE
+    // Need for every pass
+    HIPDNN_CALL(hipdnnGetRNNWorkspaceSize(*m_cudnn, *m_rnnT, (int)m_seqLength, xDesc.data(), &workSize));
+    // Only needed in training, can't be touched between passes.
+    HIPDNN_CALL(hipdnnGetRNNTrainingReserveSize(*m_cudnn, *m_rnnT, (int)m_seqLength, xDesc.data(), &reserveSize));
+#endif
 
     // convert from bytes to ElemType
     workSize = (workSize + sizeof(ElemType) - 1) / (sizeof(ElemType));
@@ -101,8 +150,22 @@ void CuDnnRNNExecutor<ElemType>::ForwardCore(
     if (wDesc->GetSize() != weightsW.GetNumElements())
         InvalidArgument("RNN needs %ld parameters, but %ld were allocated", wDesc->GetSize(), weightsW.GetNumElements());
 
+#ifdef CUDA_COMPILE
+    CUDNN_CALL(cudnnRNNForwardTraining(
+        *m_cudnn, *m_rnnT,
+        (int)m_seqLength,
+        xDesc.data(), inputX.Data(),
+        0, 0,
+        0, 0,
+        *wDesc, weightsW.Data(),
+        yDesc.data(), outputY.Data(),
+        0, 0,
+        0, 0,
+        workspace.Data(), workspace.GetNumElements()*sizeof(ElemType),
+	reserve.Data(), reserve.GetNumElements()*sizeof(ElemType)));
+#elif defined HIP_COMPILE
     HIPDNN_CALL(hipdnnRNNForwardTraining(
-        *m_hipdnn, *m_rnnT,
+        *m_cudnn, *m_rnnT,
         (int)m_seqLength,
         xDesc.data(), inputX.Data(),
         0, 0,
@@ -113,6 +176,7 @@ void CuDnnRNNExecutor<ElemType>::ForwardCore(
         0, 0,
         workspace.Data(), workspace.GetNumElements()*sizeof(ElemType),
         reserve.Data(), reserve.GetNumElements()*sizeof(ElemType)));
+#endif
     m_BackwardDataCalledYet = false;
 }
 
@@ -129,8 +193,25 @@ void CuDnnRNNExecutor<ElemType>::BackwardDataCore(
 
     if (!m_BackwardDataCalledYet)
     {
+#ifdef CUDA_COMPILE
+	CUDNN_CALL(cudnnRNNBackwardData(
+            *m_cudnn, *m_rnnT,
+            (int)m_seqLength,
+            yDesc.data(), outputY.Data(),
+            yDesc.data(), outputDY.Data(),
+            0, 0,
+            0, 0,
+            *wDesc, weightsW.Data(),
+            0, 0,
+            0, 0,
+            xDesc.data(), dx.Data(),
+            0, 0,
+            0, 0,
+            workspace.Data(), workspace.GetNumElements()*sizeof(ElemType),
+	    reserve.Data(), reserve.GetNumElements()*sizeof(ElemType)));
+#elif defined HIP_COMPILE
         HIPDNN_CALL(hipdnnRNNBackwardData(
-            *m_hipdnn, *m_rnnT,
+            *m_cudnn, *m_rnnT,
             (int)m_seqLength,
             yDesc.data(), outputY.Data(),
             yDesc.data(), outputDY.Data(),
@@ -144,6 +225,7 @@ void CuDnnRNNExecutor<ElemType>::BackwardDataCore(
             0, 0,
             workspace.Data(), workspace.GetNumElements()*sizeof(ElemType),
             reserve.Data(), reserve.GetNumElements()*sizeof(ElemType)));
+#endif
     }
     m_BackwardDataCalledYet = true;
 }
@@ -159,8 +241,19 @@ void CuDnnRNNExecutor<ElemType>::BackwardWeightsCore(const GPUMatrix<ElemType>& 
         LogicError("RNN Layout has changed during processing");
     if (!m_BackwardDataCalledYet)
         LogicError("out of order calling you have been very bad");
+#ifdef CUDA_COMPILE
+    CUDNN_CALL(cudnnRNNBackwardWeights(
+        *m_cudnn, *m_rnnT,
+        (int)m_seqLength,
+        xDesc.data(), inputX.Data(),
+        0, 0,
+        yDesc.data(), outputY.Data(),
+        workspace.Data(), workspace.GetNumElements()*sizeof(ElemType),
+        *wDesc, dw.Data(),
+	reserve.Data(), reserve.GetNumElements()*sizeof(ElemType)));
+#elif defined HIP_COMPILE
     HIPDNN_CALL(hipdnnRNNBackwardWeights(
-        *m_hipdnn, *m_rnnT,
+        *m_cudnn, *m_rnnT,
         (int)m_seqLength,
         xDesc.data(), inputX.Data(),
         0, 0,
@@ -168,6 +261,7 @@ void CuDnnRNNExecutor<ElemType>::BackwardWeightsCore(const GPUMatrix<ElemType>& 
         workspace.Data(), workspace.GetNumElements()*sizeof(ElemType),
         *wDesc, dw.Data(),
         reserve.Data(), reserve.GetNumElements()*sizeof(ElemType)));
+#endif
 }
 
 template class CuDnnRNNExecutor<double>;

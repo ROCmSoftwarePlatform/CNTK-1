@@ -58,8 +58,10 @@ public:
     {
         return cuda_ptr(p - index);
     }
+    #ifdef HIP_COMPILE
     #ifdef __HIP_PLATFORM_HCC__ //TODO:
     cudasharedcode
+    #endif
     #endif
     cuda_ptr(T* pp)
         : p(pp)
@@ -130,8 +132,10 @@ protected:
     }
 
 public:
+    #ifdef HIP_COMPILE
     #ifdef __HIP_PLATFORM_HCC__ //TODO:
     cudasharedcode
+    #endif
     #endif
     matrixref(T* p, size_t numRows, size_t numCols, size_t colStride)
         : p(p), numrows(numRows), numcols(numCols), colstride(colStride)

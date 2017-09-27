@@ -81,7 +81,7 @@ cudnn_path=/usr/local/cudnn-6.0/
 cudnn_check=cuda/include/cudnn.h
 
 have_hipdnn=no
-hipdnn_path=/opt/rocm/hipdnn/
+hipdnn_path=/opt/rocm/hipDNN/
 hipdnn_check=include/hipDNN.h
 
 have_opencv=no
