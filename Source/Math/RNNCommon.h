@@ -48,7 +48,7 @@ struct RnnAttributes
                 numNetworks * m_hiddenSize              // 1, 3, or 4 networks producing hidden-dim output
                             * (inputDim + m_hiddenSize) // each network has these two inputs
               + numNetworks * m_hiddenSize              // biases
-                            * 2;                        // for unknown reasons, hipdnn5 uses 2 bias terms everywhere
+                            * 2;                        // for unknown reasons, cudnn5 uses 2 bias terms everywhere
             total += oneNetTotal * bidirFactor;         // 1 or 2 directions
             inputDim = bidirFactor * m_hiddenSize;      // next layer continues with this as input
         }

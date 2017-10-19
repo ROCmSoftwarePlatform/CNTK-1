@@ -322,7 +322,7 @@ void latticefunctionsops::forwardbackwardlattice(const size_t *batchsizeforward,
         checklaunch("setvaluej");
         setvaluej<<<b, t, 0, GetCurrentStream()>>>(logaccbetas, LOGZERO, logalphas.size());
         checklaunch("setvaluej");
-    
+    }
 #elif defined HIP_COMPILE
     hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), logalphas, LOGZERO, logalphas.size());
     checklaunch("setvaluej");
@@ -346,19 +346,19 @@ void latticefunctionsops::forwardbackwardlattice(const size_t *batchsizeforward,
     for (size_t i = 0; i < numlaunchforward; i++)
     {
         dim3 b2((unsigned int) ((batchsizeforward[i] + tpb - 1) / tpb));
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	forwardlatticej<<<b2, t, 0, GetCurrentStream()>>>(batchsizeforward[i], startindex, edgeacscores,
                                                          spalignunitid, silalignunitid, edges, nodes, aligns,
                                                          alignments, aligmentoffsets, logalphas, lmf, wp, amf,
                                                          boostingfactor, uids, senone2classmap, returnEframescorrect,
 	logframescorrectedge, logaccalphas);
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
         hipLaunchKernelGGL((forwardlatticej), dim3(b2), dim3(t), 0, GetCurrentStream(), batchsizeforward[i], startindex, edgeacscores,
                                                          spalignunitid, silalignunitid, edges, nodes, aligns,
                                                          alignments, aligmentoffsets, logalphas, lmf, wp, amf,
                                                          boostingfactor, uids, senone2classmap, returnEframescorrect,
                                                          logframescorrectedge, logaccalphas);
-	#endif
+#endif
         checklaunch("edgealignment");
         startindex += batchsizeforward[i];
     }
@@ -375,19 +375,19 @@ void latticefunctionsops::forwardbackwardlattice(const size_t *batchsizeforward,
     for (size_t i = 0; i < numlaunchbackward; i++)
     {
         dim3 b2((unsigned int) ((batchsizebackward[i] + tpb - 1) / tpb));
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	backwardlatticej<<<b2, t, 0, GetCurrentStream()>>>(batchsizebackward[i], startindex - batchsizebackward[i],
                                                           edgeacscores, spalignunitid, silalignunitid, edges, nodes, aligns,
                                                           totalfwscore, logpps, logalphas, logbetas,
                                                           lmf, wp, amf, boostingfactor, returnEframescorrect, logframescorrectedge,
 							  logaccalphas, logEframescorrect, logaccbetas);
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
         hipLaunchKernelGGL((backwardlatticej), dim3(b2), dim3(t), 0, GetCurrentStream(), batchsizebackward[i], startindex - batchsizebackward[i],
                                                           edgeacscores, spalignunitid, silalignunitid, edges, nodes, aligns,
                                                           totalfwscore, logpps, logalphas, logbetas,
                                                           lmf, wp, amf, boostingfactor, returnEframescorrect, logframescorrectedge,
                                                           logaccalphas, logEframescorrect, logaccbetas);
-	#endif
+#endif
         checklaunch("edgealignment");
         startindex -= batchsizebackward[i];
     }

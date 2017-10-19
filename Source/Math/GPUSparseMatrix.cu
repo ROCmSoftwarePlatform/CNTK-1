@@ -10,10 +10,15 @@
 
 #include "GPUSparseMatrix.h"
 #include "GPUMatrix.h"
+#ifdef CUDA_COMPILE
+#include <cuda_runtime.h>
+#include <cusparse_v2.h>
+#include "cublas_v2.h"
+#elif defined HIP_COMPILE
 #include <hip/hip_runtime.h>
-//#include <hipsparse_v2.h>
 #include "hipsparse.h"
 #include "hipblas.h"
+#endif
 #include "GPUMatrixCUDAKernels.cuh"
 #include <functional>
 #include "CommonMatrix.h"
@@ -31,14 +36,27 @@ extern __declspec(thread)
 #else
 static
 #endif
+#ifdef CUDA_COMPILE
+    cudaStream_t t_stream;
+#elif defined HIP_COMPILE
     hipStream_t t_stream;
+#endif
 
+#ifdef CUDA_COMPILE
+template <>
+const char* CudaErrString<cusparseStatus_t>(cusparseStatus_t)
+{
+    cudaDeviceSynchronize();
+    return "(see cusparse.h & look for cusparseStatus_t or CUSPARSE_STATUS_xxx)";
+}
+#elif defined HIP_COMPILE
 template <>
 const char* CudaErrString<hipsparseStatus_t>(hipsparseStatus_t)
 {
     hipDeviceSynchronize();
     return "(see hipsparse.h & look for hipsparseStatus_t or HIPSPARSE_STATUS_xxx)";
 }
+#endif
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -49,7 +67,11 @@ GPUSPARSE_INDEX_TYPE GPUSparseMatrix<ElemType>::SecondaryIndexValueAt(size_t idx
 {
     if (idx + m_sliceViewOffset == 0) return 0;
     GPUSPARSE_INDEX_TYPE value;
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemcpy(&value, SecondaryIndexLocation() + idx, sizeof(GPUSPARSE_INDEX_TYPE), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemcpy(&value, SecondaryIndexLocation() + idx, sizeof(GPUSPARSE_INDEX_TYPE), hipMemcpyDeviceToHost));
+#endif
 
     return value;
 }
@@ -120,18 +142,31 @@ template <class ElemType>
     RequireSizeAndAllocate(deepCopy.GetNumRows(), deepCopy.GetNumCols(), deepCopy.GetNumNZElements(), deepCopy.GetFormat(), true, false);
     m_sliceViewOffset = 0; // reset to zero as we only start copying the indices starting from the offset in the source matrix
 
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemcpy(Data(), deepCopy.NzValues(), deepCopy.NzSize(), cudaMemcpyDeviceToDevice));
+    CUDA_CALL(cudaMemcpy(MajorIndexLocation(), deepCopy.MajorIndexLocationWithSliceViewOffset(), deepCopy.MajorIndexSize(), cudaMemcpyDeviceToDevice));
+    CUDA_CALL(cudaMemcpy(SecondaryIndexLocation(), deepCopy.SecondaryIndexLocation(), deepCopy.SecondaryIndexSize(), cudaMemcpyDeviceToDevice));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemcpy(Data(), deepCopy.NzValues(), deepCopy.NzSize(), hipMemcpyDeviceToDevice));
     CUDA_CALL(hipMemcpy(MajorIndexLocation(), deepCopy.MajorIndexLocationWithSliceViewOffset(), deepCopy.MajorIndexSize(), hipMemcpyDeviceToDevice));
     CUDA_CALL(hipMemcpy(SecondaryIndexLocation(), deepCopy.SecondaryIndexLocation(), deepCopy.SecondaryIndexSize(), hipMemcpyDeviceToDevice));
+#endif
 
     if (deepCopy.m_sliceViewOffset > 0)
     {
         int blocksPerGrid = (int) ceil(1.0 * SecondaryIndexCount() / GridDim::maxThreadsPerBlock);
         SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+	_shiftColCSCIndexFromSliceViewToAbsolute<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(
+            SecondaryIndexLocation(),
+            SecondaryIndexCount(),
+	    GetNumNZElements());
+#elif defined HIP_COMPILE
         hipLaunchKernelGGL((_shiftColCSCIndexFromSliceViewToAbsolute<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
             deepCopy.SecondaryIndexLocation(),
             deepCopy.SecondaryIndexCount(),
             deepCopy.GetNumNZElements());
+#endif
     } //TODO: __remove__ remove the argument object calling in kenel call
 
     // TODO: to copy other variables used only for class based LM
@@ -193,6 +228,25 @@ void GPUSparseMatrix<ElemType>::CopyToCPUSparseMatrix(CPUSparseMatrix<ElemType>&
 
         PrepareDevice();
 
+#ifdef CUDA_COMPILE
+	if (sizeof(GPUSPARSE_INDEX_TYPE) == sizeof(CPUSPARSE_INDEX_TYPE))
+        {
+            CUDA_CALL(cudaMemcpy(cpuSparseMatrix.RowLocation(), RowLocation(), RowSize(), cudaMemcpyDeviceToHost));
+            CUDA_CALL(cudaMemcpy(cpuSparseMatrix.ColLocation(), ColLocation(), ColSize(), cudaMemcpyDeviceToHost));
+        }
+        else
+        {
+            GPUSPARSE_INDEX_TYPE* h_CSRRow = (GPUSPARSE_INDEX_TYPE*) ReserveTempHostBuffer(RowSize());
+            CUDA_CALL(cudaMemcpy(h_CSRRow, RowLocation(), RowSize(), cudaMemcpyDeviceToHost));
+            ConvertBuffer(cpuSparseMatrix.RowLocation(), h_CSRRow, SecondaryIndexCount());
+
+            GPUSPARSE_INDEX_TYPE* h_Col = (GPUSPARSE_INDEX_TYPE*) ReserveTempHostBuffer(ColSize());
+            CUDA_CALL(cudaMemcpy(h_Col, ColLocation(), ColSize(), cudaMemcpyDeviceToHost));
+            ConvertBuffer(cpuSparseMatrix.ColLocation(), h_Col, MajorIndexCount());
+        }
+
+	CUDA_CALL(cudaMemcpy(cpuSparseMatrix.Data(), Data(), GetSizeElemAllocated(), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
         if (sizeof(GPUSPARSE_INDEX_TYPE) == sizeof(CPUSPARSE_INDEX_TYPE))
         {
             CUDA_CALL(hipMemcpy(cpuSparseMatrix.RowLocation(), RowLocation(), RowSize(), hipMemcpyDeviceToHost));
@@ -210,6 +264,7 @@ void GPUSparseMatrix<ElemType>::CopyToCPUSparseMatrix(CPUSparseMatrix<ElemType>&
         }
 
         CUDA_CALL(hipMemcpy(cpuSparseMatrix.Data(), Data(), GetSizeElemAllocated(), hipMemcpyDeviceToHost));
+#endif
     }
     else if (this->GetFormat() == matrixFormatSparseCSC)
     {
@@ -217,6 +272,25 @@ void GPUSparseMatrix<ElemType>::CopyToCPUSparseMatrix(CPUSparseMatrix<ElemType>&
         cpuSparseMatrix.RequireSizeAndAllocate(GetNumRows(), GetNumCols(), GetNumElemAllocated(), true, false);
 
         PrepareDevice();
+#ifdef CUDA_COMPILE
+	if (sizeof(GPUSPARSE_INDEX_TYPE) == sizeof(CPUSPARSE_INDEX_TYPE))
+        {
+            CUDA_CALL(cudaMemcpy(cpuSparseMatrix.RowLocation(), RowLocation(), RowSize(), cudaMemcpyDeviceToHost));
+            CUDA_CALL(cudaMemcpy(cpuSparseMatrix.ColLocation(), ColLocation(), ColSize(), cudaMemcpyDeviceToHost));
+        }
+        else
+        {
+            GPUSPARSE_INDEX_TYPE* h_CSCCol = (GPUSPARSE_INDEX_TYPE*) ReserveTempHostBuffer(ColSize());
+            CUDA_CALL(cudaMemcpy(h_CSCCol, ColLocation(), ColSize(), cudaMemcpyDeviceToHost));
+            ConvertBuffer(cpuSparseMatrix.ColLocation(), h_CSCCol, SecondaryIndexCount());
+
+            GPUSPARSE_INDEX_TYPE* h_Row = (GPUSPARSE_INDEX_TYPE*) ReserveTempHostBuffer(RowSize());
+            CUDA_CALL(cudaMemcpy(h_Row, RowLocation(), RowSize(), cudaMemcpyDeviceToHost));
+            ConvertBuffer(cpuSparseMatrix.RowLocation(), h_Row, MajorIndexCount());
+        }
+
+	CUDA_CALL(cudaMemcpy(cpuSparseMatrix.Data(), Data(), GetSizeElemAllocated(), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
         if (sizeof(GPUSPARSE_INDEX_TYPE) == sizeof(CPUSPARSE_INDEX_TYPE))
         {
             CUDA_CALL(hipMemcpy(cpuSparseMatrix.RowLocation(), RowLocation(), RowSize(), hipMemcpyDeviceToHost));
@@ -234,6 +308,7 @@ void GPUSparseMatrix<ElemType>::CopyToCPUSparseMatrix(CPUSparseMatrix<ElemType>&
         }
 
         CUDA_CALL(hipMemcpy(cpuSparseMatrix.Data(), Data(), GetSizeElemAllocated(), hipMemcpyDeviceToHost));
+#endif
     }
     else if (this->GetFormat() == matrixFormatSparseBlockCol)
     {
@@ -241,13 +316,21 @@ void GPUSparseMatrix<ElemType>::CopyToCPUSparseMatrix(CPUSparseMatrix<ElemType>&
 
         PrepareDevice();
         std::vector<GPUSPARSE_INDEX_TYPE> temp(GetBlockSize());
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemcpy(temp.data(), BlockId2ColOrRow(), GetBlockSize() * sizeof(GPUSPARSE_INDEX_TYPE), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemcpy(temp.data(), BlockId2ColOrRow(), GetBlockSize() * sizeof(GPUSPARSE_INDEX_TYPE), hipMemcpyDeviceToHost));
+#endif
         for (size_t i = 0; i < temp.size(); ++i)
             cpuSparseMatrix.BlockIdsLocation()[i] = temp[i];
 
         cpuSparseMatrix.SetBlockSize(GetBlockSize());
 
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemcpy(cpuSparseMatrix.Data(), Data(), NzSize(), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemcpy(cpuSparseMatrix.Data(), Data(), NzSize(), hipMemcpyDeviceToHost));
+#endif
     }
     else
         NOT_IMPLEMENTED;
@@ -263,19 +346,42 @@ void GPUSparseMatrix<ElemType>::CopyToDenseMatrix(GPUMatrix<ElemType>& denseMatr
     }
 
     PrepareDevice();
+#ifdef CUDA_COMPILE
+    cusparseHandle_t cusparseHandle = 0;
+    CUSPARSE_CALL(cusparseCreate(&cusparseHandle));
+    cusparseMatDescr_t descr = 0;
+    CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
+    cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO);
+#elif defined HIP_COMPILE
     hipsparseHandle_t hipsparseHandle = 0;
     HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descr = 0;
     HIPSPARSE_CALL(hipsparseCreateMatDescr(&descr));
     hipsparseSetMatType(descr, HIPSPARSE_MATRIX_TYPE_GENERAL);
     hipsparseSetMatIndexBase(descr, HIPSPARSE_INDEX_BASE_ZERO);
+#endif
 
     denseMatrix.RequireSize(GetNumRows(), GetNumCols());
 
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    CUSPARSE_CALL(cusparseSetStream(cusparseHandle, t_stream));
+#elif defined HIP_COMPILE
     HIPSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
+#endif
     if (GetFormat() == MatrixFormat::matrixFormatSparseCSR)
     {
+#ifdef CUDA_COMPILE
+	if (sizeof(ElemType) == sizeof(float))
+        {
+            CUSPARSE_CALL(cusparseScsr2dense(cusparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (float*) Buffer(), RowLocation(), ColLocation(), (float*) denseMatrix.Data(), int(GetNumRows())));
+        }
+        else
+        {
+            CUSPARSE_CALL(cusparseDcsr2dense(cusparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (double*) Buffer(), RowLocation(), ColLocation(), (double*) denseMatrix.Data(), int(GetNumRows())));
+	}
+#elif defined HIP_COMPILE
         if (sizeof(ElemType) == sizeof(float))
         {
             HIPSPARSE_CALL(hipsparseScsr2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (float*) Buffer(), RowLocation(), ColLocation(), (float*) denseMatrix.Data(), int(GetNumRows())));
@@ -284,9 +390,20 @@ void GPUSparseMatrix<ElemType>::CopyToDenseMatrix(GPUMatrix<ElemType>& denseMatr
         {
             HIPSPARSE_CALL(hipsparseDcsr2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (double*) Buffer(), RowLocation(), ColLocation(), (double*) denseMatrix.Data(), int(GetNumRows())));
         }
+#endif
     }
     else if (GetFormat() == MatrixFormat::matrixFormatSparseCSC)
     {
+#ifdef CUDA_COMPILE
+	if (sizeof(ElemType) == sizeof(float))
+        {
+            CUSPARSE_CALL(cusparseScsc2dense(cusparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (float*) Buffer(), RowLocation(), ColLocation(), (float*) denseMatrix.Data(), int(GetNumRows())));
+        }
+        else
+        {
+            CUSPARSE_CALL(cusparseDcsc2dense(cusparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (double*) Buffer(), RowLocation(), ColLocation(), (double*) denseMatrix.Data(), int(GetNumRows())));
+	}
+#elif defined HIP_COMPILE
         if (sizeof(ElemType) == sizeof(float))
         {
             HIPSPARSE_CALL(hipsparseScsc2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (float*) Buffer(), RowLocation(), ColLocation(), (float*) denseMatrix.Data(), int(GetNumRows())));
@@ -295,6 +412,7 @@ void GPUSparseMatrix<ElemType>::CopyToDenseMatrix(GPUMatrix<ElemType>& denseMatr
         {
             HIPSPARSE_CALL(hipsparseDcsc2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (double*) Buffer(), RowLocation(), ColLocation(), (double*) denseMatrix.Data(), int(GetNumRows())));
         }
+#endif
     }
     else if (GetFormat() == MatrixFormat::matrixFormatSparseBlockCol || GetFormat() == MatrixFormat::matrixFormatSparseBlockRow)
     {
@@ -305,7 +423,11 @@ void GPUSparseMatrix<ElemType>::CopyToDenseMatrix(GPUMatrix<ElemType>& denseMatr
     {
         NOT_IMPLEMENTED;
     }
+#ifdef CUDA_COMPILE
+    CUSPARSE_CALL(cusparseDestroy(cusparseHandle));
+#elif defined HIP_COMPILE
     HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+#endif
 
 }
 
@@ -328,17 +450,39 @@ void GPUSparseMatrix<ElemType>::ConvertToSparseFormat(MatrixFormat newFormat, GP
     }
 
     PrepareDevice();
+#ifdef CUDA_COMPILE
+    cusparseHandle_t cusparseHandle = 0;
+    CUSPARSE_CALL(cusparseCreate(&cusparseHandle));
+
+    SyncGuard syncGuard;
+    CUSPARSE_CALL(cusparseSetStream(cusparseHandle, t_stream));
+#elif defined HIP_COMPILE
     hipsparseHandle_t hipsparseHandle = 0;
     HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
 
     SyncGuard syncGuard;
     HIPSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
+#endif
 
     outMatrix.ChangeDeviceTo(GetComputeDeviceId());
     outMatrix.RequireSizeAndAllocate(GetNumRows(), GetNumCols(), NzCount(), newFormat, true, false);
 
     if ((oldFormat == matrixFormatSparseCSR && newFormat == matrixFormatSparseCSC) || (oldFormat == matrixFormatSparseCSC && newFormat == matrixFormatSparseCSR))
     {
+#ifdef CUDA_COMPILE
+	if (sizeof(ElemType) == sizeof(float))
+        {
+            CUSPARSE_CALL(cusparseScsr2csc(cusparseHandle, int(GetNumRows()), int(GetNumCols()), int(GetSizeAllocated()),
+                                           (float*) Data(), RowLocation(), ColLocation(), (float*) outMatrix.Data(),
+                                           outMatrix.RowLocation(), outMatrix.ColLocation(), CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO));
+        }
+        else
+        {
+            CUSPARSE_CALL(cusparseDcsr2csc(cusparseHandle, int(GetNumRows()), int(GetNumCols()), int(GetSizeAllocated()),
+                                           (double*) Data(), RowLocation(), ColLocation(), (double*) outMatrix.Data(),
+                                           outMatrix.RowLocation(), outMatrix.ColLocation(), CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO));
+	}
+#elif defined HIP_COMPILE
         if (sizeof(ElemType) == sizeof(float))
         {
             HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), int(GetSizeAllocated()),
@@ -351,13 +495,18 @@ void GPUSparseMatrix<ElemType>::ConvertToSparseFormat(MatrixFormat newFormat, GP
                                            (double*) Data(), RowLocation(), ColLocation(), (double*) outMatrix.Data(),
                                            outMatrix.RowLocation(), outMatrix.ColLocation(), HIPSPARSE_ACTION_NUMERIC, HIPSPARSE_INDEX_BASE_ZERO));
         }
+#endif
     }
     else
     {
         NOT_IMPLEMENTED;
     }
 
+#ifdef CUDA_COMPILE
+    CUSPARSE_CALL(cusparseDestroy(cusparseHandle));
+#elif defined HIP_COMPILE
     HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+#endif
 }
 
 template <class ElemType>
@@ -407,36 +556,44 @@ void GPUSparseMatrix<ElemType>::ChangeDeviceTo(DEVICEID_TYPE to_id)
 
 #ifdef WIN32
         // IOMMU DMAR needs to be disabled for CUDA P2P, otherwise it will silently hang.
-        // Unfortunately, hipDeviceCanAccessPeer returns true irrespective of the IOMMU settings.
+        // Unfortunately, cudaDeviceCanAccessPeer returns true irrespective of the IOMMU settings.
         // More details: https://bugzilla.kernel.org/show_bug.cgi?id=188271
         // http://docs.nvidia.com/cuda/gpudirect-rdma/#supported-systems
         // TODO: enable UVA p2p access once this is fixed.
 
 
         // first try peer access
-        int canAccessPeer = false;
-        CUDA_CALL(hipDeviceCanAccessPeer(&canAccessPeer, to_id, GetComputeDeviceId()));
+	int canAccessPeer = false;
+        CUDA_CALL(cudaDeviceCanAccessPeer(&canAccessPeer, to_id, GetComputeDeviceId()));
         if (canAccessPeer)
         {
-            hipError_t cudaStatus = hipDeviceEnablePeerAccess(GetComputeDeviceId(), 0);
-            if (cudaStatus != hipErrorPeerAccessAlreadyEnabled)
+            cudaError_t cudaStatus = cudaDeviceEnablePeerAccess(GetComputeDeviceId(), 0);
+            if (cudaStatus != cudaErrorPeerAccessAlreadyEnabled)
             {
                 CUDA_CALL(cudaStatus);
             }
-            CUDA_CALL(hipMemcpyPeer(d_dst, to_id, Buffer(), GetComputeDeviceId(), BufferSizeAllocated()));
+            CUDA_CALL(cudaMemcpyPeer(d_dst, to_id, Buffer(), GetComputeDeviceId(), BufferSizeAllocated()));
         }
-        else
+	else
 #endif
         {
             // peer access didn't work, just copy normal
             // make this more efficient by keeping some buffers available for each copy
             ElemType* h_dst = NULL;
             PrepareDevice();
+#ifdef CUDA_COMPILE
+	    CUDA_CALL(cudaMallocHost((void**) &h_dst, BufferSizeAllocated()));
+            CUDA_CALL(cudaMemcpy(h_dst, Buffer(), BufferSizeAllocated(), cudaMemcpyDeviceToHost));
+            PrepareDevice((DEVICEID_TYPE) to_id);
+            CUDA_CALL(cudaMemcpy(d_dst, h_dst, BufferSizeAllocated(), cudaMemcpyHostToDevice));
+	    CUDA_CALL(cudaFreeHost(h_dst));
+#elif defined HIP_COMPILE
             CUDA_CALL(hipHostMalloc((void**) &h_dst, BufferSizeAllocated()));
             CUDA_CALL(hipMemcpy(h_dst, Buffer(), BufferSizeAllocated(), hipMemcpyDeviceToHost));
             PrepareDevice((DEVICEID_TYPE) to_id);
             CUDA_CALL(hipMemcpy(d_dst, h_dst, BufferSizeAllocated(), hipMemcpyHostToDevice));
             CUDA_CALL(hipHostFree(h_dst));
+#endif
         }
 
         TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), Buffer());
@@ -473,12 +630,21 @@ void GPUSparseMatrix<ElemType>::SetValue(const GPUMatrix<ElemType>& denseMatrix,
     }
 
     PrepareDevice();
+#ifdef CUDA_COMPILE
+    cusparseHandle_t cusparseHandle = 0;
+    CUSPARSE_CALL(cusparseCreate(&cusparseHandle));
+    cusparseMatDescr_t descr = 0;
+    CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
+    cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO);
+#elif defined HIP_COMPILE
     hipsparseHandle_t hipsparseHandle = 0;
     HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descr = 0;
     HIPSPARSE_CALL(hipsparseCreateMatDescr(&descr));
     hipsparseSetMatType(descr, HIPSPARSE_MATRIX_TYPE_GENERAL);
     hipsparseSetMatIndexBase(descr, HIPSPARSE_INDEX_BASE_ZERO);
+#endif
 
     int numRows = (int) denseMatrix.GetNumRows(); // m
     int numCols = (int) denseMatrix.GetNumCols(); // n
@@ -488,6 +654,18 @@ void GPUSparseMatrix<ElemType>::SetValue(const GPUMatrix<ElemType>& denseMatrix,
 
     {
         SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+	if (sizeof(ElemType) == sizeof(float))
+        {
+            CUSPARSE_CALL(cusparseSnnz(cusparseHandle, (matrixFormat & matrixFormatRowMajor) ? CUSPARSE_DIRECTION_ROW : CUSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
+                                       reinterpret_cast<float*>(denseMatrix.Data()), (int) numRows, nnzPerRowOrCol, &nnzTotalDevHostPtr));
+        }
+        else
+        {
+            CUSPARSE_CALL(cusparseDnnz(cusparseHandle, (matrixFormat & matrixFormatRowMajor) ? CUSPARSE_DIRECTION_ROW : CUSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
+                                       reinterpret_cast<double*>(denseMatrix.Data()), (int) numRows, nnzPerRowOrCol, &nnzTotalDevHostPtr));
+	}
+#elif defined HIP_COMPILE
         if (sizeof(ElemType) == sizeof(float))
         {
             HIPSPARSE_CALL(hipsparseSnnz(hipsparseHandle, (matrixFormat & matrixFormatRowMajor) ? HIPSPARSE_DIRECTION_ROW : HIPSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
@@ -498,12 +676,41 @@ void GPUSparseMatrix<ElemType>::SetValue(const GPUMatrix<ElemType>& denseMatrix,
             HIPSPARSE_CALL(hipsparseDnnz(hipsparseHandle, (matrixFormat & matrixFormatRowMajor) ? HIPSPARSE_DIRECTION_ROW : HIPSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
                                        reinterpret_cast<double*>(denseMatrix.Data()), (int) numRows, nnzPerRowOrCol, &nnzTotalDevHostPtr));
         }
+#endif
         // ~SyncGuard
     }
 
     RequireSizeAndAllocate(numRows, numCols, nnzTotalDevHostPtr, matrixFormat, true, false);
 
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    if (GetFormat() == MatrixFormat::matrixFormatSparseCSR)
+    {
+        if (sizeof(ElemType) == sizeof(float))
+        {
+            CUSPARSE_CALL(cusparseSdense2csr(cusparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<float*>(denseMatrix.Data()),
+                                             (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<float*>(Data()), RowLocation(), ColLocation()));
+        }
+        else
+        {
+            CUSPARSE_CALL(cusparseDdense2csr(cusparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<double*>(denseMatrix.Data()),
+                                             (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<double*>(Data()), RowLocation(), ColLocation()));
+        }
+    }
+    else if (GetFormat() == MatrixFormat::matrixFormatSparseCSC)
+    {
+        if (sizeof(ElemType) == sizeof(float))
+        {
+            CUSPARSE_CALL(cusparseSdense2csc(cusparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<float*>(denseMatrix.Data()),
+                                             (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<float*>(Data()), RowLocation(), ColLocation()));
+        }
+        else
+        {
+            CUSPARSE_CALL(cusparseDdense2csc(cusparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<double*>(denseMatrix.Data()),
+                                             (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<double*>(Data()), RowLocation(), ColLocation()));
+        }
+    }
+#elif defined HIP_COMPILE
     if (GetFormat() == MatrixFormat::matrixFormatSparseCSR)
     {
         if (sizeof(ElemType) == sizeof(float))
@@ -530,6 +737,7 @@ void GPUSparseMatrix<ElemType>::SetValue(const GPUMatrix<ElemType>& denseMatrix,
                                              (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<double*>(Data()), RowLocation(), ColLocation()));
         }
     }
+#endif
 }
 
 ///
@@ -552,14 +760,29 @@ void GPUSparseMatrix<ElemType>::AdjustCol2BlockId(const GPUSPARSE_INDEX_TYPE* cp
     GPUSPARSE_INDEX_TYPE* newBlockId2Col = (GPUSPARSE_INDEX_TYPE*)(pArray + numNZ);
     GPUSPARSE_INDEX_TYPE* newCol2BlockId = newBlockId2Col + numCols;
 
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemset(newBlockId2Col, SparseIndex_NotAssigned, numCols * sizeof(GPUSPARSE_INDEX_TYPE)));
+    CUDA_CALL(cudaMemcpy(newCol2BlockId, cpuCol2BlockId, numCols * sizeof(GPUSPARSE_INDEX_TYPE), cudaMemcpyHostToDevice));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemset(newBlockId2Col, SparseIndex_NotAssigned, numCols * sizeof(GPUSPARSE_INDEX_TYPE)));
     CUDA_CALL(hipMemcpy(newCol2BlockId, cpuCol2BlockId, numCols * sizeof(GPUSPARSE_INDEX_TYPE), hipMemcpyHostToDevice));
+#endif
 
     int blocksPerGrid = CeilDiv(numCols, GridDim::maxThreadsPerBlock);
  
     // when useBlockId2Col==true, the original col2BlockId is copied to blockId2Col to avoid getting overwritten 
     // during the inplace aggregation of col2BlockId prior to this
-    
+
+#ifdef CUDA_COMPILE
+    _adjustCol2BlockId<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream >> > (
+        numRows,
+        numCols,
+        useBlockId2Col ? BlockId2ColOrRow() : ColOrRow2BlockId(),
+        Data(),
+        newCol2BlockId,
+        pArray,
+	newBlockId2Col);
+#elif defined HIP_COMPILE 
     auto fc_data = Data(); //TODO: __add__
     auto fc_bi2cor = BlockId2ColOrRow();
     auto fc_cor2bi = ColOrRow2BlockId();
@@ -571,6 +794,7 @@ void GPUSparseMatrix<ElemType>::AdjustCol2BlockId(const GPUSPARSE_INDEX_TYPE* cp
         newCol2BlockId,
         pArray,
         newBlockId2Col);
+#endif
 
     TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), Buffer());
 
@@ -586,7 +810,11 @@ GPUSPARSE_INDEX_TYPE* GPUSparseMatrix<ElemType>::GetCondensedVector() const
     {
         PrepareDevice();
         GPUSPARSE_INDEX_TYPE* pArray = new GPUSPARSE_INDEX_TYPE[SecondaryIndexCount()];
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemcpy(pArray, SecondaryIndexLocation(), sizeof(GPUSPARSE_INDEX_TYPE) * SecondaryIndexCount(), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemcpy(pArray, SecondaryIndexLocation(), sizeof(GPUSPARSE_INDEX_TYPE) * SecondaryIndexCount(), hipMemcpyDeviceToHost));
+#endif
         return pArray;
     }
     else
@@ -673,8 +901,13 @@ void GPUSparseMatrix<ElemType>::ResizeAsAndCopyIndexFrom(const GPUSparseMatrix<E
 {
     RequireSizeAndAllocate(a.GetNumRows(), a.GetNumCols(), a.NzCount(), a.GetFormat(), growOnly, false);
 
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemcpy(MajorIndexLocation(), a.MajorIndexLocation(), MajorIndexSize(), cudaMemcpyDeviceToDevice));
+    CUDA_CALL(cudaMemcpy(SecondaryIndexLocation(), a.SecondaryIndexLocation(), SecondaryIndexSize(), cudaMemcpyDeviceToDevice));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemcpy(MajorIndexLocation(), a.MajorIndexLocation(), MajorIndexSize(), hipMemcpyDeviceToDevice));
     CUDA_CALL(hipMemcpy(SecondaryIndexLocation(), a.SecondaryIndexLocation(), SecondaryIndexSize(), hipMemcpyDeviceToDevice));
+#endif
 }
 
 //-------------------------------------------------------------------------
@@ -701,13 +934,29 @@ void GPUSparseMatrix<ElemType>::Reshape(const size_t numRows, const size_t numCo
 
     if (Buffer() != nullptr)
     {
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemcpy(pArray, Data(), GetSizeElemAllocated(), cudaMemcpyDeviceToDevice));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemcpy(pArray, Data(), GetSizeElemAllocated(), hipMemcpyDeviceToDevice));
+#endif	
 
         GPUSPARSE_INDEX_TYPE* majorIndexInNewBuffer = (GPUSPARSE_INDEX_TYPE*) (pArray + GetSizeAllocated());
         GPUSPARSE_INDEX_TYPE* secondaryIndexInNewBuffer = majorIndexInNewBuffer + MajorIndexCount(numRows, numCols, GetSizeAllocated(), GetFormat());
 
         int blocksPerGrid = (int) ceil(1.0 * numCols / GridDim::maxThreadsPerBlock);
         SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+	_reshape<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(
+            GetNumRows(),                // old row count
+            GetNumCols(),                // old col count
+            numRows,                  // new row count
+            numCols,                  // new col count
+            MajorIndexLocation(),     // old row index array
+            SecondaryIndexLocation(), // old column index array
+            majorIndexInNewBuffer,    // new row index array
+            secondaryIndexInNewBuffer // new column index array
+	    );
+#elif defined HIP_COMPILE
 	auto fc_mail = MajorIndexLocation(); //TODO: __add__ remove this and the one below
 	auto fc_sil = SecondaryIndexLocation();
 	auto fc_gnr = GetNumRows();
@@ -722,6 +971,7 @@ void GPUSparseMatrix<ElemType>::Reshape(const size_t numRows, const size_t numCo
             majorIndexInNewBuffer,    // new row index array
             secondaryIndexInNewBuffer // new column index array
             );
+#endif
         TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), Buffer());
     }
 
@@ -750,8 +1000,12 @@ void GPUSparseMatrix<ElemType>::Allocate(const size_t numRows, const size_t numC
         char* buf = TracingGPUMemoryAllocator::Allocate<char>(GetComputeDeviceId(), bufferSizeNeeded);
         ElemType* pArray = (ElemType*)(buf);
 
-        // Note this is required due to m_nz 
+        // Note this is required due to m_nz
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemset(pArray, 0, bufferSizeNeeded));
+#elif defined HIP_COMPILE 
         CUDA_CALL(hipMemset(pArray, 0, bufferSizeNeeded));
+#endif
         if (Buffer() != nullptr)
         {
             if (keepExistingValues)
@@ -759,6 +1013,16 @@ void GPUSparseMatrix<ElemType>::Allocate(const size_t numRows, const size_t numC
                 if (NzCount() > numNZElemToReserve || BufferSizeAllocated() > bufferSizeNeeded)
                     LogicError("Resize: To keep values m_nz should <= numNZElemToReserve.");
 
+#ifdef CUDA_COMPILE
+		CUDA_CALL(cudaMemcpy(pArray, Data(), GetSizeElemAllocated(), cudaMemcpyDeviceToDevice));
+
+                GPUSPARSE_INDEX_TYPE* majorIndexInNewBuffer = (GPUSPARSE_INDEX_TYPE*) (pArray + numNZElemToReserve);
+
+                CUDA_CALL(cudaMemcpy(majorIndexInNewBuffer, MajorIndexLocation(), MajorIndexSize(), cudaMemcpyDeviceToDevice));
+
+                GPUSPARSE_INDEX_TYPE* secondaryIndexInNewBuffer = majorIndexInNewBuffer + MajorIndexCount(numRows, numCols, numNZElemToReserve, GetFormat());
+		CUDA_CALL(cudaMemcpy(secondaryIndexInNewBuffer, SecondaryIndexLocation(), SecondaryIndexSize(), cudaMemcpyDeviceToDevice));
+#elif defined HIP_COMPILE
                 CUDA_CALL(hipMemcpy(pArray, Data(), GetSizeElemAllocated(), hipMemcpyDeviceToDevice));
 
                 GPUSPARSE_INDEX_TYPE* majorIndexInNewBuffer = (GPUSPARSE_INDEX_TYPE*) (pArray + numNZElemToReserve);
@@ -767,6 +1031,7 @@ void GPUSparseMatrix<ElemType>::Allocate(const size_t numRows, const size_t numC
 
                 GPUSPARSE_INDEX_TYPE* secondaryIndexInNewBuffer = majorIndexInNewBuffer + MajorIndexCount(numRows, numCols, numNZElemToReserve, GetFormat());
                 CUDA_CALL(hipMemcpy(secondaryIndexInNewBuffer, SecondaryIndexLocation(), SecondaryIndexSize(), hipMemcpyDeviceToDevice));
+#endif
             }
             TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), Buffer());
         }
@@ -777,7 +1042,11 @@ void GPUSparseMatrix<ElemType>::Allocate(const size_t numRows, const size_t numC
     else // if requested size is smaller, keeping original values does not make sense
     {
         SetSizeAllocated(ElemCountFromBufferSize(numRows, numCols, GetFormat(), BufferSizeAllocated()));
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemset(Buffer(), 0, BufferSizeAllocated()));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemset(Buffer(), 0, BufferSizeAllocated()));
+#endif
     }
 }
 
@@ -863,7 +1132,11 @@ void GPUSparseMatrix<ElemType>::ClearNzCount()
     //    1. We must clear the secondary column index.
     //    2. Set the block size to 0.
     // These requirements can be deduced by the NzCount method.
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemset(Buffer(), 0, BufferSizeAllocated()));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemset(Buffer(), 0, BufferSizeAllocated()));
+#endif
     SetBlockSize(0);
 }
 
@@ -883,16 +1156,26 @@ void GPUSparseMatrix<ElemType>::SetMatrixFromCSRFormat(const GPUSPARSE_INDEX_TYP
     SetFormat(matrixFormatSparseCSR);
     RequireSizeAndAllocate(numRows, numCols, nz, true, false);
 
+#ifdef CUDA_COMPILE
+    cudaMemcpyKind kind = IsOnDevice ? cudaMemcpyDeviceToDevice : cudaMemcpyHostToDevice;
+    CUDA_CALL(cudaMemcpy(Data(), h_Val, nz * sizeof(ElemType), kind));
+#elif defined HIP_COMPILE
     hipMemcpyKind kind = IsOnDevice ? hipMemcpyDeviceToDevice : hipMemcpyHostToDevice;
     CUDA_CALL(hipMemcpy(Data(), h_Val, nz * sizeof(ElemType), kind));
+#endif
 
     if (sizeof(CPUSPARSE_INDEX_TYPE) == sizeof(GPUSPARSE_INDEX_TYPE))
     {
         // ColSize doesn't work since it requires NzCount() to be usable (RowSize doesn't, since it's the fixed, compressed,
         // dimension. Since NzCount is not available (because the sparse indices which is where the NzCount is copmuted from
         // haven't been copied in yet), we just tell it how many bytes to copy. That is, nz * sizeof(GPUSPARSE_INDEX_TYPE);
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemcpy(RowLocation(), h_CSRRow, RowSize(), kind));
+	CUDA_CALL(cudaMemcpy(ColLocation(), h_Col, nz * sizeof(GPUSPARSE_INDEX_TYPE), kind));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemcpy(RowLocation(), h_CSRRow, RowSize(), kind));
         CUDA_CALL(hipMemcpy(ColLocation(), h_Col, nz * sizeof(GPUSPARSE_INDEX_TYPE), kind));
+#endif
         assert(nz == NzCount());
     }
     else
@@ -903,8 +1186,13 @@ void GPUSparseMatrix<ElemType>::SetMatrixFromCSRFormat(const GPUSPARSE_INDEX_TYP
         GPUSPARSE_INDEX_TYPE* pRow = pCol + MajorIndexCount();
         ConvertBuffer(pRow, h_CSRRow, nz);
 
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemcpy(RowLocation(), pRow, RowSize(), kind));
+	CUDA_CALL(cudaMemcpy(ColLocation(), pCol, nz * sizeof(GPUSPARSE_INDEX_TYPE), kind));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemcpy(RowLocation(), pRow, RowSize(), kind));
         CUDA_CALL(hipMemcpy(ColLocation(), pCol, nz * sizeof(GPUSPARSE_INDEX_TYPE), kind));
+#endif
     }
 }
 
@@ -931,20 +1219,34 @@ void GPUSparseMatrix<ElemType>::GetMatrixFromCSRFormat(CPUSPARSE_INDEX_TYPE*& h_
         h_Col = new CPUSPARSE_INDEX_TYPE[nz];
 
         PrepareDevice();
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemcpy(h_Val, Data(), GetSizeElemAllocated(), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemcpy(h_Val, Data(), GetSizeElemAllocated(), hipMemcpyDeviceToHost));
+#endif
 
         if (sizeof(CPUSPARSE_INDEX_TYPE) == sizeof(GPUSPARSE_INDEX_TYPE))
         {
+#ifdef CUDA_COMPILE
+	    CUDA_CALL(cudaMemcpy(h_CSRRow, RowLocation(), RowSize(), cudaMemcpyDeviceToHost));
+	    CUDA_CALL(cudaMemcpy(h_Col, ColLocation(), ColSize(), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
             CUDA_CALL(hipMemcpy(h_CSRRow, RowLocation(), RowSize(), hipMemcpyDeviceToHost));
             CUDA_CALL(hipMemcpy(h_Col, ColLocation(), ColSize(), hipMemcpyDeviceToHost));
+#endif
         }
         else
         {
             GPUSPARSE_INDEX_TYPE* pCol = (GPUSPARSE_INDEX_TYPE*) ReserveTempHostBuffer(RowSize() + ColSize());
             GPUSPARSE_INDEX_TYPE* pRow = pCol + MajorIndexCount();
 
+#ifdef CUDA_COMPILE
+	    CUDA_CALL(cudaMemcpy(pRow, RowLocation(), RowSize(), cudaMemcpyDeviceToHost));
+	    CUDA_CALL(cudaMemcpy(pCol, ColLocation(), ColSize(), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
             CUDA_CALL(hipMemcpy(pRow, RowLocation(), RowSize(), hipMemcpyDeviceToHost));
             CUDA_CALL(hipMemcpy(pCol, ColLocation(), ColSize(), hipMemcpyDeviceToHost));
+#endif
 
             ConvertBuffer(h_Col, pCol, MajorIndexCount());
             ConvertBuffer(h_CSRRow, pRow, SecondaryIndexCount());
@@ -970,7 +1272,11 @@ void GPUSparseMatrix<ElemType>::SetMatrixFromCSCFormat(const CPUSPARSE_INDEX_TYP
 
     // m_nz doesn't exist anymore. How are we going to deal with the NzSize, RowSize, and ColSize? Do it ourselves of course.
 
+#ifdef CUDA_COMPILE
+    cudaMemcpyKind kind = IsOnDevice ? cudaMemcpyDeviceToDevice : cudaMemcpyHostToDevice;
+#elif defined HIP_COMPILE
     hipMemcpyKind kind = IsOnDevice ? hipMemcpyDeviceToDevice : hipMemcpyHostToDevice;
+#endif
     if (transferer)
     {
         // TODO: All RequireSizeAndAllocate should be async and use a transferer.
@@ -981,7 +1287,11 @@ void GPUSparseMatrix<ElemType>::SetMatrixFromCSCFormat(const CPUSPARSE_INDEX_TYP
         transferer->CopyCPUToGPUAsync(h_Val, nz, sizeof(ElemType), Data());
     }
     else
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemcpy(Data(), h_Val, nz * sizeof(ElemType), kind));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemcpy(Data(), h_Val, nz * sizeof(ElemType), kind));
+#endif
 
     if (sizeof(CPUSPARSE_INDEX_TYPE) == sizeof(GPUSPARSE_INDEX_TYPE))
     {
@@ -992,8 +1302,13 @@ void GPUSparseMatrix<ElemType>::SetMatrixFromCSCFormat(const CPUSPARSE_INDEX_TYP
         }
         else
         {
+#ifdef CUDA_COMPILE
+	    CUDA_CALL(cudaMemcpy(RowLocation(), h_Row, sizeof(GPUSPARSE_INDEX_TYPE) * nz, kind));
+	    CUDA_CALL(cudaMemcpy(ColLocation(), h_CSCCol, sizeof(GPUSPARSE_INDEX_TYPE) * (numCols + 1), kind));
+#elif defined HIP_COMPILE
             CUDA_CALL(hipMemcpy(RowLocation(), h_Row, sizeof(GPUSPARSE_INDEX_TYPE) * nz, kind));
             CUDA_CALL(hipMemcpy(ColLocation(), h_CSCCol, sizeof(GPUSPARSE_INDEX_TYPE) * (numCols + 1), kind));
+#endif
         }
     }
     else
@@ -1012,8 +1327,13 @@ void GPUSparseMatrix<ElemType>::SetMatrixFromCSCFormat(const CPUSPARSE_INDEX_TYP
         }
         else
         {
+#ifdef CUDA_COMPILE
+	    CUDA_CALL(cudaMemcpy(RowLocation(), pRow, sizeof(GPUSPARSE_INDEX_TYPE) * nz, kind));
+	    CUDA_CALL(cudaMemcpy(ColLocation(), pCol, sizeof(GPUSPARSE_INDEX_TYPE) * (numCols + 1), kind));
+#elif defined HIP_COMPILE
             CUDA_CALL(hipMemcpy(RowLocation(), pRow, sizeof(GPUSPARSE_INDEX_TYPE) * nz, kind));
             CUDA_CALL(hipMemcpy(ColLocation(), pCol, sizeof(GPUSPARSE_INDEX_TYPE) * (numCols + 1), kind));
+#endif
         }
     }
 }
@@ -1047,9 +1367,15 @@ void GPUSparseMatrix<ElemType>::SetMatrixFromSBCFormat(const size_t* blockIds, c
         gpuCol2BlockId[blockIds[i]] = i;
     }
 
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemcpy(Data(), val, nz * sizeof(ElemType), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(BlockId2ColOrRow(), &gpuBlockId2Col[0], numCols * sizeof(GPUSPARSE_INDEX_TYPE), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(ColOrRow2BlockId(), &gpuCol2BlockId[0], numCols * sizeof(GPUSPARSE_INDEX_TYPE), cudaMemcpyHostToDevice));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemcpy(Data(), val, nz * sizeof(ElemType), hipMemcpyHostToDevice));
     CUDA_CALL(hipMemcpy(BlockId2ColOrRow(), &gpuBlockId2Col[0], numCols * sizeof(GPUSPARSE_INDEX_TYPE), hipMemcpyHostToDevice));
     CUDA_CALL(hipMemcpy(ColOrRow2BlockId(), &gpuCol2BlockId[0], numCols * sizeof(GPUSPARSE_INDEX_TYPE), hipMemcpyHostToDevice));
+#endif
 }
 
 // this function will allocate memory while the caller needs to release it
@@ -1073,20 +1399,34 @@ void GPUSparseMatrix<ElemType>::GetMatrixFromCSCFormat(GPUSPARSE_INDEX_TYPE*& h_
         h_Row = new GPUSPARSE_INDEX_TYPE[nz];
 
         PrepareDevice();
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemcpy(h_Val, Data(), GetSizeElemAllocated(), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemcpy(h_Val, Data(), GetSizeElemAllocated(), hipMemcpyDeviceToHost));
+#endif
 
         if (sizeof(CPUSPARSE_INDEX_TYPE) == sizeof(GPUSPARSE_INDEX_TYPE))
         {
+#ifdef CUDA_COMPILE
+	    CUDA_CALL(cudaMemcpy(h_Row, RowLocation(), RowSize(), cudaMemcpyDeviceToHost));
+	    CUDA_CALL(cudaMemcpy(h_CSCCol, ColLocation(), ColSize(), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
             CUDA_CALL(hipMemcpy(h_Row, RowLocation(), RowSize(), hipMemcpyDeviceToHost));
             CUDA_CALL(hipMemcpy(h_CSCCol, ColLocation(), ColSize(), hipMemcpyDeviceToHost));
+#endif
         }
         else
         {
             GPUSPARSE_INDEX_TYPE* pCol = (GPUSPARSE_INDEX_TYPE*) ReserveTempHostBuffer(RowSize() + ColSize());
             GPUSPARSE_INDEX_TYPE* pRow = pCol + SecondaryIndexCount();
 
+#ifdef CUDA_COMPILE
+	    CUDA_CALL(cudaMemcpy(pRow, RowLocation(), RowSize(), cudaMemcpyDeviceToHost));
+	    CUDA_CALL(cudaMemcpy(pCol, ColLocation(), ColSize(), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
             CUDA_CALL(hipMemcpy(pRow, RowLocation(), RowSize(), hipMemcpyDeviceToHost));
             CUDA_CALL(hipMemcpy(pCol, ColLocation(), ColSize(), hipMemcpyDeviceToHost));
+#endif
 
             ConvertBuffer(h_CSCCol, pCol, SecondaryIndexCount());
             ConvertBuffer(h_Row, pRow, MajorIndexCount());
@@ -1188,6 +1528,25 @@ void GPUSparseMatrix<ElemType>::ConvolveAndWeightedAdd(ElemType alpha, const GPU
         {
             int blocksPerGrid = (int) ceil(1.0 * cRows * cCols / GridDim::maxThreadsPerBlock);
             SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+	    _dense1DConvMultSparseCSCAndWeightedAddToDense<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(
+                m,                   // rowDense
+                k,                   // colDense
+                n,                   // colSparse
+                numChannels,         // number of input channels
+                numSteps,            // convolution num steps
+                horizontalSubsample, // convolution step size
+                channelwise,         // channelwise or pixelwise multiplication
+                alpha,
+                reinterpret_cast<const ElemType*>(lhs.Data()), // dense
+                transposeA,
+                reinterpret_cast<const ElemType*>(rhs.Buffer()), // sparse nz values. Note that because of the offsets we use the array
+                rhs.RowLocation(),
+                rhs.ColLocation(),
+                beta,
+                reinterpret_cast<ElemType*>(c.Data()) // dense target
+		);
+#elif defined HIP_COMPILE
             hipLaunchKernelGGL((_dense1DConvMultSparseCSCAndWeightedAddToDense<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
                 m,                   // rowDense
                 k,                   // colDense
@@ -1205,6 +1564,7 @@ void GPUSparseMatrix<ElemType>::ConvolveAndWeightedAdd(ElemType alpha, const GPU
                 beta,
                 reinterpret_cast<ElemType*>(c.Data()) // dense target
                 );
+#endif
         }
         else
         {
@@ -1215,6 +1575,28 @@ void GPUSparseMatrix<ElemType>::ConvolveAndWeightedAdd(ElemType alpha, const GPU
 
             int blocksPerGrid = (int) ceil(1.0 * cRows / GridDim::maxThreadsPerBlock);
             SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+	    for (int rowInB = 0; rowInB < l; rowInB++)
+            {
+                _dense1DConvMultSparseCSCTransposeAndAddToDense<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(
+                    m,                   // rowDense
+                    k,                   // colDense
+                    n,                   // colSparse
+                    numChannels,         // number of input channels
+                    numSteps,            // convolution num steps
+                    horizontalSubsample, // convolution step size
+                    channelwise,         // channelwise or pixelwise multiplication
+                    rowInB,
+                    alpha,
+                    reinterpret_cast<const ElemType*>(lhs.Data()), // dense
+                    transposeA,
+                    reinterpret_cast<const ElemType*>(rhs.Buffer()), // sparse nz values
+                    rhs.RowLocation(),
+                    rhs.ColLocation(),
+                    reinterpret_cast<ElemType*>(c.Data()) // dense target
+                    );
+	    }
+#elif defined HIP_COMPILE
             for (int rowInB = 0; rowInB < l; rowInB++)
             {
                 hipLaunchKernelGGL((_dense1DConvMultSparseCSCTransposeAndAddToDense<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
@@ -1235,6 +1617,7 @@ void GPUSparseMatrix<ElemType>::ConvolveAndWeightedAdd(ElemType alpha, const GPU
                     reinterpret_cast<ElemType*>(c.Data()) // dense target
                     );
             }
+#endif
         }
     }
     else
@@ -1263,6 +1646,15 @@ void GPUSparseMatrix<ElemType>::ColumnwiseScaleAndWeightedAdd(ElemType alpha, co
 
     int blocksPerGrid = (int)ceil(1.0 * a.GetNumCols() / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    _columnwiseScaleAndWeightedAdd4CSC<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(
+        alpha,
+        a.Data(), a.SecondaryIndexLocation(), a.MajorIndexLocation(),
+        v.Data(),
+        beta,
+        c.Data(),
+	a.GetNumRows(), a.GetNumCols());
+#elif defined HIP_COMPILE
     hipLaunchKernelGGL((_columnwiseScaleAndWeightedAdd4CSC<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
         alpha,
         a.Data(), a.SecondaryIndexLocation(), a.MajorIndexLocation(),
@@ -1270,6 +1662,7 @@ void GPUSparseMatrix<ElemType>::ColumnwiseScaleAndWeightedAdd(ElemType alpha, co
         beta,
         c.Data(),
         a.GetNumRows(), a.GetNumCols());
+#endif
 }
 template <class ElemType>
 void GPUSparseMatrix<ElemType>::TensorShuffleScaleAndAdd(ElemType keepWeight, const GPUSparseMatrix<ElemType>& a, size_t D, size_t S, size_t M, size_t K, size_t T, 
@@ -1298,6 +1691,17 @@ void GPUSparseMatrix<ElemType>::TensorShuffleScaleAndAdd(ElemType keepWeight, co
         SyncGuard syncGuard;
         CUDA_LONG N = (CUDA_LONG) a.NzCount();
         int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
+#ifdef CUDA_COMPILE
+	_tensorShuffleScaleAndAddRowSparse<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(
+            reinterpret_cast<const ElemType*>(a.Buffer()), // source nz values
+            a.RowLocation(),
+            a.ColLocation(),
+            reinterpret_cast<ElemType*>(c.Buffer()), // target nz values
+            c.RowLocation(),
+            c.ColLocation(),
+            D, S, M, K, T,
+	    a.NzCount());
+#elif defined HIP_COMPILE
         hipLaunchKernelGGL((_tensorShuffleScaleAndAddRowSparse<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
             reinterpret_cast<const ElemType*>(a.Buffer()), // source nz values
             a.RowLocation(),
@@ -1307,10 +1711,15 @@ void GPUSparseMatrix<ElemType>::TensorShuffleScaleAndAdd(ElemType keepWeight, co
             c.ColLocation(),
             D, S, M, K, T,
             a.NzCount());
+#endif
     }
     else
     {
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemset(c.Buffer(), 0, c.BufferSizeAllocated()));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemset(c.Buffer(), 0, c.BufferSizeAllocated()));
+#endif
     }
 }
 
@@ -1362,11 +1771,30 @@ void GPUSparseMatrix<ElemType>::MultiplyAndAdd(ElemType alpha, const GPUMatrix<E
         if (blockSizePrev == 0)
         {
             c.Resize(m, n, 0);
+#ifdef CUDA_COMPILE
+	    CUDA_CALL(cudaMemset(c.ColOrRow2BlockId(), SparseIndex_NotAssigned, sizeof(GPUSPARSE_INDEX_TYPE) * (n)));
+	    CUDA_CALL(cudaMemset(c.BlockId2ColOrRow(), SparseIndex_NotAssigned, sizeof(GPUSPARSE_INDEX_TYPE) * (n)));
+#elif defined HIP_COMPILE
             CUDA_CALL(hipMemset(c.ColOrRow2BlockId(), SparseIndex_NotAssigned, sizeof(GPUSPARSE_INDEX_TYPE) * (n)));
             CUDA_CALL(hipMemset(c.BlockId2ColOrRow(), SparseIndex_NotAssigned, sizeof(GPUSPARSE_INDEX_TYPE) * (n)));
+#endif
         }
 
         size_t* blockSize = TracingGPUMemoryAllocator::Allocate<size_t>(lhs.GetComputeDeviceId(), 1);
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemcpy(blockSize, &blockSizePrev, sizeof(size_t), cudaMemcpyHostToDevice));
+
+        blocksPerGrid = (int) ceil(((double) rhs_nz) / GridDim::maxThreadsPerBlock);
+        _findColsWithValues<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(
+            rhs.RowLocation(), c.ColOrRow2BlockId(), rhs_nz);
+                
+        blocksPerGrid = (int) ceil(((double) n) / GridDim::maxThreadsPerBlock);
+        _determineBlockIds<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(
+            c.BlockId2ColOrRow(), c.ColOrRow2BlockId(), n, blockSize);
+
+        size_t blockSizeCurr;
+	CUDA_CALL(cudaMemcpy(&blockSizeCurr, blockSize, sizeof(size_t), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemcpy(blockSize, &blockSizePrev, sizeof(size_t), hipMemcpyHostToDevice));
 
         blocksPerGrid = (int) ceil(((double) rhs_nz) / GridDim::maxThreadsPerBlock);
@@ -1379,6 +1807,7 @@ void GPUSparseMatrix<ElemType>::MultiplyAndAdd(ElemType alpha, const GPUMatrix<E
 
         size_t blockSizeCurr;
         CUDA_CALL(hipMemcpy(&blockSizeCurr, blockSize, sizeof(size_t), hipMemcpyDeviceToHost));
+#endif
         TracingGPUMemoryAllocator::Free<size_t>(lhs.GetComputeDeviceId(), blockSize);
         c.SetBlockSize(blockSizeCurr);
 
@@ -1387,11 +1816,27 @@ void GPUSparseMatrix<ElemType>::MultiplyAndAdd(ElemType alpha, const GPUMatrix<E
             // zero initialize new blocks
             size_t nnz = m * blockSizeCurr;
             c.RequireSizeAndAllocate(m, n, nnz, true, true); // we need to keep the col2blockid and blockid2col info when resizing.
+#ifdef CUDA_COMPILE
+	    CUDA_CALL(cudaMemset(c.Data() + m * blockSizePrev, 0, sizeof(ElemType) * m * (blockSizeCurr - blockSizePrev)));
+#elif defined HIP_COMPILE
             CUDA_CALL(hipMemset(c.Data() + m * blockSizePrev, 0, sizeof(ElemType) * m * (blockSizeCurr - blockSizePrev)));
+#endif
         }
 
         LONG64 N = (LONG64) lhs.GetNumElements(); // here we process for each row in lhs and each column in rhs (==columns in lhs)
         blocksPerGrid = (int) ceil(((double) N) / GridDim::maxThreadsPerBlock);
+#ifdef CUDA_COMPILE
+	_denseMulSparseCSCTransposeToSparseBlockCol2<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(
+            alpha,
+            lhs.Data(),
+            m,
+            l,
+            rhs.Data(),
+            rhs.RowLocation(),
+            rhs.ColLocation(),
+            c.ColOrRow2BlockId(),
+	    c.Data());
+#elif defined HIP_COMPILE
         hipLaunchKernelGGL((_denseMulSparseCSCTransposeToSparseBlockCol2<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
             alpha,
             lhs.Data(),
@@ -1402,6 +1847,7 @@ void GPUSparseMatrix<ElemType>::MultiplyAndAdd(ElemType alpha, const GPUMatrix<E
             rhs.ColLocation(),
             c.ColOrRow2BlockId(),
             c.Data());
+#endif
     }
     else if (transposeA && !transposeB)
     {
@@ -1428,7 +1874,11 @@ size_t GPUSparseMatrix<ElemType>::IdentifyRowsWithValues() const
     // In the first nnz values of the 'rowToId' we will store the block ids of the nonzero-values (to be computed below).
     // In the next nnz values of 'rowToId' we store the row-ids of the non-zero values (copied from GPU).
     GPUSPARSE_INDEX_TYPE* h_Row = rowToId + nnz;
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemcpy(h_Row, RowLocation(), sizeof(GPUSPARSE_INDEX_TYPE) * nnz, cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemcpy(h_Row, RowLocation(), sizeof(GPUSPARSE_INDEX_TYPE) * nnz, hipMemcpyDeviceToHost));
+#endif
 
     for (size_t i = 0; i < nnz; i++)
     {
@@ -1440,7 +1890,11 @@ size_t GPUSparseMatrix<ElemType>::IdentifyRowsWithValues() const
         }
         rowToId[i] = indexer[row];
     }
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemcpy(GetTempDeviceBuffer(), rowToId, sizeof(GPUSPARSE_INDEX_TYPE) * nnz, cudaMemcpyHostToDevice));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemcpy(GetTempDeviceBuffer(), rowToId, sizeof(GPUSPARSE_INDEX_TYPE) * nnz, hipMemcpyHostToDevice));
+#endif
     return indexer.size();
 }
 
@@ -1461,6 +1915,17 @@ void GPUSparseMatrix<ElemType>::ScaleAndAdd(const ElemType alpha, const GPUSpars
         SyncGuard syncGuard;
         LONG64 N = (LONG64) lhs.GetNumNZElements();
         int blocksPerGrid = (int) ceil(((double) N) / GridDim::maxThreadsPerBlock);
+#ifdef CUDA_COMPILE
+	_scaleSparseBlockAndAddToDense<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(
+            alpha,
+            blockCol,
+            lhs.GetNumRows(),
+            lhs.GetNumCols(),
+            lhs.GetBlockSize(),
+            lhs.Data(),
+            lhs.BlockId2ColOrRow(),
+	    rhs.Data());
+#elif defined HIP_COMPILE
         hipLaunchKernelGGL((_scaleSparseBlockAndAddToDense<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
             alpha,
             blockCol,
@@ -1470,6 +1935,7 @@ void GPUSparseMatrix<ElemType>::ScaleAndAdd(const ElemType alpha, const GPUSpars
             lhs.Data(),
             lhs.BlockId2ColOrRow(),
             rhs.Data());
+#endif
 
     }
     else
@@ -1488,7 +1954,11 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::InplaceTruncate(const Elem
     CUDA_LONG blocksPerGrid = (CUDA_LONG) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
     ElemType* values = NzValues();
+#ifdef CUDA_COMPILE
+    _inplaceTruncate<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(values, threshold, N);
+#elif defined HIP_COMPILE
     hipLaunchKernelGGL((_inplaceTruncate<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, values, threshold, N);
+#endif
     return *this;
 }
 
@@ -1502,7 +1972,11 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::InplaceSoftThreshold(const
     CUDA_LONG blocksPerGrid = (CUDA_LONG) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
     ElemType* values = NzValues();
+#ifdef CUDA_COMPILE
+    _inplaceSoftThreshold<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(values, threshold, N);
+#elif defined HIP_COMPILE
     hipLaunchKernelGGL((_inplaceSoftThreshold<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, values, threshold, N);
+#endif
     return *this;
 }
 
@@ -1532,6 +2006,18 @@ void GPUSparseMatrix<ElemType>::NormalGrad(GPUMatrix<ElemType>& c, const ElemTyp
         LONG64 N = (LONG64) GetNumNZElements();
         int blocksPerGrid = (int) ceil(((double) N) / GridDim::maxThreadsPerBlock);
 
+#ifdef CUDA_COMPILE
+	_normalGradForSparseBlock<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(
+            momentum,
+            isBlockCol,
+            GetNumRows(),
+            GetNumCols(),
+            GetBlockSize(),
+            Data(),
+            BlockId2ColOrRow(),
+            c.Data(),
+	    unitGainFactor);
+#elif defined HIP_COMPILE
 	auto fc_data = Data(); //TODO:__add__ remove this and below
 	auto fc_bi2cor = BlockId2ColOrRow();
 	auto fc_gnr = GetNumRows();
@@ -1547,6 +2033,7 @@ void GPUSparseMatrix<ElemType>::NormalGrad(GPUMatrix<ElemType>& c, const ElemTyp
             fc_bi2cor,
             c.Data(),
             unitGainFactor);
+#endif
     }
     else
     {
@@ -1587,9 +2074,13 @@ ElemType GPUSparseMatrix<ElemType>::Adagrad(GPUMatrix<ElemType>& c, const bool n
         int blocksPerGrid = (nz + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
         bool colMajor = GetFormat() == MatrixFormat::matrixFormatSparseBlockCol;
         size_t len = colMajor ? GetNumRows() : GetNumCols();
+#ifdef CUDA_COMPILE
+	_adagrad4BlockSparse<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(c.Buffer(), c.GetNumRows(), Data(), BlockId2ColOrRow(), multipliers, colMajor, len, nz);
+#elif defined HIP_COMPILE
 	auto fc_data = Data(); //TODO: __add__  remove this and below
 	auto fc_bi2cor = BlockId2ColOrRow();
         hipLaunchKernelGGL((_adagrad4BlockSparse<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, c.Buffer(), c.GetNumRows(), fc_data, fc_bi2cor, multipliers, colMajor, len, nz);
+#endif
     }
     else
         NOT_IMPLEMENTED;
@@ -1598,6 +2089,21 @@ ElemType GPUSparseMatrix<ElemType>::Adagrad(GPUMatrix<ElemType>& c, const bool n
         return 1;
 
     let nz = NzCount();
+#ifdef CUDA_COMPILE
+    cublasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
+    if (sizeof(ElemType) == sizeof(float))
+    {
+        float aveMultiplier = 0;
+        CUBLAS_CALL(cublasSasum(cuHandle, (LONG64) nz, reinterpret_cast<float*>(multipliers), 1, &aveMultiplier));
+        return (ElemType) aveMultiplier / nz;
+    }
+    else
+    {
+        double aveMultiplier = 0;
+        CUBLAS_CALL(cublasDasum(cuHandle, (LONG64) nz, reinterpret_cast<double*>(multipliers), 1, &aveMultiplier));
+        return (ElemType) aveMultiplier / nz;
+    }
+#elif defined HIP_COMPILE
     hipblasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
     if (sizeof(ElemType) == sizeof(float))
     {
@@ -1611,6 +2117,7 @@ ElemType GPUSparseMatrix<ElemType>::Adagrad(GPUMatrix<ElemType>& c, const bool n
         HIPBLAS_CALL(hipblasDasum(cuHandle, (LONG64) nz, reinterpret_cast<double*>(multipliers), 1, &aveMultiplier));
         return (ElemType) aveMultiplier / nz;
     }
+#endif
 }
 
 template <class ElemType>
@@ -1640,6 +2147,12 @@ void GPUSparseMatrix<ElemType>::FSAdagrad(
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
+#ifdef CUDA_COMPILE
+    _fsadagrad4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+        n, Data(), ColOrRow2BlockId(), GetNumRows(),
+        c.Data(), c.Data() + n, functionValues.Data(),
+	learnRatePerSample, momentum, adaWeight, adaMul, unitGainFactor);
+#elif defined HIP_COMPILE
     auto fc_data = Data(); //TODO: __add__  remove all
     auto fc_cor2bi = ColOrRow2BlockId();
     auto fc_gnr = GetNumRows();
@@ -1647,6 +2160,7 @@ void GPUSparseMatrix<ElemType>::FSAdagrad(
         n, fc_data, fc_cor2bi, fc_gnr,
         c.Data(), c.Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, unitGainFactor);
+#endif
 }
 
 template <class ElemType>
@@ -1678,6 +2192,12 @@ void GPUSparseMatrix<ElemType>::Adam(
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
+#ifdef CUDA_COMPILE
+    _adam4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+        n, Data(), ColOrRow2BlockId(), GetNumRows(),
+        c.Data(), c.Data() + n, functionValues.Data(),
+	learnRatePerSample, momentum, adaWeight, adaMul, epsilon, unitGainFactor, adamax);
+#elif defined HIP_COMPILE
     auto fc_data = Data(); //TODO: __add__ remove
     auto fc_cor2bi = ColOrRow2BlockId();
     auto fc_gnr = GetNumRows();
@@ -1685,6 +2205,7 @@ void GPUSparseMatrix<ElemType>::Adam(
         n, fc_data, fc_cor2bi, fc_gnr,
         c.Data(), c.Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, epsilon, unitGainFactor, adamax);
+#endif
 }
 
 template <class ElemType>
@@ -1722,6 +2243,12 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         ElemType* steps = c.Data() + 2 * n; // current step size
                                             // Data()+3*n is temp memory used to store multipliers, no need to initialize
 
+#ifdef CUDA_COMPILE
+	_rmsprop_init4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+            avars, signs, steps, 
+            Data(), ColOrRow2BlockId(), GetNumRows(),
+	    n);
+#elif defined HIP_COMPILE
 	auto fc_data = Data(); //TODO: __add__ remove
 	auto fc_cor2bi = ColOrRow2BlockId();
 	auto fc_gnr = GetNumRows();
@@ -1729,6 +2256,7 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
             avars, signs, steps, 
             fc_data, fc_cor2bi, fc_gnr,
             n);
+#endif
     }
     assert(c.GetNumRows() == GetNumRows() && c.GetNumCols() == numColsNeeded);
 
@@ -1755,9 +2283,21 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         };
 
         upd_gpu = TracingGPUMemoryAllocator::Allocate<ElemType>(GetComputeDeviceId(), 27);
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaMemcpy(upd_gpu, upd, sizeof(ElemType) * _countof(upd), cudaMemcpyHostToDevice));
+#elif defined HIP_COMPILE
         CUDA_CALL(hipMemcpy(upd_gpu, upd, sizeof(ElemType) * _countof(upd), hipMemcpyHostToDevice));
+#endif
     }
 
+#ifdef CUDA_COMPILE
+    _rmsprop4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+        avars, signs, steps,
+        Data(), ColOrRow2BlockId(), GetNumRows(),
+        n,
+        RMS_GAMMA, RMS_WGT_INC, RMS_WGT_MAX, RMS_WGT_DEC, RMS_WGT_MIN,
+	floor, upd_gpu, multipliers);
+#elif defined HIP_COMPILE
     auto fc_data = Data(); //TODO: __add__ remove
     auto fc_cor2bi = ColOrRow2BlockId();
     auto fc_gnr = GetNumRows();
@@ -1767,10 +2307,26 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         n,
         RMS_GAMMA, RMS_WGT_INC, RMS_WGT_MAX, RMS_WGT_DEC, RMS_WGT_MIN,
         floor, upd_gpu, multipliers);
+#endif
 
     if (!needAveMultiplier)
         return 1;
 
+#ifdef CUDA_COMPILE
+    cublasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
+    if (sizeof(ElemType) == sizeof(float))
+    {
+        float aveMultiplier = 0;
+        CUBLAS_CALL(cublasSasum(cuHandle, (CUDA_LONG)n, reinterpret_cast<float*>(multipliers), 1, &aveMultiplier));
+        return aveMultiplier / n;
+    }
+    else
+    {
+        double aveMultiplier = 0;
+        CUBLAS_CALL(cublasDasum(cuHandle, (CUDA_LONG)n, reinterpret_cast<double*>(multipliers), 1, &aveMultiplier));
+        return (ElemType)aveMultiplier / n;
+    }
+#elif defined HIP_COMPILE
     hipblasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
     if (sizeof(ElemType) == sizeof(float))
     {
@@ -1784,6 +2340,7 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         HIPBLAS_CALL(hipblasDasum(cuHandle, (CUDA_LONG)n, reinterpret_cast<double*>(multipliers), 1, &aveMultiplier));
         return (ElemType)aveMultiplier / n;
     }
+#endif
 }
 
 template <class ElemType>
@@ -1806,6 +2363,12 @@ void GPUSparseMatrix<ElemType>::AdaDelta(GPUMatrix<ElemType>&c, GPUMatrix<ElemTy
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
+#ifdef CUDA_COMPILE
+    _adadelta4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
+        n, Data(), ColOrRow2BlockId(), GetNumRows(),
+        c.Data(), c.Data() + n, functionValues.Data(),
+	learningRate, rho, epsilon);
+#elif defined HIP_COMPILE
     auto fc_data = Data(); //TODO: __add__ remove
     auto fc_cor2bi = ColOrRow2BlockId();
     auto fc_gnr = GetNumRows();
@@ -1813,6 +2376,7 @@ void GPUSparseMatrix<ElemType>::AdaDelta(GPUMatrix<ElemType>&c, GPUMatrix<ElemTy
         n, fc_data, fc_cor2bi, fc_gnr,
         c.Data(), c.Data() + n, functionValues.Data(),
         learningRate, rho, epsilon);
+#endif
 }
 
 // sparse X dense = dense
@@ -1832,6 +2396,16 @@ void GPUSparseMatrix<ElemType>::MultiplyAndWeightedAdd(ElemType alpha, const GPU
         RuntimeError("MultiplyAndWeightedAdd: All matrices must be on the same GPU");
 
     a.PrepareDevice();
+#ifdef CUDA_COMPILE
+    cusparseHandle_t cusparseHandle = 0;
+    CUSPARSE_CALL(cusparseCreate(&cusparseHandle));
+    cusparseMatDescr_t descr = 0;
+    CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
+    cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO);
+
+    cusparseOperation_t oper = (transposeA != reinterpretAsCSR) ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
+#elif defined HIP_COMPILE
     hipsparseHandle_t hipsparseHandle = 0;
     HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descr = 0;
@@ -1840,6 +2414,7 @@ void GPUSparseMatrix<ElemType>::MultiplyAndWeightedAdd(ElemType alpha, const GPU
     hipsparseSetMatIndexBase(descr, HIPSPARSE_INDEX_BASE_ZERO);
 
     hipsparseOperation_t oper = (transposeA != reinterpretAsCSR) ? HIPSPARSE_OPERATION_TRANSPOSE : HIPSPARSE_OPERATION_NON_TRANSPOSE;
+#endif
 
     int n = (int)b.GetNumCols();
     int m = (int)(reinterpretAsCSR ? a.GetNumCols() : a.GetNumRows());
@@ -1850,6 +2425,21 @@ void GPUSparseMatrix<ElemType>::MultiplyAndWeightedAdd(ElemType alpha, const GPU
     const auto& aColLocation = reinterpretAsCSR ? a.RowLocation() : a.ColLocation();
 
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    if (sizeof(ElemType) == sizeof(float))
+    {
+        CUSPARSE_CALL(cusparseScsrmm(cusparseHandle, oper, m, n, k, (int) a.GetNumNZElements(), reinterpret_cast<float*>(&alpha), descr, reinterpret_cast<const float*>(a.Buffer()),
+                                     aRowLocation, aColLocation, reinterpret_cast<float*>(b.Data()),
+                                     (int) b.GetNumRows(), reinterpret_cast<float*>(&beta), reinterpret_cast<float*>(c.Data()), (int) c.GetNumRows()));
+    }
+    else
+    {
+        CUSPARSE_CALL(cusparseDcsrmm(cusparseHandle, oper, m, n, k, (int) a.GetNumNZElements(), reinterpret_cast<double*>(&alpha), descr, reinterpret_cast<const double*>(a.Buffer()),
+                                     aRowLocation, aColLocation, reinterpret_cast<double*>(b.Data()),
+                                     (int) b.GetNumRows(), reinterpret_cast<double*>(&beta), reinterpret_cast<double*>(c.Data()), (int) c.GetNumRows()));
+    }
+    CUSPARSE_CALL(cusparseDestroy(cusparseHandle));
+#elif defined HIP_COMPILE
     if (sizeof(ElemType) == sizeof(float))
     {
         HIPSPARSE_CALL(hipsparseScsrmm(hipsparseHandle, oper, m, n, k, (int) a.GetNumNZElements(), reinterpret_cast<float*>(&alpha), descr, reinterpret_cast<const float*>(a.Buffer()),
@@ -1863,6 +2453,7 @@ void GPUSparseMatrix<ElemType>::MultiplyAndWeightedAdd(ElemType alpha, const GPU
                                      (int) b.GetNumRows(), reinterpret_cast<double*>(&beta), reinterpret_cast<double*>(c.Data()), (int) c.GetNumRows()));
     }
     HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+#endif
 }
 
 template <class ElemType>
@@ -1955,7 +2546,11 @@ void GPUSparseMatrix<ElemType>::PrepareBuffer(size_t m, size_t n, bool canReuseB
     // now we know the number of Non-zeros in the result set, set the output size
     c.RequireSizeAndAllocate(m, n, nnzC, true, false);
 
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemcpy(c.SecondaryIndexLocation(), csrRowPtrC, c.SecondaryIndexSize(), cudaMemcpyDeviceToDevice));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemcpy(c.SecondaryIndexLocation(), csrRowPtrC, c.SecondaryIndexSize(), hipMemcpyDeviceToDevice));
+#endif
 
     // if we allocated the buffer, free it here
     if (allocatedBuffer)
@@ -1981,6 +2576,22 @@ void GPUSparseMatrix<ElemType>::Multiply(const GPUSparseMatrix<ElemType>& S1, bo
         RuntimeError("Sparse matrix multiply: both matrices must be on the same device");
 
     S1.PrepareDevice();
+#ifdef CUDA_COMPILE
+    cusparseHandle_t cusparseHandle = 0;
+    CUSPARSE_CALL(cusparseCreate(&cusparseHandle));
+    cusparseMatDescr_t descrA = 0, descrB = 0, descrC = 0;
+    CUSPARSE_CALL(cusparseCreateMatDescr(&descrA));
+    CUSPARSE_CALL(cusparseCreateMatDescr(&descrB));
+    CUSPARSE_CALL(cusparseCreateMatDescr(&descrC));
+    cusparseSetMatType(descrA, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatType(descrB, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatType(descrC, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(descrA, CUSPARSE_INDEX_BASE_ZERO);
+    cusparseSetMatIndexBase(descrB, CUSPARSE_INDEX_BASE_ZERO);
+    cusparseSetMatIndexBase(descrC, CUSPARSE_INDEX_BASE_ZERO);
+    cusparseOperation_t operA = transposeS1 ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
+    cusparseOperation_t operB = transposeS2 ? CUSPARSE_OPERATION_TRANSPOSE : CUSPARSE_OPERATION_NON_TRANSPOSE;
+#elif defined HIP_COMPILE
     hipsparseHandle_t hipsparseHandle = 0;
     HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descrA = 0, descrB = 0, descrC = 0;
@@ -1995,6 +2606,7 @@ void GPUSparseMatrix<ElemType>::Multiply(const GPUSparseMatrix<ElemType>& S1, bo
     hipsparseSetMatIndexBase(descrC, HIPSPARSE_INDEX_BASE_ZERO);
     hipsparseOperation_t operA = transposeS1 ? HIPSPARSE_OPERATION_TRANSPOSE : HIPSPARSE_OPERATION_NON_TRANSPOSE;
     hipsparseOperation_t operB = transposeS2 ? HIPSPARSE_OPERATION_TRANSPOSE : HIPSPARSE_OPERATION_NON_TRANSPOSE;
+#endif
 
     int m = int(transposeS1 ? S1.GetNumCols() : S1.GetNumRows());
     int n = int(transposeS2 ? S2.GetNumRows() : S2.GetNumCols());
@@ -2007,6 +2619,31 @@ void GPUSparseMatrix<ElemType>::Multiply(const GPUSparseMatrix<ElemType>& S1, bo
     int nnzB = (int) S2.GetNumNZElements();
 
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    c.PrepareBuffer(m, n, false, // false means we cannot reuse the "c" buffer if it exists for temporaries
+                    [&](GPUSPARSE_INDEX_TYPE* csrRowPtrC) -> size_t
+                    {
+                        int nnzTotal = -1;
+                        CUSPARSE_CALL(cusparseXcsrgemmNnz(cusparseHandle, operA, operB, m, n, k, descrA, nnzA, S1.RowLocation(), S1.ColLocation(), descrB, nnzB,
+                                                          S2.RowLocation(), S2.ColLocation(), descrC, csrRowPtrC, &nnzTotal));
+                        return nnzTotal;
+                    });
+
+    // Step 2
+    if (sizeof(float) == sizeof(ElemType))
+    {
+        CUSPARSE_CALL(cusparseScsrgemm(cusparseHandle, operA, operB, m, n, k, descrA, nnzA, (const float*) S1.Buffer(), S1.RowLocation(), S1.ColLocation(),
+                                       descrB, nnzB, (const float*) S2.Buffer(), S2.RowLocation(), S2.ColLocation(),
+                                       descrC, (float*) c.Data(), c.RowLocation(), c.ColLocation()));
+    }
+    else
+    {
+        CUSPARSE_CALL(cusparseDcsrgemm(cusparseHandle, operA, operB, m, n, k, descrA, nnzA, (const double*) S1.Buffer(), S1.RowLocation(), S1.ColLocation(),
+                                       descrB, nnzB, (const double*) S2.Buffer(), S2.RowLocation(), S2.ColLocation(),
+                                       descrC, (double*) c.Data(), c.RowLocation(), c.ColLocation()));
+    }
+    cusparseDestroy(cusparseHandle);
+#elif defined HIP_COMPILE
     // Step 1
     /* TODO: __add__ sparse_change c.PrepareBuffer(m, n, false, // false means we cannot reuse the "c" buffer if it exists for temporaries
                     [&](GPUSPARSE_INDEX_TYPE* csrRowPtrC) -> size_t
@@ -2031,6 +2668,7 @@ void GPUSparseMatrix<ElemType>::Multiply(const GPUSparseMatrix<ElemType>& S1, bo
                                        descrC, (double*) c.Data(), c.RowLocation(), c.ColLocation()));
     }
     hipsparseDestroy(hipsparseHandle);
+#endif
 }
 
 template <class ElemType>
@@ -2063,6 +2701,44 @@ void GPUSparseMatrix<ElemType>::ScaleAndAdd(ElemType alpha, const GPUSparseMatri
     int nnzB = (int) b.GetNumNZElements();
 
     a.PrepareDevice();
+#ifdef CUDA_COMPILE
+    cusparseHandle_t cusparseHandle = 0;
+    CUSPARSE_CALL(cusparseCreate(&cusparseHandle));
+    cusparseMatDescr_t descrA = 0, descrB = 0, descrC = 0;
+    CUSPARSE_CALL(cusparseCreateMatDescr(&descrA));
+    CUSPARSE_CALL(cusparseCreateMatDescr(&descrB));
+    CUSPARSE_CALL(cusparseCreateMatDescr(&descrC));
+    cusparseSetMatType(descrA, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatType(descrB, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatType(descrB, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(descrA, CUSPARSE_INDEX_BASE_ZERO);
+    cusparseSetMatIndexBase(descrB, CUSPARSE_INDEX_BASE_ZERO);
+    cusparseSetMatIndexBase(descrC, CUSPARSE_INDEX_BASE_ZERO);
+
+    SyncGuard syncGuard;
+    // Step 1
+    bool inOutParameter = (&b == &c);
+    c.PrepareBuffer(m, n, !inOutParameter, 
+                    [&](GPUSPARSE_INDEX_TYPE* csrRowPtrC) -> size_t
+                    {
+                        int nnzTotal = -1;
+                        CUSPARSE_CALL(cusparseXcsrgeamNnz(cusparseHandle, m, n, descrA, nnzA, a.RowLocation(), a.ColLocation(), descrB, nnzB, b.RowLocation(), b.ColLocation(), descrC, csrRowPtrC, &nnzTotal));
+                        return nnzTotal;
+                    });
+
+    // Step 2
+    if (sizeof(ElemType) == sizeof(float))
+    {
+        CUSPARSE_CALL(cusparseScsrgeam(cusparseHandle, m, n, reinterpret_cast<const float*>(&alpha), descrA, nnzA, reinterpret_cast<const float*>(a.Data()), a.RowLocation(), a.ColLocation(),
+                                       reinterpret_cast<const float*>(&beta), descrB, nnzB, reinterpret_cast<const float*>(b.Data()), b.RowLocation(), b.ColLocation(), descrC, reinterpret_cast<float*>(c.Data()), c.RowLocation(), c.ColLocation()));
+    }
+    else
+    {
+        CUSPARSE_CALL(cusparseDcsrgeam(cusparseHandle, m, n, reinterpret_cast<const double*>(&alpha), descrA, nnzA, reinterpret_cast<const double*>(a.Data()), a.RowLocation(), a.ColLocation(),
+                                       reinterpret_cast<const double*>(&beta), descrB, nnzB, reinterpret_cast<const double*>(b.Data()), b.RowLocation(), b.ColLocation(), descrC, reinterpret_cast<double*>(c.Data()), c.RowLocation(), c.ColLocation()));
+    }
+    cusparseDestroy(cusparseHandle);
+#elif defined HIP_COMPILE
     hipsparseHandle_t hipsparseHandle = 0;
     HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descrA = 0, descrB = 0, descrC = 0;
@@ -2099,6 +2775,7 @@ void GPUSparseMatrix<ElemType>::ScaleAndAdd(ElemType alpha, const GPUSparseMatri
                                        reinterpret_cast<const double*>(&beta), descrB, nnzB, reinterpret_cast<const double*>(b.Data()), b.RowLocation(), b.ColLocation(), descrC, reinterpret_cast<double*>(c.Data()), c.RowLocation(), c.ColLocation()));
     }
     hipsparseDestroy(hipsparseHandle);
+#endif
 }
 
 template <class ElemType>
@@ -2113,7 +2790,11 @@ void GPUSparseMatrix<ElemType>::ScaleAndAdd(ElemType alpha, const GPUSparseMatri
         RuntimeError("ScaleAndAdd: matrices must be on the same device");
     b.PrepareDevice();
     // copy b to c
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemcpy(c.Data(), b.Data(), sizeof(ElemType) * b.GetNumElements(), cudaMemcpyDeviceToDevice));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemcpy(c.Data(), b.Data(), sizeof(ElemType) * b.GetNumElements(), hipMemcpyDeviceToDevice));
+#endif
     if (beta != 1)
     {
         c *= beta;
@@ -2121,7 +2802,11 @@ void GPUSparseMatrix<ElemType>::ScaleAndAdd(ElemType alpha, const GPUSparseMatri
     SyncGuard syncGuard;
     CUDA_LONG M = (CUDA_LONG) a.GetNumRows();
     int blocksPerGrid = (int) ceil(1.0 * M / GridDim::maxThreadsPerBlock);
+#ifdef CUDA_COMPILE
+    _sparseCSRPlusDense<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(alpha, a.Data(), a.RowLocation(), a.ColLocation(), c.Data(), M);
+#elif defined HIP_COMPILE
     hipLaunchKernelGGL((_sparseCSRPlusDense<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, alpha, a.Data(), a.RowLocation(), a.ColLocation(), c.Data(), M);
+#endif
 }
 
 template <class ElemType>
@@ -2141,7 +2826,11 @@ void GPUSparseMatrix<ElemType>::Scale(ElemType alpha, GPUSparseMatrix<ElemType>&
     CUDA_LONG N = (CUDA_LONG) a.GetNumNZElements();
     int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    _scaleArray<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(alpha, a.NzValues(), N);
+#elif defined HIP_COMPILE
     hipLaunchKernelGGL((_scaleArray<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, alpha, a.NzValues(), N);
+#endif
 }
 
 template <class ElemType>
@@ -2164,7 +2853,11 @@ void GPUSparseMatrix<ElemType>::ElementWisePower(ElemType alpha, const GPUSparse
         a.PrepareDevice();
         CUDA_LONG N = (CUDA_LONG) a.GetNumNZElements();
         int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
+#ifdef CUDA_COMPILE
+	_elementWisePowerOnCuda<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(alpha, a.NzValues(), c.NzValues(), N);
+#elif defined HIP_COMPILE
         hipLaunchKernelGGL((_elementWisePowerOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, alpha, a.NzValues(), c.NzValues(), N);
+#endif
     }
 }
 
@@ -2186,10 +2879,17 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
     GPUSPARSE_INDEX_TYPE* cscRowIndA = nullptr;
     GPUSPARSE_INDEX_TYPE* cscColPtrA = nullptr;
 
+#ifdef CUDA_COMPILE
+    cusparseAction_t cpVals = CUSPARSE_ACTION_NUMERIC;
+    cusparseIndexBase_t idxBase = CUSPARSE_INDEX_BASE_ZERO;
+    cusparseHandle_t cusparseHandle = 0;
+    CUSPARSE_CALL(cusparseCreate(&cusparseHandle));
+#elif defined HIP_COMPILE
     hipsparseAction_t cpVals = HIPSPARSE_ACTION_NUMERIC;
     hipsparseIndexBase_t idxBase = HIPSPARSE_INDEX_BASE_ZERO;
     hipsparseHandle_t hipsparseHandle = 0;
     HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
+#endif
 
     bool allocTemp = (a.GetFormat() == matrixFormatSparseCSR);
 
@@ -2200,6 +2900,16 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
         cscColPtrA = TracingGPUMemoryAllocator::Allocate<GPUSPARSE_INDEX_TYPE>(a.GetComputeDeviceId(), (n + 1));
 
         SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+	if (sizeof(ElemType) == sizeof(float))
+        {
+            CUSPARSE_CALL(cusparseScsr2csc(cusparseHandle, m, n, nnz, reinterpret_cast<const float*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<float*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
+        }
+        else
+        {
+            CUSPARSE_CALL(cusparseDcsr2csc(cusparseHandle, m, n, nnz, reinterpret_cast<const double*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<double*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
+}
+#elif defined HIP_COMPILE
         if (sizeof(ElemType) == sizeof(float))
         {
             HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const float*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<float*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
@@ -2208,6 +2918,7 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
         {
             HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const double*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<double*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
         }
+#endif
     }
     else if (a.GetFormat() == matrixFormatSparseCSC)
     {
@@ -2227,16 +2938,38 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
     // GPUSPARSE_INDEX_TYPE* h_vectArray= new int[a.m_nz];
     int blocksPerGrid = (int) ceil(1.0 * M / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    _getSparseVectorRepresntationForCSCMatrix<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(cscColPtrA, cscRowIndA, vectArray, M, N);
+#elif defined HIP_COMPILE
     hipLaunchKernelGGL((_getSparseVectorRepresntationForCSCMatrix<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, cscColPtrA, cscRowIndA, vectArray, M, N);
+#endif
     if (allocTemp)
     {
         TracingGPUMemoryAllocator::Free<GPUSPARSE_INDEX_TYPE>(a.GetComputeDeviceId(), cscRowIndA);
         TracingGPUMemoryAllocator::Free<GPUSPARSE_INDEX_TYPE>(a.GetComputeDeviceId(), cscColPtrA);
     }
+#ifdef CUDA_COMPILE
+    // CUDA_CALL(cudaMemcpy(h_vectArray,vectArray,sizeof(GPUSPARSE_INDEX_TYPE)*a.m_nz,cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
     // CUDA_CALL(hipMemcpy(h_vectArray,vectArray,sizeof(GPUSPARSE_INDEX_TYPE)*a.m_nz,hipMemcpyDeviceToHost));
+#endif
 
     // Actual dot product
     ElemType res = 0;
+#ifdef CUDA_COMPILE
+    if (sizeof(ElemType) == sizeof(float))
+    {
+        CUSPARSE_CALL(cusparseSdoti(cusparseHandle, (int) a_nz, reinterpret_cast<float*>(cscValA), vectArray,
+                                    reinterpret_cast<float*>(b.Data()),
+                                    reinterpret_cast<float*>(&res), idxBase));
+    }
+    else
+    {
+        CUSPARSE_CALL(cusparseDdoti(cusparseHandle, (int) a_nz, reinterpret_cast<double*>(cscValA), vectArray,
+                                    reinterpret_cast<double*>(b.Data()),
+                                    reinterpret_cast<double*>(&res), idxBase));
+    }
+#elif defined HIP_COMPILE
     if (sizeof(ElemType) == sizeof(float))
     {
         HIPSPARSE_CALL(hipsparseSdoti(hipsparseHandle, (int) a_nz, reinterpret_cast<float*>(cscValA), vectArray,
@@ -2249,12 +2982,17 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
                                     reinterpret_cast<double*>(b.Data()),
                                     reinterpret_cast<double*>(&res), idxBase));
     }
+#endif
     TracingGPUMemoryAllocator::Free<GPUSPARSE_INDEX_TYPE>(a.GetComputeDeviceId(), vectArray);
     if (allocTemp)
     {
         TracingGPUMemoryAllocator::Free<ElemType>(a.GetComputeDeviceId(), cscValA);
     }
+#ifdef CUDA_COMPILE
+    CUSPARSE_CALL(cusparseDestroy(cusparseHandle));
+#elif defined HIP_COMPILE
     HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+#endif
     return res;
 }
 
@@ -2306,11 +3044,19 @@ void GPUSparseMatrix<ElemType>::InnerProduct(const GPUSparseMatrix<ElemType>& a,
     }
 
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    _innerProduct4SparseCSC<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(
+        c.Data(),
+        a.Data(), a.RowLocation(), a.ColLocation(),
+        b.Data(),
+	m, n, isColWise);
+#elif defined HIP_COMPILE
     hipLaunchKernelGGL((_innerProduct4SparseCSC<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
         c.Data(),
         a.Data(), a.RowLocation(), a.ColLocation(),
         b.Data(),
         m, n, isColWise);
+#endif
 }
 
 // This is an utility function useful for debugging issues with sparse matrices.
@@ -2327,6 +3073,15 @@ bool GPUSparseMatrix<ElemType>::IsValid() const
     res[2] = 0;
     res[3] = 0;
     long* d_res = TracingGPUMemoryAllocator::Allocate<long>(GetComputeDeviceId(), 4);
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemcpy(d_res, res, sizeof(long) * 4, cudaMemcpyHostToDevice));
+
+    SyncGuard syncGuard;
+    int blocksPerGrid = (int) ceil((1.0 * SecondaryIndexCount()) / GridDim::maxThreadsPerBlock);
+    _isValid<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(MajorIndexLocation(), SecondaryIndexLocation(), GetNumRows(), GetNumCols(), GetNumNZElements(), d_res);
+
+    CUDA_CALL(cudaMemcpy(res, d_res, sizeof(long) * 4, cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemcpy(d_res, res, sizeof(long) * 4, hipMemcpyHostToDevice));
 
     SyncGuard syncGuard;
@@ -2339,6 +3094,7 @@ bool GPUSparseMatrix<ElemType>::IsValid() const
     hipLaunchKernelGGL((_isValid<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_mail, fc_sil, fc_gnr, fc_gnc, fc_gnnze, d_res);
 
     CUDA_CALL(hipMemcpy(res, d_res, sizeof(long) * 4, hipMemcpyDeviceToHost));
+#endif
 
     if (res[0] == 1)
     {
@@ -2366,6 +3122,17 @@ template <class ElemType>
     res[1] = 1;
     res[2] = 1;
     long* d_res = TracingGPUMemoryAllocator::Allocate<long>(a.GetComputeDeviceId(), 3);
+#ifdef CUDA_COMPILE
+    CUDA_CALL(cudaMemcpy(d_res, res, sizeof(long) * 3, cudaMemcpyHostToDevice));
+
+    int blocksPerGrid = (int) ceil(1.0 * a.GetNumNZElements() / GridDim::maxThreadsPerBlock);
+    _areEqual<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(a.NzValues(), b.NzValues(), (CUDA_LONG) a.GetNumNZElements(), threshold, d_res);
+    _areEqual<int><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(a.MajorIndexLocation(), b.MajorIndexLocation(), (CUDA_LONG) a.MajorIndexCount(), (int) threshold, d_res + 1);
+    blocksPerGrid = (int) ceil((1.0 * a.SecondaryIndexCount()) / GridDim::maxThreadsPerBlock);
+    _areEqual<int><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(a.SecondaryIndexLocation(), b.SecondaryIndexLocation(), (CUDA_LONG) a.SecondaryIndexCount(), (int) threshold, d_res + 2);
+
+    CUDA_CALL(cudaMemcpy(res, d_res, sizeof(long) * 3, cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
     CUDA_CALL(hipMemcpy(d_res, res, sizeof(long) * 3, hipMemcpyHostToDevice));
 
     int blocksPerGrid = (int) ceil(1.0 * a.GetNumNZElements() / GridDim::maxThreadsPerBlock);
@@ -2375,6 +3142,7 @@ template <class ElemType>
     hipLaunchKernelGGL((_areEqual<int>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, a.SecondaryIndexLocation(), b.SecondaryIndexLocation(), (CUDA_LONG) a.SecondaryIndexCount(), (int) threshold, d_res + 2);
 
     CUDA_CALL(hipMemcpy(res, d_res, sizeof(long) * 3, hipMemcpyDeviceToHost));
+#endif
     if (res[0] * res[1] * res[2] == 1)
         return true;
     else
@@ -2435,7 +3203,11 @@ GPUMatrix<ElemType> GPUSparseMatrix<ElemType>::ElementProductOf(const GPUSparseM
     SyncGuard syncGuard;
     CUDA_LONG M = (CUDA_LONG) a.GetNumRows();
     int blocksPerGrid = (int) ceil(1.0 * M / GridDim::maxThreadsPerBlock);
+#ifdef CUDA_COMPILE
+    _sparseCSRElemMulDense<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(a.Data(), a.RowLocation(), a.ColLocation(), b.Data(), c.Data(), M);
+#elif defined HIP_COMPILE
     hipLaunchKernelGGL((_sparseCSRElemMulDense<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, a.Data(), a.RowLocation(), a.ColLocation(), b.Data(), c.Data(), M);
+#endif
     return c;
 }
 
@@ -2511,14 +3283,70 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
     int m = (int) GetNumRows();
     int n = (int) GetNumCols();
     int nnz = (int) GetNumNZElements();
+#ifdef CUDA_COMPILE
+    cusparseAction_t cpVals = CUSPARSE_ACTION_NUMERIC;
+    cusparseIndexBase_t idxBase = CUSPARSE_INDEX_BASE_ZERO;
+#elif defined HIP_COMPILE
     hipsparseAction_t cpVals = HIPSPARSE_ACTION_NUMERIC;
     hipsparseIndexBase_t idxBase = HIPSPARSE_INDEX_BASE_ZERO;
+#endif
 
     assert(GetFormat() & matrixFormatCompressed); // for now this only supports compressed formats
     PrepareDevice();
     GPUSparseMatrix c(GetComputeDeviceId(), GetFormat());
     c.RequireSizeAndAllocate(n, m, nnz, GetFormat(), true, false);
 
+#ifdef CUDA_COMPILE
+    cusparseHandle_t cusparseHandle = 0;
+    CUSPARSE_CALL(cusparseCreate(&cusparseHandle));
+
+    SyncGuard syncGuard;
+    if (GetFormat() == MatrixFormat::matrixFormatSparseCSR)
+    {
+        if (nnz > 0)
+        {
+            if (sizeof(ElemType) == sizeof(float))
+            {
+                CUSPARSE_CALL(cusparseScsr2csc(cusparseHandle, m, n, nnz, reinterpret_cast<const float*>(Data()), RowLocation(), ColLocation(),
+                                               reinterpret_cast<float*>(c.Data()), c.ColLocation(), c.RowLocation(), cpVals, idxBase));
+            }
+            else
+            {
+                CUSPARSE_CALL(cusparseDcsr2csc(cusparseHandle, m, n, nnz, reinterpret_cast<const double*>(Data()), RowLocation(), ColLocation(),
+                                               reinterpret_cast<double*>(c.Data()), c.ColLocation(), c.RowLocation(), cpVals, idxBase));
+            }
+        }
+        else
+        {
+            CUDA_CALL(cudaMemset(c.Buffer(), 0, c.BufferSizeAllocated()));
+        }
+    }
+    else if (GetFormat() == matrixFormatSparseCSC)
+    {
+        if (nnz > 0)
+        {
+            if (sizeof(ElemType) == sizeof(float))
+            {
+                CUSPARSE_CALL(cusparseScsr2csc(cusparseHandle, n, m, nnz, reinterpret_cast<const float*>(this->Data()), this->ColLocation(), this->RowLocation(),
+                                               reinterpret_cast<float*>(c.Data()), c.RowLocation(), c.ColLocation(), cpVals, idxBase));
+            }
+            else
+            {
+                CUSPARSE_CALL(cusparseDcsr2csc(cusparseHandle, n, m, nnz, reinterpret_cast<const double*>(this->Data()), this->ColLocation(), this->RowLocation(),
+                                               reinterpret_cast<double*>(c.Data()), c.RowLocation(), c.ColLocation(), cpVals, idxBase));
+            }
+        }
+        else
+        {
+            CUDA_CALL(cudaMemset(c.Buffer(), 0, c.BufferSizeAllocated()));
+        }
+    }
+    else
+    {
+        NOT_IMPLEMENTED;
+    }
+    CUSPARSE_CALL(cusparseDestroy(cusparseHandle));
+#elif defined HIP_COMPILE
     hipsparseHandle_t hipsparseHandle = 0;
     HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
 
@@ -2568,6 +3396,7 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
         NOT_IMPLEMENTED;
     }
     HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+#endif
     return c;
 }
 
@@ -2634,6 +3463,27 @@ void GPUSparseMatrix<ElemType>::AssignColumnSliceToDense(GPUMatrix<ElemType>& sl
     }
 
     PrepareDevice();
+#ifdef CUDA_COMPILE
+    cusparseHandle_t cusparseHandle = 0;
+    CUSPARSE_CALL(cusparseCreate(&cusparseHandle));
+    cusparseMatDescr_t descr = 0;
+    CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
+    cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO);
+
+    SyncGuard syncGuard;
+    CUSPARSE_CALL(cusparseSetStream(cusparseHandle, t_stream));
+    if (sizeof(ElemType) == sizeof(float))
+    {
+        CUSPARSE_CALL(cusparseScsc2dense(cusparseHandle, m, numCols, descr, (float*) Buffer(), RowLocation(), ColLocation() + startColumn, (float*) slice.Data(), m));
+    }
+    else
+    {
+        CUSPARSE_CALL(cusparseDcsc2dense(cusparseHandle, m, numCols, descr, (double*) Buffer(), RowLocation(), ColLocation() + startColumn, (double*) slice.Data(), m));
+    }
+
+    CUSPARSE_CALL(cusparseDestroy(cusparseHandle));
+#elif defined HIP_COMPILE
     hipsparseHandle_t hipsparseHandle = 0;
     HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
     hipsparseMatDescr_t descr = 0;
@@ -2653,8 +3503,10 @@ void GPUSparseMatrix<ElemType>::AssignColumnSliceToDense(GPUMatrix<ElemType>& sl
     }
 
     HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
+#endif
 
 }
+#ifdef HIP_COMPILE
 //TODO: __revert__ template specialization for char and short. Find the cause and revert.
 template <>
 void GPUSparseMatrix<char>::AssignColumnSliceToDense(GPUMatrix<char>& slice, size_t startColumn, size_t numCols) const
@@ -2740,6 +3592,7 @@ void GPUSparseMatrix<short>::AssignColumnSliceToDense(GPUMatrix<short>& slice, s
     HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
 
 }
+#endif
 template <class ElemType>
 GPUMatrix<ElemType> GPUSparseMatrix<ElemType>::CopyColumnSliceToDense(size_t startColumn, size_t numCols) const
 {
@@ -2776,6 +3629,21 @@ ElemType GPUSparseMatrix<ElemType>::SumOfAbsElements() const
     if (IsEmpty())
         return 0;
 
+#ifdef CUDA_COMPILE
+    cublasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
+    if (sizeof(ElemType) == sizeof(float))
+    {
+        float res = 0;
+        cublasSasum(cuHandle, (int) GetNumNZElements(), reinterpret_cast<const float*>(NzValues()), 1, &res);
+        return res;
+    }
+    else
+    {
+        double res = 0;
+        cublasDasum(cuHandle, (int) GetNumNZElements(), reinterpret_cast<const double*>(NzValues()), 1, &res);
+        return ElemType(res);
+    }
+#elif defined HIP_COMPILE
     hipblasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
     if (sizeof(ElemType) == sizeof(float))
     {
@@ -2791,6 +3659,7 @@ ElemType GPUSparseMatrix<ElemType>::SumOfAbsElements() const
         hipblasDasum(cuHandle, (int) GetNumNZElements(), const_cast<double*>(reinterpret_cast<const double*>(NzValues())), 1, &res);
         return ElemType(res);
     }
+#endif
 }
 
 template <class ElemType>
@@ -2801,11 +3670,17 @@ ElemType GPUSparseMatrix<ElemType>::SumOfElements() const
 
     ElemType* d_sum = TracingGPUMemoryAllocator::Allocate<ElemType>(GetComputeDeviceId(), 1);
     ElemType h_sum;
+#ifdef CUDA_COMPILE
+    // WARNING: THIS kernel is not the most efficient way!
+    _reductionSum1024Threads<ElemType><<<1, 1024>>>(NzValues(), d_sum, (LONG64) GetNumNZElements());
+    CUDA_CALL(cudaMemcpy(&h_sum, d_sum, sizeof(ElemType), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
     // WARNING: THIS kernel is not the most efficient way!
     auto fc_nzv = NzValues(); //TODO: __add__
     auto fc_gnnze = GetNumNZElements(); 
     hipLaunchKernelGGL((_reductionSum1024Threads<ElemType>), dim3(1), dim3(1024), 0, 0, fc_nzv, d_sum, (LONG64) fc_gnnze);
     CUDA_CALL(hipMemcpy(&h_sum, d_sum, sizeof(ElemType), hipMemcpyDeviceToHost));
+#endif
     TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), d_sum);
 
     return h_sum;
@@ -2820,11 +3695,17 @@ ElemType GPUSparseMatrix<ElemType>::FrobeniusNorm() const
 
     ElemType* d_sum = TracingGPUMemoryAllocator::Allocate<ElemType>(GetComputeDeviceId(), 1);
     ElemType h_sum = 0;
+#ifdef CUDA_COMPILE
+    // WARNING: THIS kernel is not the most efficient way!
+    _reductionSum21024Threads<ElemType><<<1, 1024>>>(NzValues(), d_sum, (int) GetNumNZElements());
+    CUDA_CALL(cudaMemcpy(&h_sum, d_sum, sizeof(ElemType), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
     // WARNING: THIS kernel is not the most efficient way!
     auto fc_nzv = NzValues(); //TODO: __add__
     auto fc_gnnze = GetNumNZElements();
     hipLaunchKernelGGL((_reductionSum21024Threads<ElemType>), dim3(1), dim3(1024), 0, 0, fc_nzv, d_sum, (int) fc_gnnze);
     CUDA_CALL(hipMemcpy(&h_sum, d_sum, sizeof(ElemType), hipMemcpyDeviceToHost));
+#endif
     TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), d_sum);
 
     if (sizeof(ElemType) == sizeof(float))
@@ -2841,11 +3722,17 @@ ElemType GPUSparseMatrix<ElemType>::MatrixNormInf() const
 
     ElemType* d_maxAbs = TracingGPUMemoryAllocator::Allocate<ElemType>(GetComputeDeviceId(), 1);
     ElemType h_maxAbs = 0;
+#ifdef CUDA_COMPILE
+    // WARNING: THIS kernel is not the most efficient way!
+    _reductionMatrixNormInf1024Threads<ElemType><<<1, 1024>>>(NzValues(), d_maxAbs, (int) GetNumNZElements());
+    CUDA_CALL(cudaMemcpy(&h_maxAbs, d_maxAbs, sizeof(ElemType), cudaMemcpyDeviceToHost));
+#elif defined HIP_COMPILE
     // WARNING: THIS kernel is not the most efficient way!
     auto fc_nzv = NzValues(); //TODO: __add__
     auto fc_gnnze = GetNumNZElements();
     hipLaunchKernelGGL((_reductionMatrixNormInf1024Threads<ElemType>), dim3(1), dim3(1024), 0, 0, fc_nzv, d_maxAbs, (int) fc_gnnze);
     CUDA_CALL(hipMemcpy(&h_maxAbs, d_maxAbs, sizeof(ElemType), hipMemcpyDeviceToHost));
+#endif
     TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), d_maxAbs);
 
     if (sizeof(ElemType) == sizeof(float))
@@ -2880,7 +3767,11 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::ElementInverse()
     CUDA_LONG N = (CUDA_LONG) GetNumNZElements();
     int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    _elemInverse<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(NzValues(), N);
+#elif defined HIP_COMPILE
     hipLaunchKernelGGL((_elemInverse<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, NzValues(), N);
+#endif
     return *this;
 #endif
 }
@@ -3050,8 +3941,12 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::InplaceTruncateBottom(cons
     CUDA_LONG N = (CUDA_LONG) GetNumNZElements();
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    _assignTruncateBottom<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(NzValues(), NzValues(), threshold, N);
+#elif defined HIP_COMPILE
     auto fc_nzv = NzValues(); //TODO: __remove__ 
     hipLaunchKernelGGL((_assignTruncateBottom<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_nzv, fc_nzv, threshold, N);
+#endif
     return *this;
 }
 
@@ -3071,8 +3966,12 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::AssignTruncateBottomOf(con
     CUDA_LONG N = (CUDA_LONG) GetNumNZElements();
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    _assignTruncateBottom<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(NzValues(), a.NzValues(), threshold, N);
+#elif defined HIP_COMPILE
     auto fc_nzv = NzValues(); //TODO: __remove__
     hipLaunchKernelGGL((_assignTruncateBottom<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_nzv, a.NzValues(), threshold, N);
+#endif
     return *this;
 }
 
@@ -3086,8 +3985,12 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::InplaceTruncateTop(const E
     CUDA_LONG N = (CUDA_LONG) GetNumNZElements();
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    _assignTruncateTop<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(NzValues(), NzValues(), threshold, N);
+#elif defined HIP_COMPILE
     auto fc_nzv = NzValues(); //TODO: __remove__
     hipLaunchKernelGGL((_assignTruncateTop<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_nzv, fc_nzv, threshold, N);
+#endif
     return *this;
 }
 
@@ -3124,6 +4027,15 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::AssignOneHot(const GPUMatr
     CUDA_LONG N = (CUDA_LONG)a.GetNumElements();
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    _assignOneHotAsSparse<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(indices, 
+                                                                                    secondaryIndices,
+                                                                                    majorIndices,
+                                                                                    targetData,
+                                                                                    num_class,
+                                                                                    item_size,
+										    N);
+#elif defined HIP_COMPILE
     hipLaunchKernelGGL((_assignOneHotAsSparse<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, indices, 
                                                                                     secondaryIndices,
                                                                                     majorIndices,
@@ -3131,6 +4043,7 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::AssignOneHot(const GPUMatr
                                                                                     num_class,
                                                                                     item_size,
                                                                                     N);
+#endif
 
     return *this;
 }
@@ -3151,8 +4064,12 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::AssignTruncateTopOf(const 
     CUDA_LONG N = (CUDA_LONG) GetNumNZElements();
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    _assignTruncateTop<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(NzValues(), a.NzValues(), threshold, N);
+#elif defined HIP_COMPILE
     auto fc_nzv = NzValues(); //TODO: __remove__
     hipLaunchKernelGGL((_assignTruncateTop<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_nzv, a.NzValues(), threshold, N);
+#endif
     return *this;
 }
 
@@ -3166,8 +4083,12 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::SetToZeroIfAbsLessThan(con
     CUDA_LONG N = (CUDA_LONG) GetNumNZElements();
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    _setToZeroIfAbsLessThan<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(NzValues(), threshold, N);
+#elif defined HIP_COMPILE
     auto fc_nzv = NzValues(); //TODO: __remove__
     hipLaunchKernelGGL((_setToZeroIfAbsLessThan<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_nzv, threshold, N);
+#endif
     return *this;
 }
 
@@ -3215,6 +4136,27 @@ void GPUSparseMatrix<ElemType>::performElementWiseFunction(ElementWiseOperator k
     CUDA_LONG N = (CUDA_LONG) GetNumNZElements();
     int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef CUDA_COMPILE
+    switch (kind)
+    {
+    case ElementWiseOperator::opSigmoid:
+        return _elementWiseSigmoidOnCuda<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(src.NzValues(), NzValues(), N);
+    case ElementWiseOperator::opTanh:
+        return _elementWiseTanhOnCuda<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(src.NzValues(), NzValues(), N);
+    case ElementWiseOperator::opSqrt:
+        return _elementWiseSqrtOnCuda<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(src.NzValues(), NzValues(), N);
+    case ElementWiseOperator::opExp:
+        return _elementWiseExpOnCuda<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(src.NzValues(), NzValues(), N);
+    case ElementWiseOperator::opLog:
+        return _elementWiseLogOnCuda<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(src.NzValues(), NzValues(), N);
+    case ElementWiseOperator::opAbs:
+        return _elementWiseAbsOnCuda<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(src.NzValues(), NzValues(), N);
+    case ElementWiseOperator::opLinearRectifierDerivative:
+        return _elementWiseLinRectDerivativeOnCuda<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(src.NzValues(), NzValues(), N);
+    default:
+        NOT_IMPLEMENTED;
+    }
+#elif defined HIP_COMPILE
     auto fc_nzv = NzValues(); //TODO: __remove__
     switch (kind)
     {
@@ -3242,6 +4184,7 @@ void GPUSparseMatrix<ElemType>::performElementWiseFunction(ElementWiseOperator k
     default:
         NOT_IMPLEMENTED;
     }
+#endif
 }
 
 #pragma endregion Helper Functions

@@ -22,6 +22,17 @@ public:
     using typename Base::Mat;
 
 public:
+#ifdef CUDA_COMPILE
+    CuDnnBatchNormEngine(DEVICEID_TYPE deviceId, const TensorShape& inOutT,
+                        bool spatial, ImageLayoutKind imageLayout)
+                        : Base(deviceId, inOutT, spatial, imageLayout),
+                        m_cudnn(CuDnn::Instance()),
+                        m_inOutCuDnnT(GetInOutTensor(inOutT), CuDnnTensor::GetDataType<ElemType>()),
+                        m_scaleBiasCuDnnT(GetScaleBiasTensor(inOutT, spatial), CuDnnTensor::GetDataType<ElemType>()),
+                        m_cudnnEpsilon(CUDNN_BN_MIN_EPSILON)
+    {
+    }
+#elif defined HIP_COMPILE
     CuDnnBatchNormEngine(DEVICEID_TYPE deviceId, const TensorShape& inOutT,
                         bool spatial, ImageLayoutKind imageLayout)
                         : Base(deviceId, inOutT, spatial, imageLayout),
@@ -31,6 +42,7 @@ public:
                         m_cudnnEpsilon(HIPDNN_BN_MIN_EPSILON)
     {
     }
+#endif
 
 protected:
     using Base::m_deviceId;

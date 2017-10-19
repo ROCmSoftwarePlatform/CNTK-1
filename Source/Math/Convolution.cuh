@@ -391,7 +391,7 @@ __global__ void kMaxROIPoolingForward(const int totalIterations,
 
         bool isempty = (hend <= hstart) || (wend <= wstart);
         // Define an empty pooling region to be zero
-	#ifdef __HIP_PLATFORM_NVCC__
+	#if defined(CUDA_COMPILE) || defined(__HIP_PLATFORM_NVCC__)
         ElemType maxval = isempty ? (ElemType)0 : -CUDART_INF_F;
         #endif
 	#ifdef __HIP_PLATFORM_HCC__

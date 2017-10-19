@@ -978,16 +978,25 @@ GPUMatrix<ElemType> GPUMatrix<ElemType>::Transpose() const
     return *this;
 }
 
-// GetCublasHandle - get a hipblas.handle for the given GPU, should only need one per GPU
-// computeDevice - The compute device for which the hipblas.handle is desired
-// returns: hipblas.handle
-// NOTE: we currently don't bother to ever free the HIPBLAS handle, it will be freed automatically by CUDA when the process ends
+// GetCublasHandle - get a cublas.handle for the given GPU, should only need one per GPU
+// computeDevice - The compute device for which the cublas.handle is desired
+// returns: cublas.handle
+// NOTE: we currently don't bother to ever free the CUBLAS handle, it will be freed automatically by CUDA when the process ends
+#ifdef CUDA_COMPILE
+template <class ElemType>
+cublasHandle_t GPUMatrix<ElemType>::GetCublasHandle(int computeDevice /*=-1*/)
+{
+    cublasHandle_t cuHandle = 0;
+    return cuHandle;
+}
+#elif defined HIP_COMPILE
 template <class ElemType>
 hipblasHandle_t GPUMatrix<ElemType>::GetCublasHandle(int computeDevice /*=-1*/)
 {
     hipblasHandle_t cuHandle = 0;
     return cuHandle;
 }
+#endif
 
 template <class ElemType>
 GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignTransposeOf(const GPUMatrix<ElemType>& /*a*/)
@@ -2419,11 +2428,19 @@ template MatrixQuantizerGPU<double>::~MatrixQuantizerGPU();
 template void MatrixQuantizerGPU<float>::QuantizeAsync(const Matrix<float>&, const Matrix<float>&, QuantizedMatrix<float>&, Matrix<float>&, bool);
 template void MatrixQuantizerGPU<double>::QuantizeAsync(const Matrix<double>&, const Matrix<double>&, QuantizedMatrix<double>&, Matrix<double>&, bool);
 
+#ifdef CUDA_COMPILE
+template <class ElemType>
+cublasHandle_t GPUMatrix<ElemType>::s_cuHandle[GPUMatrix<ElemType>::MaxGpus] = {0};
+
+template <class ElemType>
+void* GPUMatrix<ElemType>::s_curandGenerator = NULL;
+#elif defined HIP_COMPILE
 template <class ElemType>
 hipblasHandle_t GPUMatrix<ElemType>::s_cuHandle[GPUMatrix<ElemType>::MaxGpus] = {0};
 
 template <class ElemType>
 void* GPUMatrix<ElemType>::s_hiprngGenerator = NULL;
+#endif
 
 template <class ElemType>
 std::unique_ptr<ConvolutionEngine<ElemType>> CuDnnConvolutionEngineFactory<ElemType>::Create(ConvolveGeometryPtr, DEVICEID_TYPE,

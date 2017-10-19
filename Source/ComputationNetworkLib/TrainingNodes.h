@@ -2348,7 +2348,7 @@ private:
 // BatchNormalizationNode (input, scale, bias, runMean, runVariance, runCount,
 //                         spatial, normalizationTimeConstant = 0, blendTimeConstant = 0,
 //                         epsilon = 0.00001,
-//                         useCntkEngine = true, imageLayout = 'hipdnn')
+//                         useCntkEngine = true, imageLayout = 'cudnn')
 //
 // Implements batch normalization technique as described in:
 // Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift [S. Ioffe, C. Szegedy]
@@ -2384,7 +2384,7 @@ private:
 //      Value 1#INF (infinity) means only running mean / var will be used(this is used, for example, in evaluation phase).
 // * epsilon is a conditioner constant used in computing inverse standard deviation
 // * useCntkEngine is a Boolean flag that specifies which batch normalization implementation to use: CNTK or cuDNN-based.
-// * imageLayout is the image layout. Only hipdnn is supported at present.
+// * imageLayout is the image layout. Only cudnn is supported at present.
 // -----------------------------------------------------------------------
 template <class ElemType>
 class BatchNormalizationNode : public ComputationNodeNonLooping<ElemType>, public IFreezable,
@@ -2737,7 +2737,7 @@ public:
             // Compute all derivatives in one step. Save derivatives with respect to scale and bias in temp matrices.
             // TODO: Move this out. Follow the same pattern as the RNN node. But can't without requiring another buffer.
             m_bnEng->Backward(sliceInputValue, sliceOutputGrad, // (in)  input from below, gradient from above
-                              sliceInputGrad,                   // (out) gradient for data input goes here  --TODO: Check if hipdnn engine adds the gradient, or just overwrites (BUGBUG). CNTK engine is OK.
+                              sliceInputGrad,                   // (out) gradient for data input goes here  --TODO: Check if cudnn engine adds the gradient, or just overwrites (BUGBUG). CNTK engine is OK.
                               scale,                            // (in)  out of scale and bias, only scale is needed in gradient propagation
                               blendFactor,                      // (in)  smoothing weight for running stats (1=use only running stats)
                               *m_savedMean, *m_savedInvStdDev,  // (in)  saved mean/invstddev values used in ForwardProp()
@@ -2864,7 +2864,7 @@ public:
             {
                 InvalidArgument(
                     "%ls %ls currently supports only cuDNN (CHW) data layout. " 
-                    "Please specify imageLayout=\"hipdnn\" in BatchNormalization node in your NDL/BrainScript "
+                    "Please specify imageLayout=\"cudnn\" in BatchNormalization node in your NDL/BrainScript "
                     "and make sure your input data layout is CHW", NodeName().c_str(), OperationName().c_str());
             }
 
@@ -2873,7 +2873,7 @@ public:
                 // Fallback to cntk engine on CPU device if cuDnn is not available,
                 bool cpuDevice = (m_deviceId == CPUDEVICE);
 
-                // or if parameters cannot be handled by cuDnn (which is needed for compatibility when changing the default to hipdnn)
+                // or if parameters cannot be handled by cuDnn (which is needed for compatibility when changing the default to cudnn)
                 // In Source/Math/CuDnnBatchNormalization.cu :
                 //   if (blendFactor != 0 && (blendFactor != 1 || expAvgFactor > 0))
                 //      InvalidArgument("cuDNN batch normalization engine currently supports blendTimeConstant of 0 or 1 only.");
@@ -2890,9 +2890,9 @@ public:
                 }
             }
 
-            double hipdnnMinEps = 1e-5; // HIPDNN_BN_MIN_EPSILON
-            if (!m_useCntkEngine && m_epsilon < hipdnnMinEps) 
-                fprintf(stderr, "\nWARNING: cuDNN batch normalization requires epsilon >= %e. Epsilon will be reset to that value.\n", hipdnnMinEps);
+            double cudnnMinEps = 1e-5; // HIPDNN_BN_MIN_EPSILON
+            if (!m_useCntkEngine && m_epsilon < cudnnMinEps) 
+                fprintf(stderr, "\nWARNING: cuDNN batch normalization requires epsilon >= %e. Epsilon will be reset to that value.\n", cudnnMinEps);
 
             if (m_blendTimeConst < 0)
                 InvalidArgument("%ls %ls requires blend time constant to be >= 0.", NodeName().c_str(), OperationName().c_str());

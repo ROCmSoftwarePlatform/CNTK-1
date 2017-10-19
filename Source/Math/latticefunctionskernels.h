@@ -40,12 +40,16 @@ using namespace std;
 #define __float_as_int(in) (*(int *) &in)
 #define __int_as_float(in) (*(float *) &in)
 #else // TODO: remove this once we got this figured out
-#ifdef __HIP_PLATFORM_NVCC__
+#if defined(CUDA_COMPILE) || defined(__HIP_PLATFORM_NVCC__)
 #include "math_constants.h"
-#endif
+#elif defined HIP_COMPILE
+//#ifdef __HIP_PLATFORM_NVCC__
+//#include "math_constants.h"
+//#endif
 #ifdef __HIP_PLATFORM_HCC__
 #include "hip/hip_runtime_api.h"
 #define CUDART_MIN_DENORM_F __int_as_float(0x00000001)                                               
+#endif
 #endif
 #if __CUDA_ARCH__ < 200
 //#warning Sequence training not supported on 1.x CUDA machines.

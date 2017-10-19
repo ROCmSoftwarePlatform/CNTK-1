@@ -28,13 +28,13 @@ struct GpuData
     int versionMajor;
     int versionMinor;
     int deviceId;
-    int hipCores;
+    int cudaCores;
     GpuValidity validity;
     string name;
     size_t totalMemory;
     size_t freeMemory;
-    GpuData(int versionMajor, int versionMinor, int deviceId, int hipCores, GpuValidity validity, const string& name, size_t totalMemory, size_t freeMemory)
-        :versionMajor(versionMajor), versionMinor(versionMinor), deviceId(deviceId), hipCores(hipCores), validity(validity), name(name), totalMemory(totalMemory), freeMemory(freeMemory)
+    GpuData(int versionMajor, int versionMinor, int deviceId, int cudaCores, GpuValidity validity, const string& name, size_t totalMemory, size_t freeMemory)
+        :versionMajor(versionMajor), versionMinor(versionMinor), deviceId(deviceId), cudaCores(cudaCores), validity(validity), name(name), totalMemory(totalMemory), freeMemory(freeMemory)
     {
     }
 

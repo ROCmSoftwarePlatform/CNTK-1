@@ -14,9 +14,14 @@
 #include <vector>
 #include <type_traits>
 
+#ifdef CUDA_COMPILE
+// Forward declare CUDA stuff
+typedef struct CUstream_st* cudaStream_t;
+#elif defined HIP_COMPILE
 // Forward declare CUDA stuff
 #ifdef __HIP_PLATFORM_NVCC__
 typedef struct CUstream_st* hipStream_t;
+#endif
 #endif
 typedef struct ncclComm* ncclComm_t;
 
@@ -35,7 +40,11 @@ private:
     };
     void AllReduceImpl(void* inputbuffer, void* outputbuffer, size_t count, DataType dtype, MPI_Op op);
     void BroadcastImpl(void* buffer, size_t count, MPI_Datatype dtype, int root);
+#ifdef CUDA_COMPILE
+    cudaStream_t m_stream;
+#elif defined HIP_COMPILE
     hipStream_t m_stream;
+#endif
     ncclComm_t m_ncclComm;
 #endif
 

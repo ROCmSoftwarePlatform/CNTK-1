@@ -172,7 +172,7 @@ RecurrentLSTMLayer {outputDim,
                     allowOptimizedEngine = false} =
 if allowOptimizedEngine && BS.Constants.IsNone (cellShape) && !goBackwards && !usePeepholes && !trainInitialState && !enableSelfStabilization then
 {
-    # use hipdnn instead
+    # use cudnn instead
     W = ParameterTensor {0:0, initFilterRank=0, initOutputRank=-1, init=init, initValueScale=initValueScale}
     apply (x) = OptimizedRNNStack (W, x, outputDim, numLayers=1)
 }.apply
@@ -207,7 +207,7 @@ RecurrentLSTMLayerStack {layerDims,  # an array of dimensions for each layer (la
                          allowOptimizedEngine = false} =
 if allowOptimizedEngine && BS.Constants.IsNone (cellShapes) && !usePeepholes && !enableSelfStabilization && _AreElementsTheSame (layerDims, Length(layerDims)) then
 {
-    # use hipdnn instead
+    # use cudnn instead
     W = ParameterTensor {0:0, initFilterRank=0, initOutputRank=-1, init=init, initValueScale=initValueScale}
     apply (x) = OptimizedRNNStack (W, x, layerDims[0], numLayers=Length(layerDims))
 }.apply

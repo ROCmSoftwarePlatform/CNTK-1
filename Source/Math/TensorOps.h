@@ -32,7 +32,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
 #pragma push_macro("OverloadUnaryMathFns")
 
-#ifdef __HIP_PLATFORM_NVCC__
+#if defined(CUDA_COMPILE) || defined(__HIP_PLATFORM_NVCC__)
 #define OverloadUnaryMathFns(x) \
     DECL float x##_(float f)    \
     {                           \
@@ -43,9 +43,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return x(f);            \
     }
 
-#endif
-
-#ifdef __HIP_PLATFORM_HCC__
+#elif defined __HIP_PLATFORM_HCC__
 #define OverloadUnaryMathFns(x) \
     DECL float x##_(float f)    \
     {                           \
@@ -77,7 +75,7 @@ OverloadUnaryMathFns(cosh);
 
 #pragma push_macro("OverloadBinaryMathFns")
 
-#ifdef __HIP_PLATFORM_NVCC__
+#if defined(CUDA_COMPILE) || defined(__HIP_PLATFORM_NVCC__)
 #define OverloadBinaryMathFns(x)         \
     DECL float x##_(float f, float y)    \
     {                                    \
@@ -87,9 +85,7 @@ OverloadUnaryMathFns(cosh);
     {                                    \
         return x(f, y);                  \
     }
-#endif
-
-#ifdef __HIP_PLATFORM_HCC__
+#elif defined(__HIP_PLATFORM_HCC__)
 #define OverloadBinaryMathFns(x)         \
     DECL float x##_(float f, float y)    \
     {                                    \

@@ -10,7 +10,11 @@
 #include "RNGHandle.h"
 
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
+#include <curand.h>
+#elif defined HIP_COMPILE
 #include <hiprng.h>
+#endif
 #endif // !CPUONLY
 
 namespace Microsoft { namespace MSR { namespace CNTK {
@@ -22,13 +26,24 @@ public:
     virtual ~GPURNGHandle();
 
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
+    curandGenerator_t Generator()
+    {
+        return m_generator;
+    }
+#elif defined HIP_COMPILE
     hiprngGenerator_t Generator()
     {
         return m_generator;
     }
+#endif
 
 private:
+#ifdef CUDA_COMPILE
+    curandGenerator_t m_generator;
+#elif defined HIP_COMPILE
     hiprngGenerator_t m_generator;
+#endif
 #endif // !CPUONLY
 };
 

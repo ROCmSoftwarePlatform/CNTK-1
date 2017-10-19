@@ -1,11 +1,16 @@
 #ifndef __MATRIX_QUANTIZER_KERNEL_CUH__
 #define __MATRIX_QUANTIZER_KERNEL_CUH__
 #include <float.h>
+#ifdef CUDA_COMPILE
 #include <cuda.h>
-#include <hip/hip_runtime.h>
+#include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
+#include <device_launch_parameters.h>
+#elif defined HIP_COMPILE
 #include <hip/hip_runtime_api.h>
 #ifdef __HIP_PLATFORM_NVCC__
 #include <device_launch_parameters.h>
+#endif
 #endif
 
 #include "ValueQuantizer.h"
@@ -22,13 +27,17 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 __host__ static void ParallelizeOverRangeDim(size_t size, dim3& griddim, dim3& blockdim, const size_t warpsize = 64)
 {
     // <<< griddim, blockdim, sharedmemsize, stream >>>
-    griddim = (unsigned int) ((size + warpsize - 1) / warpsize); // 'warpsize' threads on each block (-> hipThreadIdx_x)
-    blockdim = (unsigned int) warpsize;                          // -> hipBlockIdx_x
+    griddim = (unsigned int) ((size + warpsize - 1) / warpsize); // 'warpsize' threads on each block (-> threadIdx.x)
+    blockdim = (unsigned int) warpsize;                          // -> blockIdx.x
 }
 // get the array index for the current thread
 __device__ __inline__ static size_t ParallelizeOverRangeIndex()
 {
+#ifdef CUDA_COMPILE
+    return threadIdx.x + (blockIdx.x * blockDim.x);
+#elif defined HIP_COMPILE
     return hipThreadIdx_x + (hipBlockIdx_x * hipBlockDim_x);
+#endif
 }
 
 // =======================================================================
@@ -42,9 +51,92 @@ __device__ void allreduce(T& var)
     __shared__ T buf[BLOCKSIZE];
     volatile T* vBuf = buf;
 
+#ifdef CUDA_COMPILE
+    buf[threadIdx.x] = var;
+#elif defined HIP_COMPILE
     buf[hipThreadIdx_x] = var;
+#endif	
     __syncthreads();
 
+#ifdef CUDA_COMPILE
+    // We assume BLOCKSIZE is a power of 2
+    if (BLOCKSIZE >= 1024)
+    {
+        if (threadIdx.x < 512)
+        {
+            var = var + buf[threadIdx.x + 512];
+            buf[threadIdx.x] = var;
+        }
+        __syncthreads();
+    }
+
+    if (BLOCKSIZE >= 512)
+    {
+        if (threadIdx.x < 256)
+        {
+            var = var + buf[threadIdx.x + 256];
+            buf[threadIdx.x] = var;
+        }
+        __syncthreads();
+    }
+
+    if (BLOCKSIZE >= 256)
+    {
+        if (threadIdx.x < 128)
+        {
+            var = var + buf[threadIdx.x + 128];
+            buf[threadIdx.x] = var;
+        }
+        __syncthreads();
+    }
+
+    if (BLOCKSIZE >= 128)
+    {
+        if (threadIdx.x < 64)
+        {
+            var = var + buf[threadIdx.x + 64];
+            buf[threadIdx.x] = var;
+        }
+        __syncthreads();
+    }
+
+    // Intra warp reduce
+    if ((BLOCKSIZE >= 64) && (threadIdx.x < 32))
+    {
+        var = var + vBuf[threadIdx.x + 32];
+        vBuf[threadIdx.x] = var;
+    }
+
+    if ((BLOCKSIZE >= 32) && (threadIdx.x < 16))
+    {
+        var = var + vBuf[threadIdx.x + 16];
+        vBuf[threadIdx.x] = var;
+    }
+
+    if ((BLOCKSIZE >= 16) && (threadIdx.x < 8))
+    {
+        var = var + vBuf[threadIdx.x + 8];
+        vBuf[threadIdx.x] = var;
+    }
+
+    if ((BLOCKSIZE >= 8) && (threadIdx.x < 4))
+    {
+        var = var + vBuf[threadIdx.x + 4];
+        vBuf[threadIdx.x] = var;
+    }
+
+    if ((BLOCKSIZE >= 4) && (threadIdx.x < 2))
+    {
+        var = var + vBuf[threadIdx.x + 2];
+        vBuf[threadIdx.x] = var;
+    }
+
+    if ((BLOCKSIZE >= 2) && (threadIdx.x == 0))
+    {
+        var = var + vBuf[1];
+        vBuf[0] = var;
+    }
+#elif defined HIP_COMPILE
     // We assume BLOCKSIZE is a power of 2
     if (BLOCKSIZE >= 1024)
     {
@@ -122,6 +214,7 @@ __device__ void allreduce(T& var)
         var = var + vBuf[1];
         vBuf[0] = var;
     }
+#endif
 
     __syncthreads();
 
@@ -134,14 +227,19 @@ __device__ void allreduce(T& var)
 template <class ElemType, bool ZeroThresholdFor1Bit>
 __global__ void _ComputeQuantiStatParj(const ElemType* us, const ElemType* inResidual, long M, long N, size_t ldNbits, char* qpackage)
 {
+#ifdef CUDA_COMPILE
+    size_t subset = threadIdx.x; // first thread computes 0, 64, 128; second thread 1, 65, 129 etc.
+    size_t j = blockIdx.x; // we process one column per *block*, j=column index; note: j is never out of range
+#elif defined HIP_COMPILE
     size_t subset = hipThreadIdx_x; // first thread computes 0, 64, 128; second thread 1, 65, 129 etc.
     size_t j = hipBlockIdx_x;       // we process one column per *block*, j=column index; note: j is never out of range
+#endif
 
     size_t rows = M; // we compute from 0..rows-1
     size_t bits = 1 << ldNbits;
     const size_t colSizeByte = Microsoft::MSR::CNTK::QuantizedColumn<ElemType>::QuantizedColumnSize(bits, rows);
     auto& qcol = *(Microsoft::MSR::CNTK::QuantizedColumn<ElemType>*) &qpackage[colSizeByte * j];
-    #ifdef __HIP_PLATFORM_NVCC__
+    #if defined (CUDA_COMPILE) || defined(__HIP_PLATFORM_NVCC__)
     Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int,REDUCTION_BLOCK_SIZE>);
     #endif
    //TODO: __revert__ solve this and revert on AMD Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int,REDUCTION_BLOCK_SIZE>);
@@ -178,7 +276,7 @@ __global__ void _QuantizeStripjOneQWord(
     const Microsoft::MSR::CNTK::ColumnQuantizer<ElemType> q(ldNbits, qCol.lower, qCol.upper);
 
     // quantize one QWord to qCol[iQWord]
-    #ifdef __HIP_PLATFORM_NVCC__
+    #if defined (CUDA_COMPILE) || defined(__HIP_PLATFORM_NVCC__)
     qCol.bits[iQWord] = q.QuantizeOneQWord<ZeroThresholdFor1Bit>(us, curResidual, M, iQWord, M, numQWordsPerCol, j, newResidual);
     #endif
     //TODO: __revert__ solver this and revert on AMD qCol.bits[iQWord] = q.QuantizeOneQWord<ZeroThresholdFor1Bit>(us, curResidual, M, iQWord, M, numQWordsPerCol, j, newResidual);
@@ -207,6 +305,109 @@ __global__ void UnquantizeStripejOneQWord(ElemType* us, const long M, const long
     q.UnquantizeOneQWord(us, M, iQWord, M, numQWordsPerCol, j, qcol.bits[iQWord], add);
 }
 
+#ifdef CUDA_COMPILE
+//maybe should move out into another class?
+template <class ElemType>
+void _QuantizeMatrix(
+    const ElemType* us,
+    ElemType* curResidual,
+    long M, long N,
+    char* qPackage,
+    size_t Nbits,
+    cudaStream_t stream,
+    ElemType* newResidual,
+    bool zeroThresholdFor1Bit)
+{
+
+    /* verify buffer allocation size
+        if (msra::math::matrixquantizer::buffersize(bits, rows(), cols()) != gpubuffer.size())
+        LogicError("quantizestripe: dimension of patch to be quantized does not match allocated buffer size for quantized data");
+        if (rows() != curresidual.rows() || cols() != curresidual.cols()
+        || rows() != newresidual.rows() || cols() != newresidual.cols())
+        LogicError("quantizestripe: dimension of patch to be quantized does not match residual buffer");
+        if (gpubuffer.size() == 0)      // empty buffer: empty matrix, we are done (explicit test needed since launch will fail with 0 threads)
+        return;*/
+    // determine mean and variance -> value range (stored in quant package)   --for 1 bit, refine it in a second pass
+    const size_t ldNbits = ValueQuantizer<ElemType>::ld(Nbits);
+
+    size_t nRow = M;
+    size_t nCol = N;
+    dim3 mvgriddim, mvblockdim;
+    // using specialized CUDA code (not shared with CPU) for collated memory access
+    // each thread column computes 'warpsize' elements
+    mvgriddim = (unsigned int) nCol; // column number
+    mvblockdim = REDUCTION_BLOCK_SIZE;
+
+    if (zeroThresholdFor1Bit)
+    {
+        _ComputeQuantiStatParj<ElemType, true><<<mvgriddim, mvblockdim, 0, stream>>>(us, curResidual, M, N, ldNbits, qPackage);
+    }
+    else
+    {
+        _ComputeQuantiStatParj<ElemType, false><<<mvgriddim, mvblockdim, 0, stream>>>(us, curResidual, M, N, ldNbits, qPackage);
+    }
+
+    // quantize data (also computing the residual at once)
+    // optimizing for collated memory access:
+    //  - each 32-bit word represents an interleaved (not consecutive) set of floats -> parallel threads can do collated accesses
+    // example:
+    //  - total number of 32-bit words(1-bit quant): 1100 * 2048 / 32 = 70k
+    //  - thread x dimension: index into 32-bit word (e.g. 1100/32 = 35 threads)
+    //  - thread y dimension and thread position: column (e.g. 2048)
+    //  - using 128 threads on one proc -> 70k/128 = 550 blocks
+    //  - threads are indexed by a global index into quantized 32-bit words in increasing order; each thread must
+    //     - re-linearize block index and thread index
+    //     - map to (i,j) coordinate (start of the set of floats)
+
+    const size_t numQWordsPerCol = Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::QWordsPerCol(nRow, Nbits);
+    const size_t totalQWords = nCol * numQWordsPerCol;
+
+    const size_t colsizebyte = Microsoft::MSR::CNTK::QuantizedColumn<ElemType>::QuantizedColumnSize(Nbits, nRow);
+
+    dim3 griddim, blockdim;
+    ParallelizeOverRangeDim(totalQWords, griddim, blockdim, 256);
+    if (zeroThresholdFor1Bit)
+    {
+        _QuantizeStripjOneQWord<ElemType, true><<<griddim, blockdim, 0, stream>>>(us, curResidual, M, N, qPackage, colsizebyte, numQWordsPerCol, ldNbits, newResidual);
+    }
+    else
+    {
+        _QuantizeStripjOneQWord<ElemType, false><<<griddim, blockdim, 0, stream>>>(us, curResidual, M, N, qPackage, colsizebyte, numQWordsPerCol, ldNbits, newResidual);
+    }
+}
+
+// unquantize
+// Process the quantization package to recover (unquantize) the matrix patch.
+template <class ElemType>
+void _UnquantizeMatrix(const char* gpuBuffer, size_t gpuBufferSize,
+                       ElemType* us, long M, long N,
+                       size_t nBits, bool add, cudaStream_t stream)
+{
+    // verify buffer allocation size
+    /*if (msra::math::matrixquantizer::buffersize(bits, rows(), cols()) != gpubuffer.size())
+            LogicError("unquantizestripe: dimension of patch to be unquantized does not match size of quantized data");
+        if (gpubuffer.size() == 0)      // empty buffer: empty matrix, we are done (explicit test needed since launch will fail with 0 threads)
+            return;
+        */
+    size_t qSize = QuantizedColumn<ElemType>::QuantizedColumnSize(nBits, M) * N;
+    if (qSize != gpuBufferSize)
+        LogicError("unquantizestripe: dimension of patch to be unquantized does not match size of quantized data");
+    if (gpuBufferSize == 0) // empty buffer: empty matrix, we are done (explicit test needed since launch will fail with 0 threads)
+        return;
+
+    // #bits must be a power of two; we operate on shift values
+    const size_t ldNbits = ValueQuantizer<ElemType>::ld(nBits);
+    // unquantize in the same thread layout as quantize(), see there
+    const size_t numQWordsPerCol = ColumnQuantizer<ElemType>::QWordsPerCol(M, nBits);
+    const size_t totalQWords = N * numQWordsPerCol;
+
+    const size_t colsize = QuantizedColumn<ElemType>::QuantizedColumnSize(nBits, M);
+
+    dim3 griddim, blockdim;
+    ParallelizeOverRangeDim(totalQWords, griddim, blockdim, 256);
+    UnquantizeStripejOneQWord<<<griddim, blockdim, 0, stream>>>(us, M, N, gpuBuffer, colsize, numQWordsPerCol, ldNbits, add);
+}
+#elif defined HIP_COMPILE
 //maybe should move out into another class?
 template <class ElemType>
 void _QuantizeMatrix(
@@ -308,6 +509,7 @@ void _UnquantizeMatrix(const char* gpuBuffer, size_t gpuBufferSize,
     ParallelizeOverRangeDim(totalQWords, griddim, blockdim, 256);
     hipLaunchKernelGGL((UnquantizeStripejOneQWord), dim3(griddim), dim3(blockdim), 0, stream, us, M, N, gpuBuffer, colsize, numQWordsPerCol, ldNbits, add);
 }
+#endif
 }
 }
 }

@@ -2032,6 +2032,7 @@ void GPUMatrix<ElemType>::FSAdagrad(GPUMatrix<ElemType>& gradients,
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
 #ifdef CUDA_COMPILE
     _fsadagrad<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(n, gradients.Data(), Data(), Data()+ n, functionValues.Data(),
+									 learnRatePerSample, momentum, adaWeight, adaMul, unitGainFactor);
 #elif defined HIP_COMPILE
     auto fc_data = Data(); //TODO: __add__ 
     hipLaunchKernelGGL((_fsadagrad<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, n, gradients.Data(), fc_data, fc_data+ n, functionValues.Data(),
@@ -2705,12 +2706,12 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignSigmoidOf(const GPUMatrix<ElemTy
     hipLaunchKernelGGL((_elementWiseSigmoidOnCuda), dim3(blocksPerGrid), dim3(threadsPerBlock), 0, t_stream, a.Data(), Data(), N);
 #endif
 #else
-//#ifdef CUDA_COMPILE
-  //  _assignSigmoidOf<<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(a.Data(), Data(), N);
-//#elif defined HIP_COMPILE
+#ifdef CUDA_COMPILE
+    _assignSigmoidOf<<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(a.Data(), Data(), N);
+#elif defined HIP_COMPILE
     auto fc_data = Data(); //TODO: __add__
     hipLaunchKernelGGL((_assignSigmoidOf), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a.Data(), fc_data, N);
-//#endif
+#endif
 #endif
     return *this;
 }
@@ -2927,7 +2928,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::InplaceLogSoftmax(const bool isColWise
         int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
         SyncGuard syncGuard;
 #ifdef CUDA_COMPILE
-	logSoftMaxColWise<<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(Data(), (CUDA_LONG) m_numCols, (CUDA_LONG) m_numRows);
+	_logSoftMaxColWise<<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(Data(), (CUDA_LONG) m_numCols, (CUDA_LONG) m_numRows);
 #elif defined HIP_COMPILE
         hipLaunchKernelGGL((_logSoftMaxColWise), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, fc_data, (CUDA_LONG) m_numCols, (CUDA_LONG) m_numRows);
 #endif
@@ -4220,10 +4221,10 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignAveragePoolingResult(const GPUMa
     PrepareDevice();
     SyncGuard syncGuard;
 #ifdef CUDA_COMPILE
-    _addMaxPoolingGradient<<<blocksPerGrid, numThreadPerBlock, 0, t_stream>>>(Data(), outputGradientBatch.Data(), inputBatch.Data(), outputBatch.Data(), batchSize, channels,
-                                                                              inputWidth, inputHeight, inputSizePerSample,
-                                                                              outputWidth, outputHeight, outputSizePerSample,
-                                                                              windowWidth, windowHeight, horizontalSubsample, verticalSubsample);
+    _assignAveragePoolingResult<<<blocksPerGrid, numThreadPerBlock, 0, t_stream>>>(Data(), inputBatch.Data(), batchSize, channels,
+                                                                                   inputWidth, inputHeight, inputSizePerSample,
+                                                                                   outputWidth, outputHeight, outputSizePerSample,
+										   windowWidth, windowHeight, horizontalSubsample, verticalSubsample);
 #elif defined HIP_COMPILE
     auto fc_data = Data(); //TODO: __add__
     hipLaunchKernelGGL((_assignAveragePoolingResult), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, fc_data, inputBatch.Data(), batchSize, channels,

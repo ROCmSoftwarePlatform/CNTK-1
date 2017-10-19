@@ -14,11 +14,6 @@
 	#endif
 #elif defined HIP_COMPILE
 #include <hipDNN.h>
-	#ifdef __HIP_PLATFORM_NVCC__
-		#if CUDNN_MAJOR < 5
-		#error CNTK requires the NVIDIA cuDNN library 5.0 or higher to build, cf. https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Windows#hipdnn or https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Linux#hipdnn for installation instructions.
-		#endif // version check
-	#endif // hipNV platform check
 #endif // hip compile check
 #include <memory>
 

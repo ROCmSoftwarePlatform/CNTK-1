@@ -195,6 +195,10 @@ template <class ElemType>
 class CuDnnFilter
 {
 #ifdef CUDA_COMPILE
+    cudnnDataType_t m_dataType;
+    CuDnn::ptr_t m_cudnn;
+    size_t m_filterSize;
+public:
     CuDnnFilter(const CuDnnRNN<ElemType>& rnn, const cudnnTensorDescriptor_t& xDesc) :
         m_cudnn(CuDnn::Instance()), m_dataType(CuDnnTensor::GetDataType<ElemType>())
     {
