@@ -4280,7 +4280,7 @@ void GPUMatrix<ElemType>::ConvolutionForward(const GPUMatrix<ElemType>& kernel, 
 #ifdef CUDA_COMPILE
     kConvolutionForward<<<gdim, BlockSize, 0, t_stream>>>((int)GetNumCols(), kernel.Data(), mpRowCol.Data(), mpRowIwht.Data(), mpRowRun.Data(),
 							    runs.Data(), Data(), (int)GetNumRows(), output.Data(), (int)output.GetNumRows());
-#elif defined HIP_PLATFORM
+#elif defined HIP_COMPILE
     auto fc_data = Data(); //TODO: __add__
     auto fc_gnr = GetNumRows(); //TODO: __add__ remove this
     auto fc_gnc = GetNumCols(); //TODO: __add__ remove this

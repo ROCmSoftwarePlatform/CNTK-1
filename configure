@@ -14,9 +14,9 @@ cuda_path=
 cuda_check=include/cuda.h
 enable_cuda=
 
-hip_path=/opt/rocm/hip
+hip_path=
 hip_check=include/hip/hip_runtime_api.h
-enable_hip=
+enable_hip=no
 
 enable_python=
 
@@ -73,8 +73,12 @@ gdk_nvml_lib_path=
 gdk_nvml_lib_check=libnvidia-ml.so
 
 have_cub=no
-cub_path=/usr/local/cub-hip/
+cub_path=
 cub_check=cub/cub.cuh
+
+have_cubhip=no
+cubhip_path=
+cubhip_check=cub/cub.cuh
 
 have_cudnn=no
 cudnn_path=/usr/local/cudnn-6.0/
@@ -134,8 +138,9 @@ default_kaldis="kaldi-trunk kaldi-c024e8aa"
 default_gdk_includes="include/nvidia/gdk"
 default_gdk_nvml_libs="src/gdk/nvml/lib"
 default_cubs="cub-1.4.1"
+default_cubhips="cub-hip"
 default_cudnns="cudnn-6.0 cudnn-5.1 cudnn-5.0"
-default_hipdnn="hipdnn"
+default_hipdnn="hipDNN"
 default_opencvs="opencv-3.1.0 opencv-3.0.0"
 default_protobuf="protobuf-3.1.0"
 default_libzips="libzip-1.1.2"
@@ -144,7 +149,7 @@ default_mpi="mpi"
 
 function default_paths ()
 {
-    echo $build_top $HOME $default_path_list
+    echo $build_top $default_path_list $HOME
 }
 
 # $1 is directory
@@ -233,6 +238,11 @@ function find_cub ()
     find_dir "$default_cubs" "$cub_check"
 }
 
+function find_cubhip ()
+{
+	find_dir "$default_cubhips" "$cubhip_check"
+}
+
 function find_cudnn ()
 {
     find_dir "$default_cudnns" "$cudnn_check"
@@ -280,7 +290,7 @@ function check_version ()
 
 function default_use_cuda ()
 {
-    if test x$(find_cuda) = x || test x$(find_gdk_include) = x || test x$(find_gdk_nvml_lib) = x || test x$(find_hipdnn) = x || test x$(find_cub) = x
+    if test x$(find_cuda) = x || test x$(find_gdk_include) = x || test x$(find_gdk_nvml_lib) = x || test x$(find_cudnn) = x || test x$(find_cub) = x
     then
         echo no
     else
@@ -288,7 +298,17 @@ function default_use_cuda ()
     fi
 }
 enable_cuda=$(default_use_cuda)
-enable_hip=yes
+
+function default_use_hip ()
+{
+    if test x$(find_hip) = x || test x$(find_hipdnn) = x || test x$(find_cubhip) = x
+    then
+        echo no
+    else
+        echo yes
+    fi
+}
+#enable_hip=$(default_use_hip)
 
 # TODO allow to pick up from path?
 function check_swig ()
@@ -387,7 +407,7 @@ function show_help ()
     echo "  --1bitsgd[=(yes|no)] use 1Bit SGD $(show_default ${default_use_1bitsgd})"
     echo "  --asgd[=(yes|no)] use ASGD powered by Multiverso $(show_default $(default_use_asgd))"
     echo "  --cuda[=(yes|no)] use cuda GPU $(show_default $(default_use_cuda))"
-    echo "  --hip[=(yes|no)] use HIP $(show_default $(default_use_cuda))" #MCW
+    echo "  --hip[=(yes|no)] use HIP $(show_default $(default_use_hip))" #MCW
     echo "  --python[=(yes|no)] with Python bindings $(show_default $(default_use_python))"
     echo "  --java[=(yes|no)] with Java bindings $(show_default $(default_use_java))"
     echo "  --with-jdk[=directory] $(show_default $(find_jdk))"
@@ -665,11 +685,11 @@ do
             fi
             ;;
 
-	--with-hip*)
+        --with-hip*)
             enable_hip=yes
             if test x$optarg = x
             then
-                hip_path=$(find_cuda)
+                hip_path=$(find_hip)
                 if test x$hip_path = x
                 then
                     echo "Cannot find HIP directory."
@@ -687,9 +707,8 @@ do
             fi
             ;;
 
-
         --with-cub*)
-            have_cub=yes
+	    have_cub=yes
             if test x$optarg = x
             then
                 cub_path=$(find_cub)
@@ -710,6 +729,36 @@ do
                 fi
             fi
             ;;
+
+	--with-cubhip*)
+	    if $(enable_hip) = no
+	    then
+		echo "CUB-HIP specified without enabling HIP compile."
+		echo "Enabel HIP compile with --hip=yes before specifying CUB-HIP"
+		exit 
+	    fi
+            have_cubhip=yes
+            if test x$optarg = x
+            then
+                cubhip_path=$(find_cub)
+                if test x$cub_path = x
+                then
+                    echo "Cannot find CUB-HIP directory."
+                    echo "Please specify a value for --with-cub"
+                    echo "CUB-HIP can be downloaded from https://github.com/ROCmSoftwarePlatform/cub-hip, extract the archive to /usr/local"
+                    exit 1
+                fi
+            else
+                if test $(check_dir $optarg $cubhip_check) = yes
+                then
+                    cubhip_path=$optarg
+                else
+                    echo "Invalid CUB-HIP directory $optarg"
+                    exit 1
+                fi
+            fi
+            ;;
+
         --with-gdk-include*)
             have_gdk_include=yes
             if test x$optarg = x
@@ -774,6 +823,12 @@ do
             fi
             ;;
 	--with-hipdnn*)
+	    if $(enable_hip) = no
+            then
+                echo "CUB-HIP specified without enabling HIP compile."
+                echo "Enabel HIP compile with --hip=yes before specifying CUB-HIP"
+                exit
+            fi
             have_hipdnn=yes
             if test x$optarg = x
             then
@@ -1077,7 +1132,7 @@ then
     fi
 fi
 
-if test $enable_cuda = yes && test x$cub_path = x
+if test $enable_cuda = yes && test x$cub_path = x && test $enable_hip = no
 then
     cub_path=$(find_cub)
     if test x$cub_path = x ; then
@@ -1087,6 +1142,19 @@ then
         enable_cuda=no
     else
         echo Found CUB at $cub_path
+    fi
+fi
+
+if test $enable_hip = yes && test x$cubhip_path = x
+then
+    cubhip_path=$(find_cubhip)
+    if test x$cubhip_path = x ; then
+        echo Cannot locate CUB-HIP directory
+        echo GPU will be disabled
+        echo CUB-HIP can be downloaded from https://github.com/ROCmSoftwarePlatform/cub-hip, extract the archive to /usr/local 
+        enable_hip=no
+    else
+        echo Found CUB-HIP at $cubhip_path
     fi
 fi
 
@@ -1101,7 +1169,7 @@ then
     fi
 fi
 
-if test $enable_cuda = yes && test x$hipdnn_path = x
+if test $enable_hip = yes && test x$hipdnn_path = x
 then
     hipdnn_path=$(find_hipdnn)
     if test x$hipdnn_path = x ; then
@@ -1267,12 +1335,17 @@ else
 fi
 if test $enable_cuda = yes || test $enable_hip = yes ; then
     echo CUDA_PATH=$cuda_path >> $config
-    echo HIP_PATH=$hip_path >> $config
     echo GDK_INCLUDE_PATH=$gdk_include_path >> $config
     echo GDK_NVML_LIB_PATH=$gdk_nvml_lib_path >> $config
-    echo CUB_PATH=$cub_path >> $config
+	if test $enable_hip = no
+    then
+	    echo CUB_PATH=$cub_path >> $config
+    else
+        echo HIP_PATH=$hip_path >> $config
+	    echo CUB_PATH=$cubhip_path >> $config
+        echo HIPDNN_PATH=$hipdnn_path >> $config
+    fi
     echo CUDNN_PATH=$cudnn_path >> $config
-    echo HIPDNN_PATH=$hipdnn_path >> $config
     [ -z "$nccl_path" ] || echo NCCL_PATH=$nccl_path >> $config
 fi
 if test $enable_python = yes || test $enable_java = yes ; then

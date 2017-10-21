@@ -64,17 +64,27 @@ else
   $(error Cannot find $(BUILD_TOP)/Config.make.  Please see the CNTK documentation at https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Linux for configuration instructions.)
 endif
 
+ifdef HIP_PATH
+HIPCC=${HIP_PATH}/bin/hipcc
+HIP_PLATFORM=$(shell ${HIP_PATH}/bin/hipconfig --compiler)
+$(info $(shell pwd))
+#$(shell mkdir External/HIP/ -p)
+#$(shell cd External/HIP/ && git clone https://github.com/ROCmSoftwarePlatform/hcBLAS && cd hcBLAS && ./build.sh)
+#$(info $(shell pwd))
+#$(hello):
+#	mkdir External/HIP/ -p; \
+#	cd External/HIP/ && git clone https://github.com/ROCmSoftwarePlatform/hcBLAS && cd hcBLAS && ./build.sh
+endif
+
+#hello:
+#	mkdir External/HIP/ -p; \
+#	cd External/HIP/; \
+#	git clone https://github.com/ROCmSoftwarePlatform/hcBLAS;
+
 ifndef BUILDTYPE
 $(info Defaulting BUILDTYPE=release)
 BUILDTYPE=release
 endif
-
-ifndef HIP_PATH
-  HIP_PATH=/opt/rocm/hip
-endif
-
-HIPCC=${HIP_PATH}/bin/hipcc
-HIP_PLATFORM=$(shell ${HIP_PATH}/bin/hipconfig --compiler)
 
 ifndef MATHLIB
 $(info DEFAULTING MATHLIB=mkl)
@@ -100,16 +110,24 @@ PROTOC = $(PROTOBUF_PATH)/bin/protoc
 SOURCEDIR:= Source
 INCLUDEPATH:= $(addprefix $(SOURCEDIR)/, Common/Include CNTKv2LibraryDll CNTKv2LibraryDll/API CNTKv2LibraryDll/proto ../Examples/Extensibility/CPP Math CNTK ActionsLib ComputationNetworkLib SGDLib SequenceTrainingLib CNTK/BrainScript Readers/ReaderLib PerformanceProfilerDll)
 INCLUDEPATH+=$(PROTOBUF_PATH)/include
-# COMMON_FLAGS include settings that are passed both to HIPCC and C++ compilers.
-COMMON_FLAGS:= -DHAS_MPI=$(HAS_MPI) -D_POSIX_SOURCE -D_XOPEN_SOURCE=600 -D__USE_XOPEN2K -std=c++11 -g -DCUDA_COMPILE
-
+# COMMON_FLAGS include settings that are passed both to NVCC and C++ compilers.
+COMMON_FLAGS:= -DHAS_MPI=$(HAS_MPI) -D_POSIX_SOURCE -D_XOPEN_SOURCE=600 -D__USE_XOPEN2K -std=c++11 -g
+CPPFLAGS:= 
 CXXFLAGS:= $(SSE_FLAGS) -std=c++0x -fopenmp -fpermissive -fPIC -Werror -fcheck-new
+
+ifdef HIP_PATH
+COMMON_FLAGS += -DHIP_COMPILE
 ifeq ($(HIP_PLATFORM), nvcc)
-        CXXFLAGS += -D__HIP_PLATFORM_NVCC__
-endif
+	CXXFLAGS += -D__HIP_PLATFORM_NVCC__
+else
 ifeq ($(HIP_PLATFORM), hcc)
-        CXXFLAGS += -D__HIP_PLATFORM_HCC__
-endif 
+	CXXFLAGS += -D__HIP_PLATFORM_HCC__
+endif
+endif
+else
+COMMON_FLAGS += -DCUDA_COMPILE
+endif
+        
 LIBPATH:=
 LIBS_LIST:=
 LDFLAGS:=
@@ -132,65 +150,13 @@ SRC:=
 all : buildall
 
 # Set up basic nvcc options and add CUDA targets from above
-ifeq ($(HIP_PLATFORM), nvcc)
+ifneq ($(HIP_PLATFORM), hcc)
         CUFLAGS = -m 64
 endif
-ifeq ($(HIP_PLATFORM), hcc)
-        CUFLAGS =
-endif
 
-#ifdef CUDA_PATH
-#  ifndef GDK_INCLUDE_PATH
-#    GDK_INCLUDE_PATH=/usr/include/nvidia/gdk
-#    $(info defaulting GDK_INCLUDE_PATH to $(GDK_INCLUDE_PATH))
-#  endif
-#
-#  ifndef GDK_NVML_LIB_PATH
-#    GDK_NVML_LIB_PATH=/usr/src/gdk/nvml/lib
-#    $(info defaulting GDK_NVML_LIB_PATH to $(GDK_NVML_LIB_PATH))
-#  endif
-#
-#  ifndef CUB_PATH
-#    $(info defaulting CUB_PATH to /usr/local/cub-1.4.1)
-#    CUB_PATH=/usr/local/cub-1.4.1
-#  endif
-#
-#  DEVICE = gpu
-#
-#  HIPCC = $(CUDA_PATH)/bin/nvcc
-#
-#  INCLUDEPATH+=$(GDK_INCLUDE_PATH)
-#  INCLUDEPATH+=$(CUB_PATH)
-#
-## Set up CUDA includes and libraries
-#  INCLUDEPATH += $(CUDA_PATH)/include
-#  LIBPATH += $(CUDA_PATH)/lib64
-#  LIBS_LIST += hipblas cudart cuda hiprng cusparse nvidia-ml
-#
-## Set up cuDNN if needed
-#  ifdef CUDNN_PATH
-#    INCLUDEPATH += $(CUDNN_PATH)/cuda/include
-#    LIBPATH += $(CUDNN_PATH)/cuda/lib64
-#    LIBS_LIST += cudnn
-#    COMMON_FLAGS +=-DUSE_CUDNN
-#  endif
-#
-## Set up NCCL if needed
-#  ifdef NCCL_PATH
-#    INCLUDEPATH += $(NCCL_PATH)/include
-#    LIBPATH += $(NCCL_PATH)/lib
-#    LIBS_LIST += nccl
-#    COMMON_FLAGS += -DUSE_NCCL
-#  endif
-#else
-#  DEVICE = cpu
-#
-#  COMMON_FLAGS +=-DCPUONLY
-#endif
+ifneq ($(or $(CUDA_PATH),$(HIP_PATH)),)
 
-ifdef HIP_PATH
-
-ifeq ($(HIP_PLATFORM), nvcc)
+ifneq ($(HIP_PLATFORM), hcc)
   ifndef GDK_INCLUDE_PATH
     GDK_INCLUDE_PATH=/usr/include/nvidia/gdk
     $(info defaulting GDK_INCLUDE_PATH to $(GDK_INCLUDE_PATH))
@@ -204,7 +170,10 @@ ifeq ($(HIP_PLATFORM), nvcc)
   INCLUDEPATH+=$(GDK_INCLUDE_PATH)
   INCLUDEPATH += $(CUDA_PATH)/include
   LIBPATH += $(CUDA_PATH)/lib64
-  LIBS_LIST += hipblas hip_nvcc hiprng cudart hipsparse nvidia-ml cusparse cublas curand
+  ifdef HIP_PATH
+	LIBS_LIST += hipblas hip_nvcc hiprng hipsparse
+  endif
+  LIBS_LIST += cublas cudart cuda curand cusparse nvidia-ml
 
   # Set up cuDNN if needed
   ifdef CUDNN_PATH
@@ -212,13 +181,6 @@ ifeq ($(HIP_PLATFORM), nvcc)
     LIBPATH += $(CUDNN_PATH)/cuda/lib64
     LIBS_LIST += cudnn
     COMMON_FLAGS +=-DUSE_CUDNN
-  endif
-
-  ifdef HIPDNN_PATH
-    INCLUDEPATH += $(HIPDNN_PATH)/include
-    LIBPATH += /opt/rocm/lib64
-    LIBS_LIST += hipDNN
-    COMMON_FLAGS +=-DUSE_HIPDNN
   endif
 
 # Set up NCCL if needed
@@ -240,25 +202,27 @@ endif
     CUB_PATH=/usr/local/cub-hip
   endif
 
+  DEVICE = gpu
+
+ifndef HIP_PATH
+  NVCC = $(CUDA_PATH)/bin/nvcc
+endif
+  INCLUDEPATH+=$(CUB_PATH)
+
+# Set up CUDA includes and libraries
+ifdef HIP_PATH
   ifdef HIPDNN_PATH
     INCLUDEPATH += $(HIPDNN_PATH)/include
     LIBPATH += /opt/rocm/lib64
     LIBS_LIST += hipDNN
     COMMON_FLAGS +=-DUSE_HIPDNN
   endif
-
-  DEVICE = gpu
-
-  #HIPCC = $(CUDA_PATH)/bin/nvcc
-  INCLUDEPATH+=$(CUB_PATH)
-
-# Set up CUDA includes and libraries
   INCLUDEPATH += $(HIP_PATH)/include
   INCLUDEPATH += /opt/rocm/hcblas/include/
   INCLUDEPATH += /opt/rocm/hcrng/include/
   INCLUDEPATH += /opt/rocm/hcsparse/include/
   LIBPATH += /opt/rocm/lib64
-#  LIBS_LIST += hipblas cudart cuda hiprng cusparse nvidia-ml
+endif
 
 else
   DEVICE = cpu
@@ -279,7 +243,7 @@ endif
   COMMON_FLAGS += -DUSE_MKL
 endif
 
-ifdef __HIP_PLATFORM_HIPCC__
+ifneq ($(HIP_PLATFORM), hcc)
 ifeq ($(CUDA_GDR),1)
   COMMON_FLAGS += -DUSE_CUDA_GDR
 endif
@@ -313,6 +277,14 @@ endif
 # Set up nvcc target architectures (will generate code to support them all, i.e. fat-binary, in release mode)
 # In debug mode we will rely on JIT to create code "on the fly" for the underlying architecture
 # see also http://docs.nvidia.com/cuda/pascal-compatibility-guide/index.html#building-applications-with-pascal-support
+ifndef HIP_PATH
+GENCODE_SM30 := -gencode arch=compute_30,code=\"sm_30,compute_30\"
+GENCODE_SM35 := -gencode arch=compute_35,code=\"sm_35,compute_35\"
+GENCODE_SM50 := -gencode arch=compute_50,code=\"sm_50,compute_50\"
+GENCODE_SM52 := -gencode arch=compute_52,code=\"sm_52,compute_52\"
+GENCODE_SM60 := -gencode arch=compute_60,code=\"sm_60,compute_60\"
+GENCODE_SM61 := -gencode arch=compute_61,code=\"sm_61,compute_61\"
+else
 ifeq ($(HIP_PLATFORM), nvcc)
 GENCODE_SM30 := -gencode arch=compute_30,code=sm_30
 GENCODE_SM35 := -gencode arch=compute_35,code=sm_35
@@ -320,11 +292,12 @@ GENCODE_SM50 := -gencode arch=compute_50,code=sm_50
 GENCODE_SM52 := -gencode arch=compute_52,code=sm_52
 GENCODE_SM60 := -gencode arch=compute_60,code=sm_60
 GENCODE_SM61 := -gencode arch=compute_61,code=sm_61
-GENCODE := $(GENCODE_SM30) $(GENCODE_SM35) $(GENCODE_SM50) $(GENCODE_SM52) $(GENCODE_SM60) $(GENCODE_SM61)
-endif
-
+#GENCODE := $(GENCODE_SM30) $(GENCODE_SM35) $(GENCODE_SM50) $(GENCODE_SM52) $(GENCODE_SM60) $(GENCODE_SM61)
+else
 ifeq ($(HIP_PLATFORM), hcc)
-GENCODE := -Wno-deprecated-register
+GENCODE_FLAGS := -Wno-deprecated-register
+endif
+endif
 endif
 
 # Should we relocate *.gcno and *.gcda files using -fprofile-dir option?
@@ -342,13 +315,9 @@ ifeq ("$(BUILDTYPE)","debug")
   ifdef CNTK_CUDA_CODEGEN_DEBUG
     GENCODE_FLAGS := $(CNTK_CUDA_CODEGEN_DEBUG)
   else
-    ifeq ($(HIP_PLATFORM), nvcc)
+    ifneq ($(HIP_PLATFORM), hcc)
       GENCODE_FLAGS := $(GENCODE_SM30)
       CUFLAGS += -use_fast_math
-    endif
-
-    ifeq ($(HIP_PLATFORM), hcc)
-      GENCODE_FLAGS := $(GENCODE)                                                                  
     endif
   endif
 
@@ -362,16 +331,16 @@ ifeq ("$(BUILDTYPE)","release")
   ifdef CNTK_CUDA_CODEGEN_RELEASE
     GENCODE_FLAGS := $(CNTK_CUDA_CODEGEN_RELEASE)
   else
-    GENCODE_FLAGS := $(GENCODE)
+    ifneq ($(HIP_PLATFORM), hcc)
+        GENCODE_FLAGS := $(GENCODE_SM30) $(GENCODE_SM35) $(GENCODE_SM50) $(GENCODE_SM60) $(GENCODE_SM61)
+        CUFLAGS += -use_fast_math
+    endif
   endif
 
   CXXFLAGS += -g -O4
   LDFLAGS += -rdynamic
   COMMON_FLAGS += -DNDEBUG -DNO_SYNC
   CUFLAGS += -O3 -g $(GENCODE_FLAGS)
-  ifeq ($(HIP_PLATFORM), nvcc)
-    CUFLAGS += -use_fast_math
-  endif	
 endif
 
 ifdef CNTK_CUDA_DEVICE_DEBUGINFO
@@ -438,7 +407,7 @@ SRC += $(PP_SRC)
 
 $(PERF_PROFILER_LIB): $(PP_OBJ)
 	@echo $(SEPARATOR)
-	@echo creating AZIHU $@ for $(ARCH) with build type $(BUILDTYPE)
+	@echo creating $@ for $(ARCH) with build type $(BUILDTYPE)
 	@mkdir -p $(dir $@)
 	$(CXX) $(LDFLAGS) -shared $(patsubst %,$(RPATH)%, $(ORIGINDIR)) -o $@ $^
 
@@ -500,7 +469,7 @@ MATH_SRC =\
 	$(SOURCEDIR)/Math/TensorView.cpp \
 	$(SOURCEDIR)/Math/NcclComm.cpp \
 
-ifdef HIP_PATH
+ifneq ($(or $(CUDA_PATH),$(HIP_PATH)),)
 MATH_SRC +=\
 	$(SOURCEDIR)/Math/CuDnnBatchNormalization.cu \
 	$(SOURCEDIR)/Math/CuDnnCommon.cu \
@@ -572,7 +541,7 @@ SEQUENCE_TRAINING_LIB_SRC =\
 	$(SOURCEDIR)/SequenceTrainingLib/latticeforwardbackward.cpp \
 	$(SOURCEDIR)/SequenceTrainingLib/parallelforwardbackward.cpp \
 
-ifdef HIP_PATH
+ifneq ($(or $(CUDA_PATH),$(HIP_PATH)),)
 SEQUENCE_TRAINING_LIB_SRC +=\
 	$(SOURCEDIR)/Math/cudalatticeops.cu \
 	$(SOURCEDIR)/Math/cudalattice.cpp \
@@ -759,6 +728,7 @@ EVAL_CLIENT_SRC=\
 
 EVAL_CLIENT_OBJ:=$(patsubst %.cpp, $(OBJDIR)/%.o, $(EVAL_CLIENT_SRC))
 
+#ALL+= hello
 ALL+=$(EVAL_CLIENT)
 SRC+=$(EVAL_CLIENT_SRC)
 
@@ -789,7 +759,7 @@ $(EVAL_EXTENDED_CLIENT): $(EVAL_EXTENDED_CLIENT_OBJ) | $(EVAL_LIB) $(READER_LIBS
 ########################################
 CNTKLIBRARY_CPP_EVAL_EXAMPLES:=$(BINDIR)/CNTKLibraryCPPEvalExamples
 
-#ifdef HIP_PATH
+#ifneq ($(or $(CUDA_PATH),$(HIP_PATH)),)
 CNTKLIBRARY_CPP_EVAL_EXAMPLES_SRC=\
 	$(SOURCEDIR)/../Examples/Evaluation/CNTKLibraryCPPEvalGPUExamples/CNTKLibraryCPPEvalGPUExamples.cpp\
 	$(SOURCEDIR)/../Examples/Evaluation/CNTKLibraryCPPEvalCPUOnlyExamples/CNTKLibraryCPPEvalExamples.cpp
@@ -1575,7 +1545,7 @@ $(OBJDIR)/%.o : %.cu $(BUILD_CONFIGURATION)
 	@echo $(SEPARATOR)
 	@echo creating $@ for $(ARCH) with build type $(BUILDTYPE)
 	@mkdir -p $(dir $@)
-	$(HIPCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) -Xcompiler "-fPIC"
+	$(NVCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) -Xcompiler "-fPIC"
 
 $(OBJDIR)/%.pb.o : %.pb.cc $(BUILD_CONFIGURATION) 
 	@echo $(SEPARATOR)

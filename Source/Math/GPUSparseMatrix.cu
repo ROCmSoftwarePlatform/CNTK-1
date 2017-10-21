@@ -2644,15 +2644,15 @@ void GPUSparseMatrix<ElemType>::Multiply(const GPUSparseMatrix<ElemType>& S1, bo
     }
     cusparseDestroy(cusparseHandle);
 #elif defined HIP_COMPILE
-    // Step 1
-    /* TODO: __add__ sparse_change c.PrepareBuffer(m, n, false, // false means we cannot reuse the "c" buffer if it exists for temporaries
+    // Step 1 //TODO: __add__ nnz_change
+    c.PrepareBuffer(m, n, false, // false means we cannot reuse the "c" buffer if it exists for temporaries
                     [&](GPUSPARSE_INDEX_TYPE* csrRowPtrC) -> size_t
                     {
                         int nnzTotal = -1;
                         HIPSPARSE_CALL(hipsparseXcsrgemmNnz(hipsparseHandle, operA, operB, m, n, k, descrA, nnzA, S1.RowLocation(), S1.ColLocation(), descrB, nnzB,
                                                           S2.RowLocation(), S2.ColLocation(), descrC, csrRowPtrC, &nnzTotal));
                         return nnzTotal;
-                    });*/
+                    });
 
     // Step 2
     if (sizeof(float) == sizeof(ElemType))
@@ -2753,15 +2753,15 @@ void GPUSparseMatrix<ElemType>::ScaleAndAdd(ElemType alpha, const GPUSparseMatri
     hipsparseSetMatIndexBase(descrC, HIPSPARSE_INDEX_BASE_ZERO);
 
     SyncGuard syncGuard;
-    // Step 1
-   /* TODO: __add__ nnz_change  bool inOutParameter = (&b == &c);
+    // Step 1 //TODO: __add__ nnz_change
+    bool inOutParameter = (&b == &c);
     c.PrepareBuffer(m, n, !inOutParameter, 
                     [&](GPUSPARSE_INDEX_TYPE* csrRowPtrC) -> size_t
                     {
                         int nnzTotal = -1;
                          HIPSPARSE_CALL(hipsparseXcsrgeamNnz(hipsparseHandle, m, n, descrA, nnzA, a.RowLocation(), a.ColLocation(), descrB, nnzB, b.RowLocation(), b.ColLocation(), descrC, csrRowPtrC, &nnzTotal));
                         return nnzTotal;
-                    });*/
+                    });
 
     // Step 2
     if (sizeof(ElemType) == sizeof(float))
