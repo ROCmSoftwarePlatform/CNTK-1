@@ -76,10 +76,12 @@ $(info $(shell pwd))
 #	cd External/HIP/ && git clone https://github.com/ROCmSoftwarePlatform/hcBLAS && cd hcBLAS && ./build.sh
 endif
 
-#hello:
+hello:
 #	mkdir External/HIP/ -p; \
 #	cd External/HIP/; \
 #	git clone https://github.com/ROCmSoftwarePlatform/hcBLAS;
+	@$(shell chmod 755 install_hiplibs.sh)
+	@$(shell ./install_hiplibs.sh)
 
 ifndef BUILDTYPE
 $(info Defaulting BUILDTYPE=release)
@@ -213,15 +215,16 @@ endif
 ifdef HIP_PATH
   ifdef HIPDNN_PATH
     INCLUDEPATH += $(HIPDNN_PATH)/include
-    LIBPATH += /opt/rocm/lib64
+    #LIBPATH += /opt/rocm/lib64
+    LIBPATH += $(EXTERNAL_DIR)/lib64
     LIBS_LIST += hipDNN
     COMMON_FLAGS +=-DUSE_HIPDNN
   endif
   INCLUDEPATH += $(HIP_PATH)/include
-  INCLUDEPATH += /opt/rocm/hcblas/include/
-  INCLUDEPATH += /opt/rocm/hcrng/include/
-  INCLUDEPATH += /opt/rocm/hcsparse/include/
-  LIBPATH += /opt/rocm/lib64
+  INCLUDEPATH += $(EXTERNAL_DIR)/hcblas/include/
+  INCLUDEPATH += $(EXTERNAL_DIR)/hcrng/include/
+  INCLUDEPATH += $(EXTERNAL_DIR)/hcsparse/include/
+  LIBPATH += $(EXTERNAL_DIR)/lib64
 endif
 
 else
@@ -1545,7 +1548,11 @@ $(OBJDIR)/%.o : %.cu $(BUILD_CONFIGURATION)
 	@echo $(SEPARATOR)
 	@echo creating $@ for $(ARCH) with build type $(BUILDTYPE)
 	@mkdir -p $(dir $@)
+ifndef HIP_PATH
 	$(NVCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) -Xcompiler "-fPIC"
+else
+	$(HIPCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) -Xcompiler "-fPIC"
+endif
 
 $(OBJDIR)/%.pb.o : %.pb.cc $(BUILD_CONFIGURATION) 
 	@echo $(SEPARATOR)

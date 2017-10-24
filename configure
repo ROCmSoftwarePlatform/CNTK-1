@@ -9,6 +9,7 @@
 
 configure=$0
 build_top=$PWD
+external_dir=$(dirname "$(readlink -f "$0")")/External/HIP
 
 cuda_path=
 cuda_check=include/cuda.h
@@ -85,7 +86,7 @@ cudnn_path=/usr/local/cudnn-6.0/
 cudnn_check=cuda/include/cudnn.h
 
 have_hipdnn=no
-hipdnn_path=/opt/rocm/hipDNN/
+hipdnn_path=
 hipdnn_check=include/hipDNN.h
 
 have_opencv=no
@@ -149,7 +150,7 @@ default_mpi="mpi"
 
 function default_paths ()
 {
-    echo $build_top $default_path_list $HOME
+    echo $build_top $external_dir $default_path_list $HOME
 }
 
 # $1 is directory
@@ -1344,6 +1345,7 @@ if test $enable_cuda = yes || test $enable_hip = yes ; then
         echo HIP_PATH=$hip_path >> $config
 	    echo CUB_PATH=$cubhip_path >> $config
         echo HIPDNN_PATH=$hipdnn_path >> $config
+        echo EXTERNAL_DIR=$external_dir >> $config
     fi
     echo CUDNN_PATH=$cudnn_path >> $config
     [ -z "$nccl_path" ] || echo NCCL_PATH=$nccl_path >> $config
