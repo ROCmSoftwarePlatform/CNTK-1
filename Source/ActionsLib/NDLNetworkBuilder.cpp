@@ -322,23 +322,23 @@ void NDLNodeEvaluatorImpl<ElemType>::Evaluate(NDLNode<ElemType>* node, const wst
             {
                 RuntimeError("%ls: unexpected parameter count. %ls supports 2 modes: \n"
                              "1. 2D convolution which takes 7 fixed parameters [weightNodeName, inputValueNodeName, kernelWidth, kernelHeight, outputChannels, horizontalSubsample, verticalSubsample] \n"
-                             "and two optional parameters [zeroPadding = [false|yourvalue], maxTempMemSizeInSamples = [0|yourvalue], imageLayout = \"HWC\"|\"hipdnn\"]. \n"
+                             "and two optional parameters [zeroPadding = [false|yourvalue], maxTempMemSizeInSamples = [0|yourvalue], imageLayout = \"HWC\"|\"cudnn\"]. \n"
                              "2. ND convolution which takes 3 fixed parameters [weightNodeName, inputValueNodeName, kernelShape] and \n"
-                             "10 optional parameters [mapCount = [0|yourvalue], stride = [1|yourvalue], sharing = [true|yourvalue], autoPadding = [true|yourvalue], lowerPad = [0|yourvalue], upperPad = [0|yourvalue], bool transpose = [false|yourvalue], maxTempMemSizeInSamples = [0|yourvalue], imageLayout = \"hipdnn\"|\"HWC\"]. \n"
+                             "10 optional parameters [mapCount = [0|yourvalue], stride = [1|yourvalue], sharing = [true|yourvalue], autoPadding = [true|yourvalue], lowerPad = [0|yourvalue], upperPad = [0|yourvalue], bool transpose = [false|yourvalue], maxTempMemSizeInSamples = [0|yourvalue], imageLayout = \"cudnn\"|\"HWC\"]. \n"
                              "For ND convolution, parameters kernelShape, mapCount, stride, sharing, autoPadding, lowerPad, upperPad can be arrays, e.g. kernelShape={5, 5, 3}",
                              cnNodeType.c_str(), cnNodeType.c_str());
             }
             else if (cnNodeType == OperationNameOf(PoolingNode))
             {
                 RuntimeError("%ls: unexpected parameter count. %ls 3 fixed parameters [inputValueNodeName, poolKind, kernelShape] and \n"
-                             "5 optional parameters stride = [1|yourvalue], autoPadding = [true|yourvalue], lowerPad = [0|yourvalue], upperPad = [0|yourvalue], imageLayout = \"hipdnn\"]. \n"
+                             "5 optional parameters stride = [1|yourvalue], autoPadding = [true|yourvalue], lowerPad = [0|yourvalue], upperPad = [0|yourvalue], imageLayout = \"cudnn\"]. \n"
                              "Parameters kernelShape, stride, autoPadding, lowerPad, upperPad can be arrays, e.g. kernelShape={5, 5, 3}",
                              cnNodeType.c_str(), cnNodeType.c_str());
             }
             else if (cnNodeType == OperationNameOf(MaxUnpoolingNode))
             {
                 RuntimeError("%ls: unexpected parameter count. %ls 3 fixed parameters [inputValueNodeName, mask, kernelShape] and \n"
-                             "5 optional parameters stride = [1|yourvalue], autoPadding = [true|yourvalue], lowerPad = [0|yourvalue], upperPad = [0|yourvalue], imageLayout = \"hipdnn\"]. \n"
+                             "5 optional parameters stride = [1|yourvalue], autoPadding = [true|yourvalue], lowerPad = [0|yourvalue], upperPad = [0|yourvalue], imageLayout = \"cudnn\"]. \n"
                              "Parameters kernelShape, stride, autoPadding, lowerPad, upperPad can be arrays, e.g. kernelShape={5, 5, 3}",
                              cnNodeType.c_str(), cnNodeType.c_str());
             }
@@ -456,7 +456,7 @@ void NDLNodeEvaluatorImpl<ElemType>::Evaluate(NDLNode<ElemType>* node, const wst
     else if (cnNodeType == OperationNameOf(MaxPoolingNode))
     {
         if (parameter.size() != 5)
-            RuntimeError("%ls should have 5 parameters[inputValueNodeName, windowWidth, windowHeight, horizontalSubsample, verticalSubsample, imageLayout = \"HWC\"|\"hipdnn\"].", cnNodeType.c_str());
+            RuntimeError("%ls should have 5 parameters[inputValueNodeName, windowWidth, windowHeight, horizontalSubsample, verticalSubsample, imageLayout = \"HWC\"|\"cudnn\"].", cnNodeType.c_str());
 
         // setup the parameter position of children so we can hook them up later
         nodeParamCount = 1;
@@ -484,7 +484,7 @@ void NDLNodeEvaluatorImpl<ElemType>::Evaluate(NDLNode<ElemType>* node, const wst
     else if (cnNodeType == OperationNameOf(AveragePoolingNode))
     {
         if (parameter.size() != 5)
-            RuntimeError("%ls should have 5 parameters[inputValueNodeName, windowWidth, windowHeight, horizontalSubsample, verticalSubsample, imageLayout = \"HWC\"|\"hipdnn\"].", cnNodeType.c_str());
+            RuntimeError("%ls should have 5 parameters[inputValueNodeName, windowWidth, windowHeight, horizontalSubsample, verticalSubsample, imageLayout = \"HWC\"|\"cudnn\"].", cnNodeType.c_str());
 
         // setup the parameter position of children so we can hook them up later
         nodeParamCount = 1;
@@ -533,10 +533,10 @@ void NDLNodeEvaluatorImpl<ElemType>::Evaluate(NDLNode<ElemType>* node, const wst
             bool useCntkEngine;
             if (EqualCI(bnEngineS, L"cntk"))
                 useCntkEngine = true;
-            else if (EqualCI(bnEngineS, L"hipdnn"))
+            else if (EqualCI(bnEngineS, L"cudnn"))
                 useCntkEngine = false;
             else
-                InvalidArgument("Unsupported batch normalization engine, choose either \"cntk\"(default) or \"hipdnn\".");
+                InvalidArgument("Unsupported batch normalization engine, choose either \"cntk\"(default) or \"cudnn\".");
             ImageLayoutKind imageLayoutKind = ImageLayoutKindFrom(node->GetOptionalParameter("imageLayout", "CHW"));
 
             nodePtr = builder.BatchNormalization(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, spatial, normTimeConst, blendTimeConst, epsilon, useCntkEngine, imageLayoutKind, name);
