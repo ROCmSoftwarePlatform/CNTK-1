@@ -28,7 +28,7 @@
 #include "device_launch_parameters.h"
 #endif // nv platform check
 #include <hip/hip_runtime.h>
-#include <hiprng.h>
+#include <hiprand.h>
 #include "hipblas.h"
 #endif // cuda-hip compile check
 #include <assert.h>
@@ -174,10 +174,10 @@ const char* CudaErrString<hipblasStatus_t>(hipblasStatus_t e)
     }
 }
 template <>
-const char* CudaErrString<hiprngStatus_t>(hiprngStatus_t)
+const char* CudaErrString<hiprandStatus_t>(hiprandStatus_t)
 {
     hipDeviceSynchronize();
-    return "(see hiprng.h & look for hiprngStatus or HIPRNG_STATUS_xxx)";
+    return "(see hiprand.h & look for hiprandStatus or HIPRAND_STATUS_xxx)";
 }
 #endif
 
@@ -1731,9 +1731,9 @@ void GPUMatrix<ElemType>::SetUniformRandomValue(const ElemType low, const ElemTy
 	    CURAND_CALL(curandGenerateUniformDouble(((curandGenerator_t*) s_curandGenerator)[0], reinterpret_cast<double*>(Data()), GetNumElements()));
 #elif defined HIP_COMPILE
         if (sizeof(ElemType) == sizeof(float))
-            HIPRNG_CALL(hiprngGenerateUniform(((hiprngGenerator_t*) s_hiprngGenerator)[0], reinterpret_cast<float*>(Data()), GetNumElements()));
+            HIPRAND_CALL(hiprandGenerateUniform(((hiprandGenerator_t*) s_hiprandGenerator)[0], reinterpret_cast<float*>(Data()), GetNumElements()));
         else
-            HIPRNG_CALL(hiprngGenerateUniformDouble(((hiprngGenerator_t*) s_hiprngGenerator)[0], reinterpret_cast<double*>(Data()), GetNumElements()));
+            HIPRAND_CALL(hiprandGenerateUniformDouble(((hiprandGenerator_t*) s_hiprandGenerator)[0], reinterpret_cast<double*>(Data()), GetNumElements()));
 #endif
     }
     RescaleToRange(*this, low, high);
@@ -1758,9 +1758,9 @@ void GPUMatrix<ElemType>::SetUniformRandomValue(RNGHandle& rngHandle, const Elem
 	    CURAND_CALL(curandGenerateUniformDouble(gpuRNGHandle->Generator(), reinterpret_cast<double*>(Data()), GetNumElements()));
 #elif defined HIP_COMPILE
         if (sizeof(ElemType) == sizeof(float))
-            HIPRNG_CALL(hiprngGenerateUniform(gpuRNGHandle->Generator(), reinterpret_cast<float*>(Data()), GetNumElements()));
+            HIPRAND_CALL(hiprandGenerateUniform(gpuRNGHandle->Generator(), reinterpret_cast<float*>(Data()), GetNumElements()));
         else
-            HIPRNG_CALL(hiprngGenerateUniformDouble(gpuRNGHandle->Generator(), reinterpret_cast<double*>(Data()), GetNumElements()));
+            HIPRAND_CALL(hiprandGenerateUniformDouble(gpuRNGHandle->Generator(), reinterpret_cast<double*>(Data()), GetNumElements()));
 #endif
     }
     RescaleToRange(*this, low, high);
@@ -1784,19 +1784,19 @@ void SetNormalRandomValue(const GPUMatrix<ElemType>& matrix, const curandGenerat
 }
 #elif defined HIP_COMPILE
 template <class ElemType>
-void SetNormalRandomValue(const GPUMatrix<ElemType>& matrix, const hiprngGenerator_t& generator, const ElemType mean, const ElemType stdev)
+void SetNormalRandomValue(const GPUMatrix<ElemType>& matrix, const hiprandGenerator_t& generator, const ElemType mean, const ElemType stdev)
 {
     //Nobody is ever calling SetStream so all work is done one the same stream
     //Therefore we don't need to sync
     //SyncGuard syncGuard;
 
-    // hiprngGenerateNormal can return the error HIPRNG_STATUS_LENGTH_NOT_MULTIPLE if GetNumElements() is odd.
+    // hiprandGenerateNormal can return the error HIPRAND_STATUS_LENGTH_NOT_MULTIPLE if GetNumElements() is odd.
     // To avoid this we always allocate a buffer of even size and potentially generate one more random element.
     auto n = AsMultipleOf(matrix.GetNumElements(), 2);
     if (sizeof(ElemType) == sizeof(float))
-        HIPRNG_CALL(hiprngGenerateNormal(generator, reinterpret_cast<float*>(matrix.Data()), n, (float)mean, (float)stdev));
+        HIPRAND_CALL(hiprandGenerateNormal(generator, reinterpret_cast<float*>(matrix.Data()), n, (float)mean, (float)stdev));
     else
-        HIPRNG_CALL(hiprngGenerateNormalDouble(generator, reinterpret_cast<double*>(matrix.Data()), n, (double)mean, (double)stdev));
+        HIPRAND_CALL(hiprandGenerateNormalDouble(generator, reinterpret_cast<double*>(matrix.Data()), n, (double)mean, (double)stdev));
 }
 #endif
 
@@ -1828,9 +1828,9 @@ void GPUMatrix<ElemType>::SetGumbelRandomValue(RNGHandle& rngHandle, const ElemT
 	    CURAND_CALL(curandGenerateUniformDouble(gpuRNGHandle->Generator(), reinterpret_cast<double*>(Data()), GetNumElements()));
 #elif defined HIP_COMPILE
         if (sizeof(ElemType) == sizeof(float))
-            HIPRNG_CALL(hiprngGenerateUniform(gpuRNGHandle->Generator(), reinterpret_cast<float*>(Data()), GetNumElements()));
+            HIPRAND_CALL(hiprandGenerateUniform(gpuRNGHandle->Generator(), reinterpret_cast<float*>(Data()), GetNumElements()));
         else
-            HIPRNG_CALL(hiprngGenerateUniformDouble(gpuRNGHandle->Generator(), reinterpret_cast<double*>(Data()), GetNumElements()));
+            HIPRAND_CALL(hiprandGenerateUniformDouble(gpuRNGHandle->Generator(), reinterpret_cast<double*>(Data()), GetNumElements()));
 #endif
     }
 
@@ -1858,7 +1858,7 @@ void GPUMatrix<ElemType>::SetGaussianRandomValue(const ElemType mean, const Elem
 #ifdef CUDA_COMPILE
     SetNormalRandomValue(*this, ((curandGenerator_t*)s_curandGenerator)[0], mean, sigma);
 #elif defined HIP_COMPILE
-    SetNormalRandomValue(*this, ((hiprngGenerator_t*)s_hiprngGenerator)[0], mean, sigma);
+    SetNormalRandomValue(*this, ((hiprandGenerator_t*)s_hiprandGenerator)[0], mean, sigma);
 #endif
 }
 
@@ -1881,9 +1881,9 @@ void GPUMatrix<ElemType>::SetTruncatedNormalRandomValue(const ElemType mean, con
 	    CURAND_CALL(curandGenerateUniformDouble(((curandGenerator_t*)s_curandGenerator)[0], reinterpret_cast<double*>(Data()), GetNumElements()));
 #elif defined HIP_COMPILE
         if (sizeof(ElemType) == sizeof(float))
-            HIPRNG_CALL(hiprngGenerateUniform(((hiprngGenerator_t*)s_hiprngGenerator)[0], reinterpret_cast<float*>(Data()), GetNumElements()));
+            HIPRAND_CALL(hiprandGenerateUniform(((hiprandGenerator_t*)s_hiprandGenerator)[0], reinterpret_cast<float*>(Data()), GetNumElements()));
         else
-            HIPRNG_CALL(hiprngGenerateUniformDouble(((hiprngGenerator_t*)s_hiprngGenerator)[0], reinterpret_cast<double*>(Data()), GetNumElements()));
+            HIPRAND_CALL(hiprandGenerateUniformDouble(((hiprandGenerator_t*)s_hiprandGenerator)[0], reinterpret_cast<double*>(Data()), GetNumElements()));
 #endif
     }
 
@@ -1927,9 +1927,9 @@ void GPUMatrix<ElemType>::SetUniformRandomMask(const ElemType maskRate, const El
     hipEvent_t done = nullptr;
     CUDA_CALL(hipEventCreate(&done)); // TODO: why not condition on do_sync, so that we can use SyncGuard?
     if (sizeof(ElemType) == sizeof(float))
-        HIPRNG_CALL(hiprngGenerateUniform(gpuRNGHandle->Generator(), reinterpret_cast<float*>(Data()), GetNumElements()));
+        HIPRAND_CALL(hiprandGenerateUniform(gpuRNGHandle->Generator(), reinterpret_cast<float*>(Data()), GetNumElements()));
     else
-        HIPRNG_CALL(hiprngGenerateUniformDouble(gpuRNGHandle->Generator(), reinterpret_cast<double*>(Data()), GetNumElements()));
+        HIPRAND_CALL(hiprandGenerateUniformDouble(gpuRNGHandle->Generator(), reinterpret_cast<double*>(Data()), GetNumElements()));
     CUDA_CALL(hipEventRecord(done));
     CUDA_CALL(hipEventSynchronize(done));
     CUDA_CALL(hipEventDestroy(done));
@@ -5553,19 +5553,19 @@ void GPUMatrix<ElemType>::CreateCurandObject(unsigned long seed, const char* cal
         CURAND_CALL(curandSetGeneratorOrdering(((curandGenerator_t*) s_curandGenerator)[0], CURAND_ORDERING_PSEUDO_SEEDED));
     }
 #elif defined HIP_COMPILE
-    if (s_hiprngGenerator == NULL)
+    if (s_hiprandGenerator == NULL)
     {
         unsigned long long hipSeed = (seed == USE_TIME_BASED_SEED) ? time(NULL) : seed;
         if (GetMathLibTraceLevel() > 0)
         {
-            fprintf(stderr, "%s (GPU): creating hiprng object with seed %llu, sizeof(ElemType)==%lu\n",
+            fprintf(stderr, "%s (GPU): creating hiprand object with seed %llu, sizeof(ElemType)==%lu\n",
                     caller, hipSeed, (unsigned long)sizeof(ElemType));
         }
-        s_hiprngGenerator = new hiprngGenerator_t;
+        s_hiprandGenerator = new hiprandGenerator_t;
         // Create pseudo-random number generator
-        HIPRNG_CALL(hiprngCreateGenerator(&(((hiprngGenerator_t*) s_hiprngGenerator)[0]), HIPRNG_RNG_PSEUDO_XORWOW));
-        HIPRNG_CALL(hiprngSetPseudoRandomGeneratorSeed(((hiprngGenerator_t*) s_hiprngGenerator)[0], hipSeed));
-        HIPRNG_CALL(hiprngSetGeneratorOrdering(((hiprngGenerator_t*) s_hiprngGenerator)[0], HIPRNG_ORDERING_PSEUDO_SEEDED));
+        HIPRAND_CALL(hiprandCreateGenerator(&(((hiprandGenerator_t*) s_hiprandGenerator)[0]), HIPRAND_RNG_PSEUDO_XORWOW));
+        HIPRAND_CALL(hiprandSetPseudoRandomGeneratorSeed(((hiprandGenerator_t*) s_hiprandGenerator)[0], hipSeed));
+        //TODO: __prasanth__ HIPRAND_CALL(hiprandSetGeneratorOrdering(((hiprandGenerator_t*) s_hiprandGenerator)[0], HIPRAND_ORDERING_PSEUDO_SEEDED));
     }
 #endif
 }
@@ -5583,11 +5583,11 @@ void GPUMatrix<ElemType>::ResetCurandObject(unsigned long seed, const char* call
         CURAND_CALL(curandSetGeneratorOffset(((curandGenerator_t*) s_curandGenerator)[0], 0));
     }
 #elif defined HIP_COMPILE
-    if (s_hiprngGenerator && (seed != USE_TIME_BASED_SEED))
+    if (s_hiprandGenerator && (seed != USE_TIME_BASED_SEED))
     {
         // Note: this might be slow.
-        HIPRNG_CALL(hiprngSetPseudoRandomGeneratorSeed(((hiprngGenerator_t*) s_hiprngGenerator)[0], seed));
-        HIPRNG_CALL(hiprngSetGeneratorOffset(((hiprngGenerator_t*) s_hiprngGenerator)[0], 0));
+        HIPRAND_CALL(hiprandSetPseudoRandomGeneratorSeed(((hiprandGenerator_t*) s_hiprandGenerator)[0], seed));
+        HIPRAND_CALL(hiprandSetGeneratorOffset(((hiprandGenerator_t*) s_hiprandGenerator)[0], 0));
     }
 #endif
     else
@@ -6479,7 +6479,7 @@ template <class ElemType>
 hipblasHandle_t GPUMatrix<ElemType>::s_cuHandle[GPUMatrix<ElemType>::MaxGpus] = {0};
 
 template <class ElemType>
-void* GPUMatrix<ElemType>::s_hiprngGenerator = NULL;
+void* GPUMatrix<ElemType>::s_hiprandGenerator = NULL;
 #endif
 
 // We use Matrix<char> as the backing store for QuantizedMatrix

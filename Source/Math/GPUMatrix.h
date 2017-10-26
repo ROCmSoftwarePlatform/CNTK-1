@@ -35,14 +35,16 @@
 struct cublasContext;
 typedef struct cublasContext* cublasHandle_t;
 struct CUstream_st;
+#if defined (CUDA_COMPILE) || defined (__HIP_PLATFORM_NVCC__)
 typedef struct CUstream_st* hipStream_t;
+#endif
 
 #ifdef HIP_COMPILE
 #ifdef __HIP_PLATFORM_NVCC__
 typedef cublasHandle_t hipblasHandle_t;
 #elif defined __HIP_PLATFORM_HCC__
-typedef struct Hcblaslibrary *hcblasHandle_t;
-typedef hcblasHandle_t hipblasHandle_t;
+//typedef struct Hcblaslibrary *hcblasHandle_t;
+typedef void* hipblasHandle_t;
 #endif
 #endif
 
@@ -190,7 +192,7 @@ private:
     static void* s_curandGenerator;
 #elif defined HIP_COMPILE
     static hipblasHandle_t s_cuHandle[MaxGpus];
-    static void* s_hiprngGenerator;
+    static void* s_hiprandGenerator;
 #endif
 
 // Have to use disable the warning to avoid issues with __declspec(dllexport) on Windows (C4251).
@@ -748,7 +750,7 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
 #define CUDA_CALL(expr)     (CudaCall((expr), #expr, "HIP",     hipSuccess))
 #define HIPBLAS_CALL(expr)   (CudaCall((expr), #expr, "HIPBLAS",   HIPBLAS_STATUS_SUCCESS))
 #define HIPSPARSE_CALL(expr) (CudaCall((expr), #expr, "HIPSPARSE", HIPSPARSE_STATUS_SUCCESS))
-#define HIPRNG_CALL(expr)   (CudaCall((expr), #expr, "HIPRNG",   HIPRNG_STATUS_SUCCESS))
+#define HIPRAND_CALL(expr)   (CudaCall((expr), #expr, "HIPRAND",   HIPRAND_STATUS_SUCCESS))
 #define HIPDNN_CALL(expr)    (CudaCall((expr), #expr, "HIPDNN",    HIPDNN_STATUS_SUCCESS))
 #define HIPDNN_CALL2(expr,m) (CudaCall((expr), #expr, "HIPDNN",    HIPDNN_STATUS_SUCCESS, m))
 #endif

@@ -27,13 +27,13 @@ GPURNGHandle::GPURNGHandle(int deviceId, uint64_t seed, uint64_t offset)
 #elif defined HIP_COMPILE
     if (GetMathLibTraceLevel() > 0)
     {
-        fprintf(stderr, "(GPU): creating hiprng object with seed %llu\n", cudaSeed);
+        fprintf(stderr, "(GPU): creating hiprand object with seed %llu\n", cudaSeed);
     }
 
-    HIPRNG_CALL(hiprngCreateGenerator(&m_generator, HIPRNG_RNG_PSEUDO_XORWOW));
-    HIPRNG_CALL(hiprngSetPseudoRandomGeneratorSeed(m_generator, cudaSeed));
-    HIPRNG_CALL(hiprngSetGeneratorOrdering(m_generator, HIPRNG_ORDERING_PSEUDO_SEEDED));
-    HIPRNG_CALL(hiprngSetGeneratorOffset(m_generator, offset));
+    HIPRAND_CALL(hiprandCreateGenerator(&m_generator, HIPRAND_RNG_PSEUDO_XORWOW));
+    HIPRAND_CALL(hiprandSetPseudoRandomGeneratorSeed(m_generator, cudaSeed));
+    // TODO: __prasanth__ HIPRAND_CALL(hiprandSetGeneratorOrdering(m_generator, HIPRAND_ORDERING_PSEUDO_SEEDED));
+    HIPRAND_CALL(hiprandSetGeneratorOffset(m_generator, offset));
 #endif
 }
 
@@ -46,9 +46,9 @@ GPURNGHandle::GPURNGHandle(int deviceId, uint64_t seed, uint64_t offset)
 	CURAND_CALL(curandDestroyGenerator(m_generator));
 #elif defined HIP_COMPILE
     if (std::uncaught_exception())
-        hiprngDestroyGenerator(m_generator);
+        hiprandDestroyGenerator(m_generator);
     else
-        HIPRNG_CALL(hiprngDestroyGenerator(m_generator));
+        HIPRAND_CALL(hiprandDestroyGenerator(m_generator));
 #endif
 }
 

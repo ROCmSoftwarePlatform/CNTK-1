@@ -2439,7 +2439,7 @@ template <class ElemType>
 hipblasHandle_t GPUMatrix<ElemType>::s_cuHandle[GPUMatrix<ElemType>::MaxGpus] = {0};
 
 template <class ElemType>
-void* GPUMatrix<ElemType>::s_hiprngGenerator = NULL;
+void* GPUMatrix<ElemType>::s_hiprandGenerator = NULL;
 #endif
 
 template <class ElemType>

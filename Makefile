@@ -121,9 +121,11 @@ ifdef HIP_PATH
 COMMON_FLAGS += -DHIP_COMPILE
 ifeq ($(HIP_PLATFORM), nvcc)
 	CXXFLAGS += -D__HIP_PLATFORM_NVCC__
+	COMPILE_FLAGS = -Xcompiler "-fPIC"
 else
 ifeq ($(HIP_PLATFORM), hcc)
 	CXXFLAGS += -D__HIP_PLATFORM_HCC__
+	COMPILE_FLAGS = "-fPIC"
 endif
 endif
 else
@@ -195,7 +197,7 @@ ifneq ($(HIP_PLATFORM), hcc)
 endif
 
 ifeq ($(HIP_PLATFORM), hcc)
-  LIBS_LIST += hipblas_hcc hip_hcc hiprng_hcc hipsparse_hcc MIOpen
+  LIBS_LIST += hipblas hip_hcc hiprand hipsparse MIOpen
   INCLUDEPATH += /opt/rocm/miopen/include/
 endif
 
@@ -221,8 +223,9 @@ ifdef HIP_PATH
     COMMON_FLAGS +=-DUSE_HIPDNN
   endif
   INCLUDEPATH += $(HIP_PATH)/include
-  INCLUDEPATH += $(EXTERNAL_DIR)/hcblas/include/
-  INCLUDEPATH += $(EXTERNAL_DIR)/hcrng/include/
+  INCLUDEPATH += $(EXTERNAL_DIR)/hipblas/include/
+  INCLUDEPATH += $(EXTERNAL_DIR)/hiprand/include/
+  INCLUDEPATH += $(EXTERNAL_DIR)/rocrand/include/
   INCLUDEPATH += $(EXTERNAL_DIR)/hcsparse/include/
   LIBPATH += $(EXTERNAL_DIR)/lib64
 endif
@@ -1551,7 +1554,7 @@ $(OBJDIR)/%.o : %.cu $(BUILD_CONFIGURATION)
 ifndef HIP_PATH
 	$(NVCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) -Xcompiler "-fPIC"
 else
-	$(HIPCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) -Xcompiler "-fPIC"
+	$(HIPCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) $(COMMON_FLAGS) $(COMPILE_FLAGS)
 endif
 
 $(OBJDIR)/%.pb.o : %.pb.cc $(BUILD_CONFIGURATION) 

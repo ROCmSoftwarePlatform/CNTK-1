@@ -13,7 +13,7 @@
 #ifdef CUDA_COMPILE
 #include <curand.h>
 #elif defined HIP_COMPILE
-#include <hiprng.h>
+#include <hiprand.h>
 #endif
 #endif // !CPUONLY
 
@@ -32,7 +32,7 @@ public:
         return m_generator;
     }
 #elif defined HIP_COMPILE
-    hiprngGenerator_t Generator()
+    hiprandGenerator_t Generator()
     {
         return m_generator;
     }
@@ -42,7 +42,7 @@ private:
 #ifdef CUDA_COMPILE
     curandGenerator_t m_generator;
 #elif defined HIP_COMPILE
-    hiprngGenerator_t m_generator;
+    hiprandGenerator_t m_generator;
 #endif
 #endif // !CPUONLY
 };

@@ -82,7 +82,7 @@ cubhip_path=
 cubhip_check=cub/cub.cuh
 
 have_cudnn=no
-cudnn_path=/usr/local/cudnn-6.0/
+cudnn_path=
 cudnn_check=cuda/include/cudnn.h
 
 have_hipdnn=no
@@ -90,7 +90,7 @@ hipdnn_path=
 hipdnn_check=include/hipDNN.h
 
 have_opencv=no
-opencv_path=/usr/local/opencv-3.1.0
+opencv_path=
 opencv_check=include/opencv2/opencv.hpp
 
 have_libzip=no
@@ -1335,19 +1335,22 @@ else
     echo CUDA_GDR=0 >> $config
 fi
 if test $enable_cuda = yes || test $enable_hip = yes ; then
-    echo CUDA_PATH=$cuda_path >> $config
-    echo GDK_INCLUDE_PATH=$gdk_include_path >> $config
-    echo GDK_NVML_LIB_PATH=$gdk_nvml_lib_path >> $config
-	if test $enable_hip = no
+    if test $enable_cuda = yes
     then
-	    echo CUB_PATH=$cub_path >> $config
+    	echo CUDA_PATH=$cuda_path >> $config
+    	echo GDK_INCLUDE_PATH=$gdk_include_path >> $config
+    	echo GDK_NVML_LIB_PATH=$gdk_nvml_lib_path >> $config
+        echo CUDNN_PATH=$cudnn_path >> $config
+    fi
+    if test $enable_hip = no
+    then
+	echo CUB_PATH=$cub_path >> $config
     else
         echo HIP_PATH=$hip_path >> $config
-	    echo CUB_PATH=$cubhip_path >> $config
+	echo CUB_PATH=$cubhip_path >> $config
         echo HIPDNN_PATH=$hipdnn_path >> $config
         echo EXTERNAL_DIR=$external_dir >> $config
     fi
-    echo CUDNN_PATH=$cudnn_path >> $config
     [ -z "$nccl_path" ] || echo NCCL_PATH=$nccl_path >> $config
 fi
 if test $enable_python = yes || test $enable_java = yes ; then
