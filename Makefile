@@ -175,7 +175,7 @@ ifneq ($(HIP_PLATFORM), hcc)
   INCLUDEPATH += $(CUDA_PATH)/include
   LIBPATH += $(CUDA_PATH)/lib64
   ifdef HIP_PATH
-	LIBS_LIST += hipblas hip_nvcc hiprng hipsparse
+	LIBS_LIST += hipblas hip_nvcc hiprand hipsparse
   endif
   LIBS_LIST += cublas cudart cuda curand cusparse nvidia-ml
 
@@ -224,7 +224,7 @@ ifdef HIP_PATH
   endif
   INCLUDEPATH += $(HIP_PATH)/include
   INCLUDEPATH += $(EXTERNAL_DIR)/hipblas/include/
-  INCLUDEPATH += $(EXTERNAL_DIR)/hiprand/include/
+  #INCLUDEPATH += $(EXTERNAL_DIR)/hiprand/include/
   INCLUDEPATH += $(EXTERNAL_DIR)/rocrand/include/
   INCLUDEPATH += $(EXTERNAL_DIR)/hcsparse/include/
   LIBPATH += $(EXTERNAL_DIR)/lib64
@@ -1554,7 +1554,7 @@ $(OBJDIR)/%.o : %.cu $(BUILD_CONFIGURATION)
 ifndef HIP_PATH
 	$(NVCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) -Xcompiler "-fPIC"
 else
-	$(HIPCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) $(COMMON_FLAGS) $(COMPILE_FLAGS)
+	$(HIPCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) $(COMPILE_FLAGS)
 endif
 
 $(OBJDIR)/%.pb.o : %.pb.cc $(BUILD_CONFIGURATION) 

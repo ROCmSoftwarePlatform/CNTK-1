@@ -31,21 +31,14 @@
 #include <unistd.h>
 #endif
 
+#ifdef CUDA_COMPILE
 // predeclare hipblasHandle_t
 struct cublasContext;
 typedef struct cublasContext* cublasHandle_t;
 struct CUstream_st;
-#if defined (CUDA_COMPILE) || defined (__HIP_PLATFORM_NVCC__)
-typedef struct CUstream_st* hipStream_t;
-#endif
-
-#ifdef HIP_COMPILE
-#ifdef __HIP_PLATFORM_NVCC__
-typedef cublasHandle_t hipblasHandle_t;
-#elif defined __HIP_PLATFORM_HCC__
-//typedef struct Hcblaslibrary *hcblasHandle_t;
+typedef struct CUstream_st* cudaStream_t;
+#elif defined  HIP_COMPILE
 typedef void* hipblasHandle_t;
-#endif
 #endif
 
 #ifdef _WIN32
