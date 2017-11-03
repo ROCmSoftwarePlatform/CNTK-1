@@ -3,7 +3,7 @@ rootDir=$(dirname "$(readlink -f "$0")")
 cd $rootDir
 
 #External Directory
-externalDir=External/HIP3
+externalDir=External/HIP
 mkdir ${externalDir} -p
 cd ${externalDir}
 cur_dir=$(pwd)
