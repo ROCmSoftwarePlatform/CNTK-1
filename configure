@@ -9,7 +9,8 @@
 
 configure=$0
 build_top=$PWD
-external_dir=$(dirname "$(readlink -f "$0")")/External/HIP
+root_dir=$(dirname "$(readlink -f "$0")")
+external_dir=$root_dir/External/HIP3
 
 cuda_path=
 cuda_check=include/cuda.h
@@ -523,6 +524,7 @@ do
             if test x$optarg = xyes || test x$optarg = xno
             then
                 enable_hip=$optarg
+                /bin/bash $root_dir/install_hiplibs.sh
             else
                 echo "Invalid value for --hip $optarg"
                 show_help

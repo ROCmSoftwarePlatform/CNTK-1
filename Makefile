@@ -67,21 +67,7 @@ endif
 ifdef HIP_PATH
 HIPCC=${HIP_PATH}/bin/hipcc
 HIP_PLATFORM=$(shell ${HIP_PATH}/bin/hipconfig --compiler)
-$(info $(shell pwd))
-#$(shell mkdir External/HIP/ -p)
-#$(shell cd External/HIP/ && git clone https://github.com/ROCmSoftwarePlatform/hcBLAS && cd hcBLAS && ./build.sh)
-#$(info $(shell pwd))
-#$(hello):
-#	mkdir External/HIP/ -p; \
-#	cd External/HIP/ && git clone https://github.com/ROCmSoftwarePlatform/hcBLAS && cd hcBLAS && ./build.sh
 endif
-
-hello:
-#	mkdir External/HIP/ -p; \
-#	cd External/HIP/; \
-#	git clone https://github.com/ROCmSoftwarePlatform/hcBLAS;
-	@$(shell chmod 755 install_hiplibs.sh)
-	@$(shell ./install_hiplibs.sh)
 
 ifndef BUILDTYPE
 $(info Defaulting BUILDTYPE=release)
@@ -175,7 +161,7 @@ ifneq ($(HIP_PLATFORM), hcc)
   INCLUDEPATH += $(CUDA_PATH)/include
   LIBPATH += $(CUDA_PATH)/lib64
   ifdef HIP_PATH
-	LIBS_LIST += hipblas hip_nvcc hiprand hipsparse
+	LIBS_LIST += hipblas hiprand hipsparse
   endif
   LIBS_LIST += cublas cudart cuda curand cusparse nvidia-ml
 
@@ -224,7 +210,7 @@ ifdef HIP_PATH
   endif
   INCLUDEPATH += $(HIP_PATH)/include
   INCLUDEPATH += $(EXTERNAL_DIR)/hipblas/include/
-  #INCLUDEPATH += $(EXTERNAL_DIR)/hiprand/include/
+  INCLUDEPATH += $(EXTERNAL_DIR)/hiprand/include/
   INCLUDEPATH += $(EXTERNAL_DIR)/rocrand/include/
   INCLUDEPATH += $(EXTERNAL_DIR)/hcsparse/include/
   LIBPATH += $(EXTERNAL_DIR)/lib64
@@ -734,7 +720,6 @@ EVAL_CLIENT_SRC=\
 
 EVAL_CLIENT_OBJ:=$(patsubst %.cpp, $(OBJDIR)/%.o, $(EVAL_CLIENT_SRC))
 
-#ALL+= hello
 ALL+=$(EVAL_CLIENT)
 SRC+=$(EVAL_CLIENT_SRC)
 
