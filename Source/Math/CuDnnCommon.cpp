@@ -42,7 +42,7 @@ CuDnnTensor::~CuDnnTensor()
     if (m_tensor != nullptr)
     {
 #ifdef CUDA_COMPILE
-	cudnnDestroyTensorDescriptor(m_tensor);
+	    cudnnDestroyTensorDescriptor(m_tensor);
 #elif defined HIP_COMPILE
         hipdnnDestroyTensorDescriptor(m_tensor);
 #endif
@@ -154,14 +154,14 @@ CuDnn::ptr_t CuDnn::Instance()
     {
         int deviceId;
 #ifdef CUDA_COMPILE
-	CUDA_CALL(cudaGetDevice(&deviceId));
+	    CUDA_CALL(cudaGetDevice(&deviceId));
         cudaDeviceProp props = {0};
         if (cudaGetDeviceProperties(&props, deviceId) != cudaSuccess || props.major < 3)
             RuntimeError("cuDNN requires device with compute capability 3.0 or higher.");
         cudnnHandle_t* cudnn = new cudnnHandle_t;
         CUDNN_CALL(cudnnCreate(cudnn));
         CUDNN_CALL(cudnnSetStream(*cudnn, GetStream()));
-	return cudnn;
+	    return cudnn;
 #elif defined HIP_COMPILE
         CUDA_CALL(hipGetDevice(&deviceId));
         hipDeviceProp_t props = {0};

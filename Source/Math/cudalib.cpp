@@ -88,11 +88,11 @@ void *mallocbytes(size_t nelem, size_t sz)
         {
             // fprintf (stderr, "mallocbytes: allocating %d elements of size %d, %d bytes\n", (int) nelem, (int) sz, (int) (nelem * sz));        // comment out by [v-hansu] to get rid out annoying output
             void *p;
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    cudaMalloc(&p, nelem * sz) || "cudaMalloc failed";
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipMalloc(&p, nelem * sz) || "hipMalloc failed";
-	#endif
+#endif
             return p;
         }
         catch (const std::exception &e)

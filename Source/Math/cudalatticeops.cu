@@ -17,15 +17,15 @@ namespace msra { namespace cuda {
 // This is non-blocking. It catches launch failures, but not crashes during execution.
 static void checklaunch(const char* fn)
 {
-    #ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
     cudaError_t rc = cudaGetLastError();
     if (rc != cudaSuccess)
 	RuntimeError("%s: launch failure: %s (cuda error %d)", fn, cudaGetErrorString(rc), (int) rc);
-    #elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
     hipError_t rc = hipGetLastError();
     if (rc != hipSuccess)
         RuntimeError("%s: launch failure: %s (cuda error %d)", fn, hipGetErrorString(rc), (int) rc);
-    #endif
+#endif
 }
 };
 };

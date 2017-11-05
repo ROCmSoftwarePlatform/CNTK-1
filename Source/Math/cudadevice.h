@@ -45,15 +45,15 @@ class ondevice
 public:
     ondevice(size_t deviceid)
     {
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	auto rc = cudaSetDevice((int)deviceid);
         if (rc != cudaSuccess)
 	    RuntimeError("Cannot set cuda device: %s (cuda error %d)", cudaGetErrorString(rc), (int)rc);
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
         auto rc = hipSetDevice((int)deviceid);
         if (rc != hipSuccess)
             RuntimeError("Cannot set cuda device: %s (cuda error %d)", hipGetErrorString(rc), (int)rc);
-	#endif
+#endif
     }
 };
 } }
