@@ -58,11 +58,11 @@ public:
     {
         if (m_dropoutDesc != nullptr)
         {
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    cudnnDestroyDropoutDescriptor(m_dropoutDesc);
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipdnnDestroyDropoutDescriptor(m_dropoutDesc);
-	#endif
+#endif
         }
     }
 
@@ -153,11 +153,11 @@ public:
     {
         if (m_rnnDesc != nullptr)
         {
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    cudnnDestroyRNNDescriptor(m_rnnDesc);
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipdnnDestroyRNNDescriptor(m_rnnDesc);
-	#endif
+#endif
             m_rnnDesc = nullptr;
         }
     }

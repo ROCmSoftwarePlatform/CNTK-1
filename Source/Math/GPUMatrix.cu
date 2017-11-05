@@ -227,23 +227,23 @@ SyncGuard::~SyncGuard()
         // If this destructor runs during stack unwinding, then a different error has
         // already happened that should be reported; so we only clean up the resource.
         if (std::uncaught_exception())
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    cudaEventDestroy(m_done);
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipEventDestroy(m_done);
-	#endif
+#endif
         else
         {
             // failures in a prior launch might be reported here
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    CUDA_CALL(cudaEventRecord(m_done));
             CUDA_CALL(cudaEventSynchronize(m_done));
 	    CUDA_CALL(cudaEventDestroy(m_done));
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             CUDA_CALL(hipEventRecord(m_done));
             CUDA_CALL(hipEventSynchronize(m_done));
             CUDA_CALL(hipEventDestroy(m_done));
-	#endif
+#endif
         }
     }
 }
@@ -1622,11 +1622,11 @@ void GPUMatrix<ElemType>::SetValue(const size_t numRows, const size_t numCols, i
                 if (transferer)
                     transferer->CopyCPUToGPUAsync(pArray, GetNumElements(), sizeof(ElemType), Data());
                 else
-		#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 		    CUDA_CALL(cudaMemcpy(Data(), pArray, sizeof(ElemType) * GetNumElements(), (matrixFlags & matrixFlagSetValueOnDevice) ? cudaMemcpyDeviceToDevice : cudaMemcpyHostToDevice));
-		#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
                     CUDA_CALL(hipMemcpy(Data(), pArray, sizeof(ElemType) * GetNumElements(), (matrixFlags & matrixFlagSetValueOnDevice) ? hipMemcpyDeviceToDevice : hipMemcpyHostToDevice));
-		#endif
+#endif
             }
             else // row major: must transpose (this is not meant to be efficient, but very useful for defining inline matrices for test code)
             {
@@ -1638,11 +1638,11 @@ void GPUMatrix<ElemType>::SetValue(const size_t numRows, const size_t numCols, i
                 if (transferer)
                     transferer->CopyCPUToGPUAsync(transposed.data(), GetNumElements(), sizeof(ElemType), Data());
                 else
-		#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 		    CUDA_CALL(cudaMemcpy(Data(), transposed.data(), sizeof(ElemType) * GetNumElements(), (matrixFlags & matrixFlagSetValueOnDevice) ? cudaMemcpyDeviceToDevice : cudaMemcpyHostToDevice));
-		#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
                     CUDA_CALL(hipMemcpy(Data(), transposed.data(), sizeof(ElemType) * GetNumElements(), (matrixFlags & matrixFlagSetValueOnDevice) ? hipMemcpyDeviceToDevice : hipMemcpyHostToDevice));
-		#endif
+#endif
             }
         }
     }
@@ -4769,7 +4769,7 @@ template <class ElemType>
             if ((int) c.GetNumRows() != m || (int) c.GetNumCols() != n)
                 InvalidArgument("dimension of matrix c does not match dimension of matrix a.");
 
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    cublasHandle_t cuHandle = GetCublasHandle(a.GetComputeDeviceId());
             // TODO: Overload the call to cublas_axpy to remove these ugly if/else statements.
             if (sizeof(ElemType) == sizeof(float))
@@ -4784,7 +4784,7 @@ template <class ElemType>
             {
                 RuntimeError("Unsupported template argument in GPUMatrix");
 	    }
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipblasHandle_t cuHandle = GetCublasHandle(a.GetComputeDeviceId());
             // TODO: Overload the call to hipblas_axpy to remove these ugly if/else statements.
             if (sizeof(ElemType) == sizeof(float))
@@ -4799,7 +4799,7 @@ template <class ElemType>
             {
                 RuntimeError("Unsupported template argument in GPUMatrix");
             }
-	#endif
+#endif
         }
         else if (a.GetNumElements() == 1)
         {
@@ -4807,11 +4807,11 @@ template <class ElemType>
             int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
             c.PrepareDevice();
             SyncGuard syncGuard;
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    _scaleAndAddScalar<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(c.Data(), N, alpha, a.Data(), c.Data());
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipLaunchKernelGGL((_scaleAndAddScalar<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, c.Data(), N, alpha, a.Data(), c.Data());
-	#endif
+#endif
         }
         else if (a.GetNumCols() == 1) // col vector, add it to all columns
         {
@@ -4828,31 +4828,31 @@ template <class ElemType>
             for (int i = 0; i < 2; i++)
             {
                 ElemType buffer[10] = {-1.234f};
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 		cudaError_t error = cudaMemcpy(buffer, !i ? a.Data(): c.Data(), sizeof(buffer), cudaMemcpyKind::cudaMemcpyDeviceToHost);
                 if (error == cudaError::cudaSuccess)
 		    printf("buffer valid\n");
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
                 hipError_t error = hipMemcpy(buffer, !i ? a.Data(): c.Data(), sizeof(buffer), hipMemcpyKind::hipMemcpyDeviceToHost);
                 if (error == hipError_t::hipSuccess)
                     printf("buffer valid\n");
-	#endif
+#endif
             }
 #endif
 
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    _matrixVectorColumnWiseAddWithThreadPerElem<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(a.Data(), c.Data(), c.Data(), alpha, m, n);
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipLaunchKernelGGL((_matrixVectorColumnWiseAddWithThreadPerElem<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a.Data(), c.Data(), c.Data(), alpha, m, n);
-	#endif
+#endif
         }
         else if (a.GetNumRows() == 1) // row vector, add it to all rows
         {
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    cublasHandle_t cuHandle = GetCublasHandle(a.GetComputeDeviceId());
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipblasHandle_t cuHandle = GetCublasHandle(a.GetComputeDeviceId());
-	#endif
+#endif
             int m = (int) c.GetNumRows();
             int n = (int) c.GetNumCols();
             assert(n == (int) a.GetNumCols());
@@ -4864,22 +4864,22 @@ template <class ElemType>
             {
                 foreach_row (i, c)
                 {
-		#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 		    CUBLAS_CALL(cublasDaxpy(cuHandle, n, reinterpret_cast<double*>(&alpha), reinterpret_cast<double*>(a.Data()), 1, reinterpret_cast<double*>(c.Data()+ i), m));
-		#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
                     HIPBLAS_CALL(hipblasDaxpy(cuHandle, n, reinterpret_cast<double*>(&alpha), reinterpret_cast<double*>(a.Data()), 1, reinterpret_cast<double*>(c.Data()+ i), m));
-		#endif
+#endif
                 }
             }
             else
             {
                 foreach_row (i, c)
                 {
-		#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 		    CUBLAS_CALL(cublasSaxpy(cuHandle, n, reinterpret_cast<float*>(&alpha), reinterpret_cast<float*>(a.Data()), 1, reinterpret_cast<float*>(c.Data()+ i), m));
-		#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
                     HIPBLAS_CALL(hipblasSaxpy(cuHandle, n, reinterpret_cast<float*>(&alpha), reinterpret_cast<float*>(a.Data()), 1, reinterpret_cast<float*>(c.Data()+ i), m));
-		#endif
+#endif
                 }
             }
         }
@@ -4926,11 +4926,11 @@ template <class ElemType>
             int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
             c.PrepareDevice();
             SyncGuard syncGuard;
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    _matrixMatrixAddOnCuda<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(alpha, a.Data(), b.Data(), c.Data(), N);
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipLaunchKernelGGL((_matrixMatrixAddOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, alpha, a.Data(), b.Data(), c.Data(), N);
-	#endif
+#endif
         }
         else if (a.GetNumElements() == 1)
         {
@@ -4938,11 +4938,11 @@ template <class ElemType>
             int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
             c.PrepareDevice();
             SyncGuard syncGuard;
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    _scaleAndAddScalar<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(c.Data(), N, alpha, a.Data(), b.Data());
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipLaunchKernelGGL((_scaleAndAddScalar<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, c.Data(), N, alpha, a.Data(), b.Data());
-	#endif
+#endif
         }
         else if (a.GetNumCols() == 1) // col vector, add it to all columns
         {
@@ -4953,11 +4953,11 @@ template <class ElemType>
 
             int blocksPerGrid = (int) (ceil(1.0 * m * n / GridDim::maxThreadsPerBlock));
             SyncGuard syncGuard;
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    _matrixVectorColumnWiseAddWithThreadPerElem<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(a.Data(), b.Data(), c.Data(), alpha, m, n);
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipLaunchKernelGGL((_matrixVectorColumnWiseAddWithThreadPerElem<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a.Data(), b.Data(), c.Data(), alpha, m, n);
-	#endif
+#endif
 
         }
         else if (a.GetNumRows() == 1) // row vector, add it to all rows
@@ -4969,11 +4969,11 @@ template <class ElemType>
 
             int blocksPerGrid = (int) (ceil(1.0 * m * n / GridDim::maxThreadsPerBlock));
             SyncGuard syncGuard;
-	#ifdef CUDA_COMPILE
+#ifdef CUDA_COMPILE
 	    _matrixVectorRowWiseAddWithThreadPerElem<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(a.Data(), b.Data(), c.Data(), alpha, m, n);
-	#elif defined HIP_COMPILE
+#elif defined HIP_COMPILE
             hipLaunchKernelGGL((_matrixVectorRowWiseAddWithThreadPerElem<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a.Data(), b.Data(), c.Data(), alpha, m, n);
-	#endif
+#endif
         }
         else
             InvalidArgument("Dimension of matrix c does not match dimension of matrix a.");
