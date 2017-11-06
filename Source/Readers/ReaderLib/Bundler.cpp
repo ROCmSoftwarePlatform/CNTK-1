@@ -93,7 +93,8 @@ void Bundler::CreateChunkDescriptions()
 
         // Also remember necessary secondary chunks.
         std::vector<std::vector<ChunkIdType>> secondaryChunks;
-        secondaryChunks.reserve(m_deserializers.size());
+        secondaryChunks.resize(m_deserializers.size());
+        secondaryChunks[0].push_back(chunks[chunkIndex].m_id);
         for (size_t sequenceIndex = 0; sequenceIndex < sequenceDescriptions.size(); ++sequenceIndex)
         {
             auto sequence = sequenceDescriptions[sequenceIndex];
@@ -249,7 +250,7 @@ public:
 
         // Fetch all chunks in parallel.
         std::vector<std::map<ChunkIdType, std::future<ChunkPtr>>> chunks;
-        chunks.reserve(chunk.m_secondaryChunks.size());
+        chunks.resize(chunk.m_secondaryChunks.size());
         for (size_t i = 0; i < chunk.m_secondaryChunks.size(); ++i)
         {
             for (const auto& c : chunk.m_secondaryChunks[i])
