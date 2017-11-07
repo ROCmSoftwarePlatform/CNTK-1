@@ -79,7 +79,7 @@
       <AdditionalDependencies Condition="!$(IsUWP)">$(OpenCvLib);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>prebuild.bat "$(Configuration)" "$(CNTK_MKL_SEQUENTIAL)" "$(CNTK_ENABLE_1BitSGD)" "$(CudaPath)" "$(HIPDNN_PATH)" "$(CUB_PATH)" "$(CNTK_ENABLE_ASGD)"</Command>
+      <Command>prebuild.bat "$(Configuration)" "$(CNTK_MKL_SEQUENTIAL)" "$(CNTK_ENABLE_1BitSGD)" "$(CudaPath)" "$(CUDNN_PATH)" "$(CUB_PATH)" "$(CNTK_ENABLE_ASGD)"</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="$(DebugBuild)">
