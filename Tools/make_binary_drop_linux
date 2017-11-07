@@ -125,11 +125,11 @@ declare -a opencvFiles=("libopencv_core.so.3.1" "libopencv_imgproc.so.3.1" "libo
 declare -a libzipFiles=("libzip.so.4")
 
 # CUDA
-declare -a cudaFiles=("libcudart.so.8.0" "libhipblas.so.8.0" "libhiprng.so.8.0" "libcusparse.so.8.0")
+declare -a cudaFiles=("libcudart.so.8.0" "libcublas.so.8.0" "libcurand.so.8.0" "libcusparse.so.8.0")
 
 # cuDNN
 # Note: can be only a single file currently, see copy below.
-declare -a hipdnnFiles=("libhipdnn.so")
+declare -a cudnnFiles=("libcudnn.so")
 
 # OpenBLAS (Needed by Kaldi)
 declare -a openblasFiles=("libopenblas.so.0")
@@ -153,7 +153,7 @@ opencvVersion="3.1.0"
 opencvPath="/usr/local/opencv-$opencvVersion/lib"
 libzipPath="/usr/local/lib"
 cudaPath="/usr/local/cuda/lib64"
-hipdnnPath="/usr/local/hipdnn/cuda/lib64"
+cudnnPath="/usr/local/cudnn-6.0/cuda/lib64"
 openblasPath="/usr/local/openblas/lib"
 kaldiVersion="c024e8aa"
 kaldiPath="/usr/local/kaldi-$kaldiVersion/src/lib"
@@ -269,7 +269,7 @@ if [[ $targetConfiguration != "cpu" ]]; then
 
     # Copy cuDNN
     echo "Copying cuDNN..." >&3
-    CopyFilesFromList $hipdnnPath hipdnnFiles[@] $baseDependenciesPath/libhipdnn.so.5
+    CopyFilesFromList $cudnnPath cudnnFiles[@] $baseDependenciesPath/libcudnn.so.6
 
 fi
 

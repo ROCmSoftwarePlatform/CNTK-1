@@ -179,7 +179,7 @@ function OpNVidiaCudnn6080(
 
     $prodSubDir =  "cudnn-8.0-v6.0"
     $targetPath = join-path $targetFolder $prodSubDir
-    $envVar = "HIPDNN_PATH"
+    $envVar = "CUDNN_PATH"
     $envValue = join-path $targetPath "cuda"
     $downloadSource = "http://developer.download.nvidia.com/compute/redist/cudnn/v6.0"
 

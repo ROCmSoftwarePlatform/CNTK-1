@@ -177,10 +177,10 @@ RUN git clone --depth=1 -b v${NCCL_VERSION} https://github.com/NVIDIA/nccl.git &
 
 WORKDIR /cntk
 
-RUN mkdir -p /usr/local/hipdnn/cuda/include && \
-    ln -s /usr/include/hipDNN.h /usr/local/hipdnn/cuda/include/hipDNN.h && \
-    mkdir -p /usr/local/hipdnn/cuda/lib64 && \
-    ln -s /etc/alternatives/libhipdnn_so /usr/local/hipdnn/cuda/lib64/libhipdnn.so && \
+RUN mkdir -p /usr/local/cudnn/cuda/include && \
+    ln -s /usr/include/cudnn.h /usr/local/cudnn/cuda/include/cudnn.h && \
+    mkdir -p /usr/local/cudnn/cuda/lib64 && \
+    ln -s /etc/alternatives/libcudnn_so /usr/local/cudnn/cuda/lib64/libcudnn.so && \
     ln -s /usr/local/cuda/lib64/stubs/libnvidia-ml.so /usr/local/cuda/lib64/stubs/libnvidia-ml.so.1
 
 # Build CNTK
@@ -192,7 +192,7 @@ RUN git clone --depth=1 --recursive -b $COMMIT https://github.com/Microsoft/CNTK
       --with-gdk-nvml-lib=/usr/local/cuda/lib64/stubs \
       --with-kaldi=${KALDI_PATH} \
       --with-py35-path=/root/anaconda3/envs/cntk-py35 \
-      --with-hipdnn=/usr/local/hipdnn \
+      --with-cudnn=/usr/local/cudnn \
       --with-nccl=${NCCL_PATH}" && \
     mkdir -p build/gpu/release && \
     cd build/gpu/release && \
