@@ -74,7 +74,7 @@ TrainConvNet = {
 
         # Note that learning rates are 10x more than in the paper due to a different 
         # momentum update rule in CNTK: v{t + 1} = lr*(1 - momentum)*g{t + 1} + momentum*v{t} 
-        learningRatesPerMB = 1.0*80: 0.1*40: 0.01
+        learningRatesPerMB = 0.1*1:1.0*80: 0.1*40: 0.01
         momentumPerMB = 0.9
         maxEpochs = 160
         L2RegWeight = 0.0001

@@ -67,7 +67,7 @@ def create_trainer(network, minibatch_size, epoch_size, num_quantization_bits, b
     if network['name'] == 'resnet20':
         lr_per_mb = [1.0]*80 + [0.1]*40 + [0.01]
     elif network['name'] == 'resnet110':
-        lr_per_mb = [1.0]*80 + [0.1]*40 + [0.01]
+        lr_per_mb = [0.1]*1 + [1.0]*80 + [0.1]*40 + [0.01]
     else:
         raise RuntimeError("Unknown model name!")
 
