@@ -59,6 +59,7 @@ if [ -d $cubRepo ]; then
     echo -e "\t\t----- CUB-HIP already exists -----\n"
 else
     git clone https://github.com/ROCmSoftwarePlatform/cub-hip.git
+    cd cub-hip
     git checkout developer-cub-hip
     gti checkout 3effedd23f4e80ccec5d0808d8349f7d570e488e
 fi

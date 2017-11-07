@@ -64,7 +64,7 @@ ConvLayer1x1MSRAInit(
     strideShape = (horizontalStride:verticalStride:inputChannels)
     W = Parameter(outputChannels, inputChannels, init ='heNormal')
     c = Convolution(W, input, kernelShape, mapDims = outputShape, stride = strideShape,
-                    autoPadding = false, imageLayout = "hipdnn")
+                    autoPadding = false, imageLayout = "cudnn")
 ].c
 
 # Learnable upsampling layer initialized with bilinear weights.

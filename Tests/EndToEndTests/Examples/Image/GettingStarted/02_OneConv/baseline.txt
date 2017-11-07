@@ -20,7 +20,7 @@ Changed current directory to C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160
 09/22/2016 16:27:00: 		Math lib: mkl
 09/22/2016 16:27:00: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 09/22/2016 16:27:00: 		CUB_PATH: C:\src\cub-1.4.1
-09/22/2016 16:27:00: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-5.1\cuda
+09/22/2016 16:27:00: 		CUDNN_PATH: c:\NVIDIA\cudnn-5.1\cuda
 09/22/2016 16:27:00: 		Build Branch: HEAD
 09/22/2016 16:27:00: 		Build SHA1: 216029bfedd92253fd45034da1d1cc68c4d4c7f1
 09/22/2016 16:27:00: 		Built by svcphil on liana-08-w

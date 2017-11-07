@@ -24,7 +24,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 		CUB_PATH: E:\cub-1.4.1
-		HIPDNN_PATH: E:\hipdnn-5.1
+		CUDNN_PATH: E:\cudnn-5.1
 		Build Branch: amitaga/freeStaticAxes
 		Build SHA1: 607bf6e3d8b037453f3fcb8ee41585b4dc6c41c9 (modified)
 		Built by amitaga on Amitaga-Win-DT3

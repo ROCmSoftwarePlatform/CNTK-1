@@ -2,4 +2,4 @@
 
 . $TEST_DIR/../run-test-common
 
-cntkrun 01_OneHidden.cntk batchNormalizationEngine=hipdnn
+cntkrun 01_OneHidden.cntk batchNormalizationEngine=cudnn

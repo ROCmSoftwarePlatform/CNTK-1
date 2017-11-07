@@ -21,7 +21,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 		CUB_PATH: C:\src\cub-1.4.1
-		HIPDNN_PATH: C:\local\hipdnn-8.0-v5.1\cuda
+		CUDNN_PATH: C:\local\cudnn-8.0-v5.1\cuda
 		Build Branch: master
 		Build SHA1: 190dc1b3042d62c20aeba5bd336bbeaa8a6466ca
 		Built by chazhang on CHAZHANG
@@ -265,9 +265,9 @@ Setting dropout rate to 0.5.
 05/08/2017 22:00:01: Starting Epoch 1: learning rate per sample = 0.001000  effective momentum = 0.898824  momentum as time constant = 600.0 samples
 
 05/08/2017 22:00:01: Starting minibatch loop.
-(GPU): creating hiprng object with seed 0
-(GPU): creating hiprng object with seed 1
-(GPU): creating hiprng object with seed 2
+(GPU): creating curand object with seed 0
+(GPU): creating curand object with seed 1
+(GPU): creating curand object with seed 2
 05/08/2017 22:00:02:  Epoch[ 1 of 3]-Minibatch[   1-  16, 50.00%]: ce = 2.30184174 * 1024; errs = 88.184% * 1024; time = 1.6009s; samplesPerSecond = 639.6
 05/08/2017 22:00:02:  Epoch[ 1 of 3]-Minibatch[  17-  32, 100.00%]: ce = 2.30038643 * 1024; errs = 84.766% * 1024; time = 0.0417s; samplesPerSecond = 24572.3
 05/08/2017 22:00:02: Finished Epoch[ 1 of 3]: [Training] ce = 2.30111408 * 2048; errs = 86.475% * 2048; totalSamplesSeen = 2048; learningRatePerSample = 0.001; epochTime=1.65165s
@@ -276,9 +276,9 @@ Setting dropout rate to 0.5.
 05/08/2017 22:00:02: Starting Epoch 2: learning rate per sample = 0.001000  effective momentum = 0.898824  momentum as time constant = 600.0 samples
 
 05/08/2017 22:00:02: Starting minibatch loop.
-(GPU): creating hiprng object with seed 3
-(GPU): creating hiprng object with seed 4
-(GPU): creating hiprng object with seed 5
+(GPU): creating curand object with seed 3
+(GPU): creating curand object with seed 4
+(GPU): creating curand object with seed 5
 05/08/2017 22:00:03:  Epoch[ 2 of 3]-Minibatch[   1-  16, 50.00%]: ce = 2.29803061 * 1024; errs = 83.887% * 1024; time = 0.1511s; samplesPerSecond = 6777.5
 05/08/2017 22:00:03:  Epoch[ 2 of 3]-Minibatch[  17-  32, 100.00%]: ce = 2.29530358 * 1024; errs = 80.371% * 1024; time = 0.0434s; samplesPerSecond = 23608.3
 05/08/2017 22:00:03: Finished Epoch[ 2 of 3]: [Training] ce = 2.29666710 * 2048; errs = 82.129% * 2048; totalSamplesSeen = 4096; learningRatePerSample = 0.001; epochTime=0.19624s
@@ -287,9 +287,9 @@ Setting dropout rate to 0.5.
 05/08/2017 22:00:03: Starting Epoch 3: learning rate per sample = 0.001000  effective momentum = 0.898824  momentum as time constant = 600.0 samples
 
 05/08/2017 22:00:03: Starting minibatch loop.
-(GPU): creating hiprng object with seed 6
-(GPU): creating hiprng object with seed 7
-(GPU): creating hiprng object with seed 8
+(GPU): creating curand object with seed 6
+(GPU): creating curand object with seed 7
+(GPU): creating curand object with seed 8
 05/08/2017 22:00:03:  Epoch[ 3 of 3]-Minibatch[   1-  16, 50.00%]: ce = 2.28963256 * 1024; errs = 78.906% * 1024; time = 0.0720s; samplesPerSecond = 14216.2
 05/08/2017 22:00:03:  Epoch[ 3 of 3]-Minibatch[  17-  32, 100.00%]: ce = 2.28485131 * 1024; errs = 74.512% * 1024; time = 0.0358s; samplesPerSecond = 28569.9
 05/08/2017 22:00:03: Finished Epoch[ 3 of 3]: [Training] ce = 2.28724194 * 2048; errs = 76.709% * 2048; totalSamplesSeen = 6144; learningRatePerSample = 0.001; epochTime=0.110093s

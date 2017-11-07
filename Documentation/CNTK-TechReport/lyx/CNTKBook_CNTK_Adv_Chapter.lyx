@@ -3503,7 +3503,7 @@ Convolution(w, image, kernelWidth, kernelHeight,
 
 \begin_layout Plain Layout
 
-            maxTempMemSizeInSamples=0, imageLayout="HWC"|hipdnn"])
+            maxTempMemSizeInSamples=0, imageLayout="HWC"|cudnn"])
 \end_layout
 
 \begin_layout Plain Layout
@@ -3523,7 +3523,7 @@ Convolve(w, image, kernelWidth, kernelHeight,
 
 \begin_layout Plain Layout
 
-            maxTempMemSizeInSamples=0, imageLayout="HWC"|hipdnn"]) #deprecated
+            maxTempMemSizeInSamples=0, imageLayout="HWC"|cudnn"]) #deprecated
 \end_layout
 
 \end_inset
@@ -3590,7 +3590,7 @@ HWC
 
 , which means each image is stored as [channel, width, height] in column
  major.
- If you use cuDNN to speed up training, you should set it to hipdnn, which
+ If you use cuDNN to speed up training, you should set it to cudnn, which
  means each image is stored as [width, height, channel].
 \end_layout
 
@@ -3633,7 +3633,7 @@ status open
 
 \begin_layout Plain Layout
 
-MaxPooling(m, windowWidth, windowHeight, stepW, stepH, imageLayout="HWC"|hipdnn")
+MaxPooling(m, windowWidth, windowHeight, stepW, stepH, imageLayout="HWC"|cudnn")
 \end_layout
 
 \begin_layout Plain Layout
@@ -3679,7 +3679,7 @@ HWC
 
 , which means each image is stored as [channel, width, height] in column
  major.
- If you use cuDNN to speed up training, you should set it to hipdnn, which
+ If you use cuDNN to speed up training, you should set it to cudnn, which
  means each image is stored as [width, height, channel].
 \end_layout
 

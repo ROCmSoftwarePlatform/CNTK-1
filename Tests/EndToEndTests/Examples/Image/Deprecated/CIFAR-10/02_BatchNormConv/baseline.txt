@@ -14,7 +14,7 @@ Build info:
 		With 1bit-SGD: yes
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: C:\R\cub-1.4.1
-		HIPDNN_PATH: C:\R\hipdnn-7.5-windows10-x64-v5.0-ga\cuda
+		CUDNN_PATH: C:\R\cudnn-7.5-windows10-x64-v5.0-ga\cuda
 		Build Branch: mahilleb/CuDnn5Test
 		Build SHA1: d9e9c885bd703367ce299251768bc107e0913e74 (modified)
 		Built by mahilleb on mahilleb57
@@ -32,7 +32,7 @@ Changed current directory to C:\cygwin64\tmp\cntk-test-20160825162438.206738\Exa
 08/25/2016 15:24:41: 		With 1bit-SGD: yes
 08/25/2016 15:24:41: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 08/25/2016 15:24:41: 		CUB_PATH: C:\R\cub-1.4.1
-08/25/2016 15:24:41: 		HIPDNN_PATH: C:\R\hipdnn-7.5-windows10-x64-v5.0-ga\cuda
+08/25/2016 15:24:41: 		CUDNN_PATH: C:\R\cudnn-7.5-windows10-x64-v5.0-ga\cuda
 08/25/2016 15:24:41: 		Build Branch: mahilleb/CuDnn5Test
 08/25/2016 15:24:41: 		Build SHA1: d9e9c885bd703367ce299251768bc107e0913e74 (modified)
 08/25/2016 15:24:41: 		Built by mahilleb on mahilleb57
@@ -56,7 +56,7 @@ configparameters: 02_BatchNormConv.cntk:ConfigDir=C:\R\CNTK\Examples\Image\Misce
 configparameters: 02_BatchNormConv.cntk:currentDirectory=C:\cygwin64\tmp\cntk-test-20160825162438.206738\Examples\Image\Miscellaneous\CIFAR-10_02_BatchNormConv@release_gpu\TestData
 configparameters: 02_BatchNormConv.cntk:DataDir=C:\cygwin64\tmp\cntk-test-20160825162438.206738\Examples\Image\Miscellaneous\CIFAR-10_02_BatchNormConv@release_gpu\TestData
 configparameters: 02_BatchNormConv.cntk:deviceId=0
-configparameters: 02_BatchNormConv.cntk:imageLayout=hipdnn
+configparameters: 02_BatchNormConv.cntk:imageLayout=cudnn
 configparameters: 02_BatchNormConv.cntk:initOnCPUOnly=true
 configparameters: 02_BatchNormConv.cntk:ModelDir=C:\cygwin64\tmp\cntk-test-20160825162438.206738\Examples\Image\Miscellaneous\CIFAR-10_02_BatchNormConv@release_gpu/Models
 configparameters: 02_BatchNormConv.cntk:ndlMacros=C:\R\CNTK\Examples\Image\Miscellaneous\CIFAR-10/Macros.ndl
@@ -162,7 +162,7 @@ Node 'featOffs' (LearnableParameter operation): Initializing Parameter[1 x 1] <-
 Node 'featOffs' (LearnableParameter operation): Initializing Parameter[1 x 1] <- 128.000000.
 Node 'featOffs' (LearnableParameter operation): Initializing Parameter[1 x 1] <- 128.000000.
 Node 'conv1.c.W' (LearnableParameter operation): Initializing Parameter[32 x 75] <- gaussian(seed=1, init dims=[32 x 75], range=0.023094*0.004300, onCPU=false).
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 Node 'conv1.c.c.b' (LearnableParameter operation): Initializing Parameter[32 x 1] <- 0.000000.
 Node 'conv1.c.c.sc' (LearnableParameter operation): Initializing Parameter[32 x 1] <- 1.000000.
 Node 'conv1.c.c.m' (LearnableParameter operation): Initializing Parameter[32 x 1] <- 0.000000.

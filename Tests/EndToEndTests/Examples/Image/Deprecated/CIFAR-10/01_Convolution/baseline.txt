@@ -15,7 +15,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: c:\src\cub-1.4.1
-		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 		Build Branch: HEAD
 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 		Built by svcphil on Philly-Pool3
@@ -34,7 +34,7 @@ Changed current directory to C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160
 08/16/2016 03:02:05: 		Math lib: mkl
 08/16/2016 03:02:05: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 08/16/2016 03:02:05: 		CUB_PATH: c:\src\cub-1.4.1
-08/16/2016 03:02:05: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+08/16/2016 03:02:05: 		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 08/16/2016 03:02:05: 		Build Branch: HEAD
 08/16/2016 03:02:05: 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 08/16/2016 03:02:05: 		Built by svcphil on Philly-Pool3
@@ -64,7 +64,7 @@ ModelDir = "$OutputDir$/Models"
 ndlMacros = "$ConfigDir$/Macros.ndl"
 precision = "float"
 deviceId = 0
-imageLayout = "hipdnn"
+imageLayout = "cudnn"
 initOnCPUOnly=true
 command = Train:Test
 modelPath = "$ModelDir$/01_Convolution"
@@ -140,7 +140,7 @@ ModelDir = "C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\
 ndlMacros = "C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\Miscellaneous\CIFAR-10/Macros.ndl"
 precision = "float"
 deviceId = 0
-imageLayout = "hipdnn"
+imageLayout = "cudnn"
 initOnCPUOnly=true
 command = Train:Test
 modelPath = "C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu/Models/01_Convolution"
@@ -213,7 +213,7 @@ configparameters: 01_Conv.cntk:ConfigDir=C:\jenkins\workspace\CNTK-Test-Windows-
 configparameters: 01_Conv.cntk:currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu\TestData
 configparameters: 01_Conv.cntk:DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu\TestData
 configparameters: 01_Conv.cntk:deviceId=0
-configparameters: 01_Conv.cntk:imageLayout=hipdnn
+configparameters: 01_Conv.cntk:imageLayout=cudnn
 configparameters: 01_Conv.cntk:initOnCPUOnly=true
 configparameters: 01_Conv.cntk:ModelDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu/Models
 configparameters: 01_Conv.cntk:modelPath=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu/Models/01_Convolution
@@ -307,7 +307,7 @@ Node 'featOffs' (LearnableParameter operation): Initializing Parameter[1 x 1] <-
 Node 'featOffs' (LearnableParameter operation): Initializing Parameter[1 x 1] <- 128.000000.
 Node 'featOffs' (LearnableParameter operation): Initializing Parameter[1 x 1] <- 128.000000.
 Node 'conv1_act.W' (LearnableParameter operation): Initializing Parameter[32 x 75] <- gaussian(seed=1, range=0.023094*0.004300, onCPU=false).
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 Node 'conv1_act.b' (LearnableParameter operation): Initializing Parameter[1 x 1 x 32] <- 0.000000.
 Node 'conv2_act.W' (LearnableParameter operation): Initializing Parameter[32 x 800] <- gaussian(seed=2, range=0.007071*1.414000, onCPU=false).
 Node 'conv2_act.b' (LearnableParameter operation): Initializing Parameter[1 x 1 x 32] <- 0.000000.
@@ -493,7 +493,7 @@ Setting dropout rate to 0.5.
 BlockRandomizer::StartEpoch: epoch 5: frames [500..600] (first sequence at sample 500), data subset 0 of 1
 
 08/16/2016 03:02:15: Starting minibatch loop.
-(GPU): creating hiprng object with seed 5
+(GPU): creating curand object with seed 5
 08/16/2016 03:02:15: Finished Epoch[ 6 of 10]: [Training] CE = 2.29013901 * 100; Err = 0.81000000 * 100; totalSamplesSeen = 600; learningRatePerSample = 0.00015625; epochTime=0.023069s
 08/16/2016 03:02:15: SGD: Saving checkpoint model 'C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu/Models/01_Convolution.6'
 
@@ -501,7 +501,7 @@ BlockRandomizer::StartEpoch: epoch 5: frames [500..600] (first sequence at sampl
 BlockRandomizer::StartEpoch: epoch 6: frames [600..700] (first sequence at sample 600), data subset 0 of 1
 
 08/16/2016 03:02:15: Starting minibatch loop.
-(GPU): creating hiprng object with seed 6
+(GPU): creating curand object with seed 6
 08/16/2016 03:02:15: Finished Epoch[ 7 of 10]: [Training] CE = 2.29815735 * 100; Err = 0.93000000 * 100; totalSamplesSeen = 700; learningRatePerSample = 0.00015625; epochTime=0.030436s
 08/16/2016 03:02:15: SGD: Saving checkpoint model 'C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu/Models/01_Convolution.7'
 
@@ -509,7 +509,7 @@ BlockRandomizer::StartEpoch: epoch 6: frames [600..700] (first sequence at sampl
 BlockRandomizer::StartEpoch: epoch 7: frames [700..800] (first sequence at sample 700), data subset 0 of 1
 
 08/16/2016 03:02:15: Starting minibatch loop.
-(GPU): creating hiprng object with seed 7
+(GPU): creating curand object with seed 7
 08/16/2016 03:02:15: Finished Epoch[ 8 of 10]: [Training] CE = 2.28805984 * 100; Err = 0.89000000 * 100; totalSamplesSeen = 800; learningRatePerSample = 0.00015625; epochTime=0.022867s
 08/16/2016 03:02:15: SGD: Saving checkpoint model 'C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu/Models/01_Convolution.8'
 
@@ -517,7 +517,7 @@ BlockRandomizer::StartEpoch: epoch 7: frames [700..800] (first sequence at sampl
 BlockRandomizer::StartEpoch: epoch 8: frames [800..900] (first sequence at sample 800), data subset 0 of 1
 
 08/16/2016 03:02:15: Starting minibatch loop.
-(GPU): creating hiprng object with seed 8
+(GPU): creating curand object with seed 8
 08/16/2016 03:02:15: Finished Epoch[ 9 of 10]: [Training] CE = 2.29377136 * 100; Err = 0.88000000 * 100; totalSamplesSeen = 900; learningRatePerSample = 0.00015625; epochTime=0.022876s
 08/16/2016 03:02:15: SGD: Saving checkpoint model 'C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu/Models/01_Convolution.9'
 
@@ -525,7 +525,7 @@ BlockRandomizer::StartEpoch: epoch 8: frames [800..900] (first sequence at sampl
 BlockRandomizer::StartEpoch: epoch 9: frames [900..1000] (first sequence at sample 900), data subset 0 of 1
 
 08/16/2016 03:02:15: Starting minibatch loop.
-(GPU): creating hiprng object with seed 9
+(GPU): creating curand object with seed 9
 08/16/2016 03:02:15: Finished Epoch[10 of 10]: [Training] CE = 2.27813766 * 100; Err = 0.88000000 * 100; totalSamplesSeen = 1000; learningRatePerSample = 0.00015625; epochTime=0.022892s
 08/16/2016 03:02:15: SGD: Saving checkpoint model 'C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160816030038.674053\Examples\Image\Miscellaneous\CIFAR-10_01_Convolution@release_gpu/Models/01_Convolution'
 08/16/2016 03:02:15: CNTKCommandTrainEnd: Train

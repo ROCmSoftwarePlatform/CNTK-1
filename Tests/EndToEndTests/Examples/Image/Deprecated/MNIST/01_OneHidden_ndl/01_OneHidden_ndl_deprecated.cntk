@@ -72,7 +72,7 @@ train = [
 
     # deprecated NDL version
     NDLNetworkBuilder = [
-        imageLayout = "hipdnn"
+        imageLayout = "cudnn"
         initOnCPUOnly = true
         ndlMacros = "$configDir$/../Macros.ndl"
         networkDescription = "$ConfigDir$/01_OneHidden.ndl"

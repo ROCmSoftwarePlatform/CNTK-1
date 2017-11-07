@@ -11,14 +11,14 @@ ClassCount = $ClassCount$
 
 # Replace cropped features with uncropped features.
 Rename(features, oldFeatures)
-features = ImageInput(ImageWidth, ImageHeight, ImageChannels, imageLayout = "hipdnn", tag = "feature")
+features = ImageInput(ImageWidth, ImageHeight, ImageChannels, imageLayout = "cudnn", tag = "feature")
 SetInput(featuresFCN4.x._.x.c, 1, features)
 SetInput(out, 2, features)
 Delete(oldFeatures)
 
 # Replace cropped labels with uncropped labels.
 Rename(labels, oldLabels)
-labels = ImageInput(ImageWidth, ImageHeight, ClassCount, imageLayout = "hipdnn", tag = "label")
+labels = ImageInput(ImageWidth, ImageHeight, ClassCount, imageLayout = "cudnn", tag = "label")
 SetInput(out, 1, labels)
 SetInput(out, 3, labels)
 SetInput(CE.logits_per_class, 0, labels)
@@ -28,7 +28,7 @@ Delete(oldLabels)
 
 # Replace cropped ignore mask with uncropped ignore mask.
 Rename(ignoreMask, oldIgnoreMask)
-ignoreMask = ImageInput(ImageWidth, ImageHeight, 1, imageLayout = "hipdnn", tag = "feature")
+ignoreMask = ImageInput(ImageWidth, ImageHeight, 1, imageLayout = "cudnn", tag = "feature")
 SetInput(CE.diff_valid, 1, ignoreMask)
 SetInput(CE.norm_factor.z, 0, ignoreMask)
 SetInput(miouError.outMasked, 1, ignoreMask)

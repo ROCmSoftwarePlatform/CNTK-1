@@ -9,7 +9,7 @@ Build info:
 		With 1bit-SGD: yes
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.0
 		CUB_PATH: D:\work\Program\Code\src\CUB
-		HIPDNN_PATH: D:\work\Program\Code\src\cuDNN\cuda
+		CUDNN_PATH: D:\work\Program\Code\src\cuDNN\cuda
 		Build Branch: erw/PlotFix
 		Build SHA1: 4e90a514120ae6033d9bfa88b3ba296bfae0d559 (modified)
 		Built by erw on 7253-Wang
@@ -26,7 +26,7 @@ Changed current directory to D:\work\Program\Code\local-src\CNTK-public\CNTK-git
 04/18/2016 12:15:03: 		With 1bit-SGD: yes
 04/18/2016 12:15:03: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.0
 04/18/2016 12:15:03: 		CUB_PATH: D:\work\Program\Code\src\CUB
-04/18/2016 12:15:03: 		HIPDNN_PATH: D:\work\Program\Code\src\cuDNN\cuda
+04/18/2016 12:15:03: 		CUDNN_PATH: D:\work\Program\Code\src\cuDNN\cuda
 04/18/2016 12:15:03: 		Build Branch: erw/PlotFix
 04/18/2016 12:15:03: 		Build SHA1: 4e90a514120ae6033d9bfa88b3ba296bfae0d559 (modified)
 04/18/2016 12:15:03: 		Built by erw on 7253-Wang
@@ -351,7 +351,7 @@ label set 0: 129 classes
 minibatchutterancesource: 948 utterances grouped into 3 chunks, av. chunk size: 316.0 utterances, 84244.7 frames
 
 04/18/2016 12:15:05: Creating virgin network.
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 
 Post-processing network...
 

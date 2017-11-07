@@ -20,7 +20,7 @@ Changed current directory to /home/philly/jenkins/workspace/CNTK-Test-Linux-Slav
 12/21/2016 09:27:02: 		Math lib: mkl
 12/21/2016 09:27:02: 		CUDA_PATH: /usr/local/cuda-8.0
 12/21/2016 09:27:02: 		CUB_PATH: /usr/local/cub-1.4.1
-12/21/2016 09:27:02: 		HIPDNN_PATH: /usr/local
+12/21/2016 09:27:02: 		CUDNN_PATH: /usr/local
 12/21/2016 09:27:02: 		Build Branch: HEAD
 12/21/2016 09:27:02: 		Build SHA1: bbb4406fcb69b190109ec665d8c0a619271f1b24
 12/21/2016 09:27:02: 		Built by Source/CNTK/buildinfo.h$$0 on 3165e53f9498
@@ -917,7 +917,7 @@ Changed current directory to /home/philly/jenkins/workspace/CNTK-Test-Linux-Slav
 12/21/2016 09:27:07: 		Math lib: mkl
 12/21/2016 09:27:07: 		CUDA_PATH: /usr/local/cuda-8.0
 12/21/2016 09:27:07: 		CUB_PATH: /usr/local/cub-1.4.1
-12/21/2016 09:27:07: 		HIPDNN_PATH: /usr/local
+12/21/2016 09:27:07: 		CUDNN_PATH: /usr/local
 12/21/2016 09:27:07: 		Build Branch: HEAD
 12/21/2016 09:27:07: 		Build SHA1: bbb4406fcb69b190109ec665d8c0a619271f1b24
 12/21/2016 09:27:07: 		Built by Source/CNTK/buildinfo.h$$0 on 3165e53f9498

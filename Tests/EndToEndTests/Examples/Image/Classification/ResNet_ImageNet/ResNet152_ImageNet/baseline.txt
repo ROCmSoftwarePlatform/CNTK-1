@@ -29,7 +29,7 @@ CNTK 2.0rc2+ (HEAD 431a9e, May 17 2017 16:38:22) on 5e7fd7c6732f at 2017/05/18 0
 05/18/2017 08:54:00: 		Math lib: mkl
 05/18/2017 08:54:00: 		CUDA_PATH: /usr/local/cuda-8.0
 05/18/2017 08:54:00: 		CUB_PATH: /usr/local/cub-1.4.1
-05/18/2017 08:54:00: 		HIPDNN_PATH: /usr/local/hipdnn-5.1
+05/18/2017 08:54:00: 		CUDNN_PATH: /usr/local/cudnn-5.1
 05/18/2017 08:54:00: 		Build Branch: HEAD
 05/18/2017 08:54:00: 		Build SHA1: 431a9e4e669a1f5d141a9de4524f67c7dbce787c
 05/18/2017 08:54:00: 		Built by Source/CNTK/buildinfo.h$$0 on 1a055313a787

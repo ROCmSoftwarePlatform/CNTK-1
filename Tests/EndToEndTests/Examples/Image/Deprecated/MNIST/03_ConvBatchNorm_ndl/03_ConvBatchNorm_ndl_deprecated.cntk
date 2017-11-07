@@ -37,7 +37,7 @@ train = [
     action = "train"
 
     NDLNetworkBuilder = [
-        imageLayout = "hipdnn"
+        imageLayout = "cudnn"
         initOnCPUOnly=true
         ndlMacros = "$ConfigDir$/../Macros.ndl"
         networkDescription = "$ConfigDir$/03_ConvBatchNorm.ndl"

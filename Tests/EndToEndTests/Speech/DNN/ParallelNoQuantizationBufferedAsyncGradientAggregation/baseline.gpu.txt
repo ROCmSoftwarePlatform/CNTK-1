@@ -15,7 +15,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: c:\src\cub-1.4.1
-		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 		Build Branch: HEAD
 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 		Built by svcphil on Philly-Pool3
@@ -34,7 +34,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: c:\src\cub-1.4.1
-		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 		Build Branch: HEAD
 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 		Built by svcphil on Philly-Pool3
@@ -53,7 +53,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: c:\src\cub-1.4.1
-		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 		Build Branch: HEAD
 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 		Built by svcphil on Philly-Pool3
@@ -97,7 +97,7 @@ MPI Rank 0: 08/16/2016 03:04:10: 		With 1bit-SGD: no
 MPI Rank 0: 08/16/2016 03:04:10: 		Math lib: mkl
 MPI Rank 0: 08/16/2016 03:04:10: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 MPI Rank 0: 08/16/2016 03:04:10: 		CUB_PATH: c:\src\cub-1.4.1
-MPI Rank 0: 08/16/2016 03:04:10: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+MPI Rank 0: 08/16/2016 03:04:10: 		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 MPI Rank 0: 08/16/2016 03:04:10: 		Build Branch: HEAD
 MPI Rank 0: 08/16/2016 03:04:10: 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 MPI Rank 0: 08/16/2016 03:04:10: 		Built by svcphil on Philly-Pool3
@@ -459,7 +459,7 @@ MPI Rank 0:
 MPI Rank 0: 08/16/2016 03:04:11: Creating virgin network.
 MPI Rank 0: Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 363] <- 0.000000.
 MPI Rank 0: Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 363] <- uniform(seed=1, range=0.050000*1.000000, onCPU=false).
-MPI Rank 0: Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==8
+MPI Rank 0: Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==8
 MPI Rank 0: Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 MPI Rank 0: Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 MPI Rank 0: Node 'W1' (LearnableParameter operation): Initializing Parameter[512 x 512] <- 0.000000.
@@ -715,7 +715,7 @@ MPI Rank 1: 08/16/2016 03:04:11: 		With 1bit-SGD: no
 MPI Rank 1: 08/16/2016 03:04:11: 		Math lib: mkl
 MPI Rank 1: 08/16/2016 03:04:11: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 MPI Rank 1: 08/16/2016 03:04:11: 		CUB_PATH: c:\src\cub-1.4.1
-MPI Rank 1: 08/16/2016 03:04:11: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+MPI Rank 1: 08/16/2016 03:04:11: 		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 MPI Rank 1: 08/16/2016 03:04:11: 		Build Branch: HEAD
 MPI Rank 1: 08/16/2016 03:04:11: 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 MPI Rank 1: 08/16/2016 03:04:11: 		Built by svcphil on Philly-Pool3
@@ -1077,7 +1077,7 @@ MPI Rank 1:
 MPI Rank 1: 08/16/2016 03:04:11: Creating virgin network.
 MPI Rank 1: Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 363] <- 0.000000.
 MPI Rank 1: Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 363] <- uniform(seed=1, range=0.050000*1.000000, onCPU=false).
-MPI Rank 1: Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==8
+MPI Rank 1: Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==8
 MPI Rank 1: Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 MPI Rank 1: Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 MPI Rank 1: Node 'W1' (LearnableParameter operation): Initializing Parameter[512 x 512] <- 0.000000.
@@ -1329,7 +1329,7 @@ MPI Rank 2: 08/16/2016 03:04:11: 		With 1bit-SGD: no
 MPI Rank 2: 08/16/2016 03:04:11: 		Math lib: mkl
 MPI Rank 2: 08/16/2016 03:04:11: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 MPI Rank 2: 08/16/2016 03:04:11: 		CUB_PATH: c:\src\cub-1.4.1
-MPI Rank 2: 08/16/2016 03:04:11: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+MPI Rank 2: 08/16/2016 03:04:11: 		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 MPI Rank 2: 08/16/2016 03:04:11: 		Build Branch: HEAD
 MPI Rank 2: 08/16/2016 03:04:11: 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 MPI Rank 2: 08/16/2016 03:04:11: 		Built by svcphil on Philly-Pool3
@@ -1691,7 +1691,7 @@ MPI Rank 2:
 MPI Rank 2: 08/16/2016 03:04:12: Creating virgin network.
 MPI Rank 2: Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 363] <- 0.000000.
 MPI Rank 2: Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 363] <- uniform(seed=1, range=0.050000*1.000000, onCPU=false).
-MPI Rank 2: Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==8
+MPI Rank 2: Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==8
 MPI Rank 2: Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 MPI Rank 2: Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 MPI Rank 2: Node 'W1' (LearnableParameter operation): Initializing Parameter[512 x 512] <- 0.000000.

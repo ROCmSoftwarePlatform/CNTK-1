@@ -20,7 +20,7 @@ Changed current directory to D:\GitHub\CNTK\Examples\Image\Miscellaneous\CIFAR-1
 09/29/2016 21:58:44: 		Math lib: mkl
 09/29/2016 21:58:44: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 09/29/2016 21:58:44: 		CUB_PATH: C:\src\cub-1.4.1
-09/29/2016 21:58:44: 		HIPDNN_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
+09/29/2016 21:58:44: 		CUDNN_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 09/29/2016 21:58:44: 		Build Branch: chazhang/image_examples
 09/29/2016 21:58:44: 		Build SHA1: e04f125298711fdaab8c60371888c62896780ffe (modified)
 09/29/2016 21:58:44: 		Built by chazhang on CHAZHANG
@@ -39,7 +39,7 @@ configparameters: 05_ConvLocal_ndl_deprecated.cntk:ConfigDir=D:\GitHub\CNTK\Test
 configparameters: 05_ConvLocal_ndl_deprecated.cntk:currentDirectory=D:\GitHub\CNTK\Examples\Image\Miscellaneous\CIFAR-10
 configparameters: 05_ConvLocal_ndl_deprecated.cntk:DataDir=D:\GitHub\CNTK\Examples\Image\Miscellaneous\CIFAR-10
 configparameters: 05_ConvLocal_ndl_deprecated.cntk:deviceId=0
-configparameters: 05_ConvLocal_ndl_deprecated.cntk:imageLayout=hipdnn
+configparameters: 05_ConvLocal_ndl_deprecated.cntk:imageLayout=cudnn
 configparameters: 05_ConvLocal_ndl_deprecated.cntk:ModelDir=C:\cygwin64\tmp\cntk-test-20160929135842.395780\Examples\Image\Deprecated\CIFAR-10_05_ConvLocal@release_gpu/Models
 configparameters: 05_ConvLocal_ndl_deprecated.cntk:modelPath=C:\cygwin64\tmp\cntk-test-20160929135842.395780\Examples\Image\Deprecated\CIFAR-10_05_ConvLocal@release_gpu/Models/05_ConvLocal
 configparameters: 05_ConvLocal_ndl_deprecated.cntk:ndlMacros=D:\GitHub\CNTK\Tests\EndToEndTests\Examples\Image\Deprecated\CIFAR-10\05_ConvLocal/../Macros.ndl
@@ -111,7 +111,7 @@ configparameters: 05_ConvLocal_ndl_deprecated.cntk:Train=[
 09/29/2016 21:58:44: 
 Creating virgin network.
 NDLBuilder Using GPU 0
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 conv1.c: using cuDNN convolution engine for geometry: Input: 32 x 32 x 3, Output: 32 x 32 x 64, Kernel: 5 x 5 x 3, Map: 1 x 1 x 64, Stride: 1 x 1 x 3, Sharing: (1), AutoPad: (1), LowerPad: 0, UpperPad: 0.
 pool1: using cuDNN convolution engine for geometry: Input: 32 x 32 x 64, Output: 15 x 15 x 64, Kernel: 3 x 3 x 1, Map: 1, Stride: 2 x 2 x 1, Sharing: (1), AutoPad: (0), LowerPad: 0, UpperPad: 0.
 conv2.c: using cuDNN convolution engine for geometry: Input: 15 x 15 x 64, Output: 15 x 15 x 64, Kernel: 5 x 5 x 64, Map: 1 x 1 x 64, Stride: 1 x 1 x 64, Sharing: (1), AutoPad: (1), LowerPad: 0, UpperPad: 0.

@@ -126,7 +126,7 @@
   <PropertyGroup Condition="'$(CudaVersion)' == '8.0'">
     <CudaPath>$(CUDA_PATH_V8_0)</CudaPath>
     <CudaRuntimeDll>cudart64_80.dll</CudaRuntimeDll>
-    <CudaDlls>hipblas64_80.dll;cusparse64_80.dll;hiprng64_80.dll;$(CudaRuntimeDll)</CudaDlls>
+    <CudaDlls>cublas64_80.dll;cusparse64_80.dll;curand64_80.dll;$(CudaRuntimeDll)</CudaDlls>
 
 <!-- Use NvidiaCompute to define nvcc target architectures (will generate code to support them all, i.e. fat-binary, in release mode)
     In debug mode we only include cubin/PTX for 30 and rely on PTX / JIT to generate the required native cubin format
@@ -141,7 +141,7 @@
   <PropertyGroup Condition="'$(CudaVersion)' == '7.5'">
     <CudaPath>$(CUDA_PATH_V7_5)</CudaPath>
     <CudaRuntimeDll>cudart64_75.dll</CudaRuntimeDll>
-    <CudaDlls>hipblas64_75.dll;cusparse64_75.dll;hiprng64_75.dll;$(CudaRuntimeDll)</CudaDlls>
+    <CudaDlls>cublas64_75.dll;cusparse64_75.dll;curand64_75.dll;$(CudaRuntimeDll)</CudaDlls>
 
     <NvidiaCompute Condition="$(DebugBuild)">$(CNTK_CUDA_CODEGEN_DEBUG)</NvidiaCompute>
     <NvidiaCompute Condition="$(DebugBuild) And '$(NvidiaCompute)'==''">compute_30,sm_30</NvidiaCompute>
@@ -151,7 +151,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <CudaLibs>cudart.lib;hipblas.lib;cusparse.lib;hiprng.lib</CudaLibs>
+    <CudaLibs>cudart.lib;cublas.lib;cusparse.lib;curand.lib</CudaLibs>
     <CudaInclude>$(CudaPath)\include</CudaInclude>
     <CudaLibPath>$(CudaPath)\lib\$(Platform)</CudaLibPath>
 

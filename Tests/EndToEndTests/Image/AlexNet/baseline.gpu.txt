@@ -21,7 +21,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 		CUB_PATH: C:\src\cub-1.4.1
-		HIPDNN_PATH: C:\local\hipdnn-8.0-v5.1\cuda
+		CUDNN_PATH: C:\local\cudnn-8.0-v5.1\cuda
 		Build Branch: chazhang/asym
 		Build SHA1: 937c03c0f998ee7c913884c3d35647a9bfda2845 (modified)
 		Built by chazhang on CHAZHANG
@@ -140,7 +140,7 @@ parallelTrain option is not enabled. ParallelTrain config will be ignored.
 04/14/2017 03:10:48: 
 Creating virgin network.
 NDLBuilder Using GPU 0
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 Node 'h2.W' (LearnableParameter operation): Initializating Parameter[4096 x 0] as gaussian later when dimensions are fully known.
 Node 'OutputNodes.W' (LearnableParameter operation): Initializating Parameter[1000 x 0] as gaussian later when dimensions are fully known.
 Node 'h2.W' (LearnableParameter operation) operation: Tensor shape was inferred as [4096 x 4096].

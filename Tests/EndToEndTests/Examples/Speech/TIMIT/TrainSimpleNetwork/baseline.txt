@@ -15,7 +15,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: c:\src\cub-1.4.1
-		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 		Build Branch: HEAD
 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 		Built by svcphil on Philly-Pool1
@@ -33,7 +33,7 @@ Changed current directory to C:\Data\CNTKTestData\Speech\ASR
 08/16/2016 03:20:53: 		Math lib: mkl
 08/16/2016 03:20:53: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 08/16/2016 03:20:53: 		CUB_PATH: c:\src\cub-1.4.1
-08/16/2016 03:20:53: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+08/16/2016 03:20:53: 		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 08/16/2016 03:20:53: 		Build Branch: HEAD
 08/16/2016 03:20:53: 		Build SHA1: 026b1e772b963461e189f8f00aa7ed6951298f84
 08/16/2016 03:20:53: 		Built by svcphil on Philly-Pool1
@@ -261,7 +261,7 @@ minibatchutterancesource: 3696 utterances grouped into 13 chunks, av. chunk size
 08/16/2016 03:20:56: Creating virgin network.
 Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 792] <- 0.000000.
 Node 'W0' (LearnableParameter operation): Initializing Parameter[512 x 792] <- uniform(seed=1, range=0.050000*1.000000, onCPU=false).
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 Node 'B0' (LearnableParameter operation): Initializing Parameter[512 x 1] <- 0.000000.
 Node 'W1' (LearnableParameter operation): Initializing Parameter[512 x 512] <- 0.000000.

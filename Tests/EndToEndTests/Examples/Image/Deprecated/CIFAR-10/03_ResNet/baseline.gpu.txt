@@ -21,7 +21,7 @@ Changed current directory to C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161
 12/15/2016 08:29:14: 		Math lib: mkl
 12/15/2016 08:29:14: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 12/15/2016 08:29:14: 		CUB_PATH: c:\src\cub-1.4.1
-12/15/2016 08:29:14: 		HIPDNN_PATH: C:\local\hipdnn-8.0-windows10-x64-v5.1
+12/15/2016 08:29:14: 		CUDNN_PATH: C:\local\cudnn-8.0-windows10-x64-v5.1
 12/15/2016 08:29:14: 		Build Branch: HEAD
 12/15/2016 08:29:14: 		Build SHA1: 5f1fabfe95e68af0787193f8849159f824d914d5 (modified)
 12/15/2016 08:29:14: 		Built by svcphil on liana-08-w
@@ -40,7 +40,7 @@ configparameters: 03_ResNet_ndl_deprecated.cntk:ConfigDir=C:\jenkins\workspace\C
 configparameters: 03_ResNet_ndl_deprecated.cntk:currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\Examples\Image\Deprecated\CIFAR-10_03_ResNet@release_gpu\TestData
 configparameters: 03_ResNet_ndl_deprecated.cntk:DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\Examples\Image\Deprecated\CIFAR-10_03_ResNet@release_gpu\TestData
 configparameters: 03_ResNet_ndl_deprecated.cntk:deviceId=0
-configparameters: 03_ResNet_ndl_deprecated.cntk:imageLayout=hipdnn
+configparameters: 03_ResNet_ndl_deprecated.cntk:imageLayout=cudnn
 configparameters: 03_ResNet_ndl_deprecated.cntk:initOnCPUOnly=true
 configparameters: 03_ResNet_ndl_deprecated.cntk:makeMode=true
 configparameters: 03_ResNet_ndl_deprecated.cntk:ModelDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20161215082658.690476\Examples\Image\Deprecated\CIFAR-10_03_ResNet@release_gpu/Models
@@ -138,7 +138,7 @@ parallelTrain option is not enabled. ParallelTrain config will be ignored.
 12/15/2016 08:29:14: 
 Creating virgin network.
 NDLBuilder Using GPU 0
-Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+Microsoft::MSR::CNTK::GPUMatrix<ElemType>::SetGaussianRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 
 OutputNodes.t Times operation: For legacy compatibility, the sample layout of left input (OutputNodes.W LearnableParameter operation) was patched to [10 x 1 x 1 x 64] (from [10 x 64])
 conv1.c.c.c: using cuDNN convolution engine for geometry: Input: 32 x 32 x 3, Output: 32 x 32 x 16, Kernel: 3 x 3 x 3, Map: 1 x 1 x 16, Stride: 1 x 1 x 3, Sharing: (1), AutoPad: (1), LowerPad: 0, UpperPad: 0.

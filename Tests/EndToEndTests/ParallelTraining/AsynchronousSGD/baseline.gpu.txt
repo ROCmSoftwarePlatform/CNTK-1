@@ -28,7 +28,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: /usr/local/cuda-8.0
 		CUB_PATH: /usr/local/cub-1.4.1
-		HIPDNN_PATH: /usr/local/hipdnn-5.1
+		CUDNN_PATH: /usr/local/cudnn-5.1
 		Build Branch: master
 		Build SHA1: e1f48f4c145ed8b7e34d064758d449a8e7cc46b5
 		Built by Source/CNTK/buildinfo.h$$0 on msraml-tesla03
@@ -60,7 +60,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: /usr/local/cuda-8.0
 		CUB_PATH: /usr/local/cub-1.4.1
-		HIPDNN_PATH: /usr/local/hipdnn-5.1
+		CUDNN_PATH: /usr/local/cudnn-5.1
 		Build Branch: master
 		Build SHA1: e1f48f4c145ed8b7e34d064758d449a8e7cc46b5
 		Built by Source/CNTK/buildinfo.h$$0 on msraml-tesla03
@@ -89,7 +89,7 @@ MPI Rank 0: configparameters: 03_ResNet-parallel.cntk:configName=ssgd
 MPI Rank 0: configparameters: 03_ResNet-parallel.cntk:DataDir=/home/qiwye/git/cntk/Examples/Image/DataSets/CIFAR-9
 MPI Rank 0: configparameters: 03_ResNet-parallel.cntk:DeviceId=0
 MPI Rank 0: configparameters: 03_ResNet-parallel.cntk:epochSize=13
-MPI Rank 0: configparameters: 03_ResNet-parallel.cntk:imageLayout=hipdnn
+MPI Rank 0: configparameters: 03_ResNet-parallel.cntk:imageLayout=cudnn
 MPI Rank 0: configparameters: 03_ResNet-parallel.cntk:initOnCPUOnly=true
 MPI Rank 0: configparameters: 03_ResNet-parallel.cntk:makeMode=true
 MPI Rank 0: configparameters: 03_ResNet-parallel.cntk:minibatch=256
@@ -659,7 +659,7 @@ MPI Rank 1: configparameters: 03_ResNet-parallel.cntk:configName=ssgd
 MPI Rank 1: configparameters: 03_ResNet-parallel.cntk:DataDir=/home/qiwye/git/cntk/Examples/Image/DataSets/CIFAR-10
 MPI Rank 1: configparameters: 03_ResNet-parallel.cntk:DeviceId=0
 MPI Rank 1: configparameters: 03_ResNet-parallel.cntk:epochSize=12
-MPI Rank 1: configparameters: 03_ResNet-parallel.cntk:imageLayout=hipdnn
+MPI Rank 1: configparameters: 03_ResNet-parallel.cntk:imageLayout=cudnn
 MPI Rank 1: configparameters: 03_ResNet-parallel.cntk:initOnCPUOnly=true
 MPI Rank 1: configparameters: 03_ResNet-parallel.cntk:makeMode=true
 MPI Rank 1: configparameters: 03_ResNet-parallel.cntk:minibatch=256

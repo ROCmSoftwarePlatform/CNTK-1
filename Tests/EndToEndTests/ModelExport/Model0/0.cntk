@@ -1,5 +1,5 @@
 # deviceId = 0
-# imageLayout = "hipdnn"
+# imageLayout = "cudnn"
 
  deviceId = -1
  imageLayout = "legacy"

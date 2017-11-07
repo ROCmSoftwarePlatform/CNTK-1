@@ -2,7 +2,7 @@
 
 . $TEST_DIR/../run-test-common
 
-cntkrun 02_BatchNormConv.cntk batchNormalizationEngine=hipdnn
+cntkrun 02_BatchNormConv.cntk batchNormalizationEngine=cudnn
 ExitCode=$?
 
 # Delete the test data if copied

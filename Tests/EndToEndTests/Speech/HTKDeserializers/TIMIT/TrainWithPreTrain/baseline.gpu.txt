@@ -20,7 +20,7 @@ Changed current directory to /home/philly/data/CNTKTestData/Speech/ASR
 12/20/2016 15:26:38: 		Math lib: mkl
 12/20/2016 15:26:38: 		CUDA_PATH: /usr/local/cuda-8.0
 12/20/2016 15:26:38: 		CUB_PATH: /usr/local/cub-1.4.1
-12/20/2016 15:26:38: 		HIPDNN_PATH: /usr/local
+12/20/2016 15:26:38: 		CUDNN_PATH: /usr/local
 12/20/2016 15:26:38: 		Build Branch: HEAD
 12/20/2016 15:26:38: 		Build SHA1: bf0ca998cd077aa28c04371fd2093770e819ffd0
 12/20/2016 15:26:38: 		Built by Source/CNTK/buildinfo.h$$0 on b4b39bc07965
@@ -144,7 +144,7 @@ configparameters: TIMIT_TrainWithPreTrain_ndl_deprecated.cntk:traceLevel=1
 12/20/2016 15:26:39: 
 Creating virgin network.
 NDLBuilder Using GPU 0
-SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 Reading script file /home/philly/data/CNTKTestData/Speech/ASR/TIMIT.train.scp.fbank.fullpath.rnn ... 3696 entries
 HTKDataDeserializer::HTKDataDeserializer: selected 3696 utterances grouped into 13 chunks, average chunk size: 284.3 utterances, 86524.8 frames (for I/O: 284.3 utterances, 86524.8 frames)
 HTKDataDeserializer::HTKDataDeserializer: determined feature kind as 72-dimensional 'FBANK_D_A_Z' with frame shift 10.0 ms

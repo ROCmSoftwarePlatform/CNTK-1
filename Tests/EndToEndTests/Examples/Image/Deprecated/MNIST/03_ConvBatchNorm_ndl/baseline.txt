@@ -3,7 +3,7 @@ CPU info:
     Hardware threads: 24
     Total Memory: 268381192 kB
 -------------------------------------------------------------------
-=== Running /cygdrive/c/jenkins/workspace/CNTK-Test-Windows-W1/x64/release/cntk.exe configFile=C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\MNIST\Config\Ndl_deprecated/03_ConvBatchNorm_ndl_deprecated.cntk currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu\TestData RunDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu\TestData ConfigDir=C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\MNIST\Config\Ndl_deprecated OutputDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu DeviceId=0 timestamping=true train=[SGD=[maxEpochs=3]] imageLayout="hipdnn" stderr=-
+=== Running /cygdrive/c/jenkins/workspace/CNTK-Test-Windows-W1/x64/release/cntk.exe configFile=C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\MNIST\Config\Ndl_deprecated/03_ConvBatchNorm_ndl_deprecated.cntk currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu\TestData RunDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu\TestData ConfigDir=C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\MNIST\Config\Ndl_deprecated OutputDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu DeviceId=0 timestamping=true train=[SGD=[maxEpochs=3]] imageLayout="cudnn" stderr=-
 -------------------------------------------------------------------
 Build info: 
 
@@ -15,7 +15,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: C:\src\cub-1.4.1
-		HIPDNN_PATH: c:\NVIDIA\hipdnn-5.1\cuda
+		CUDNN_PATH: c:\NVIDIA\cudnn-5.1\cuda
 		Build Branch: HEAD
 		Build SHA1: dc27f22964e37ed721e445787ed58be17efe8f24
 		Built by svcphil on liana-08-w
@@ -34,7 +34,7 @@ Changed current directory to C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160
 09/13/2016 08:53:50: 		Math lib: mkl
 09/13/2016 08:53:50: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 09/13/2016 08:53:50: 		CUB_PATH: C:\src\cub-1.4.1
-09/13/2016 08:53:50: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-5.1\cuda
+09/13/2016 08:53:50: 		CUDNN_PATH: c:\NVIDIA\cudnn-5.1\cuda
 09/13/2016 08:53:50: 		Build Branch: HEAD
 09/13/2016 08:53:50: 		Build SHA1: dc27f22964e37ed721e445787ed58be17efe8f24
 09/13/2016 08:53:50: 		Built by svcphil on liana-08-w
@@ -50,7 +50,7 @@ Changed current directory to C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160
 
 09/13/2016 08:53:51: Running on DPHAIM-22 at 2016/09/13 08:53:51
 09/13/2016 08:53:51: Command line: 
-C:\jenkins\workspace\CNTK-Test-Windows-W1\x64\release\cntk.exe  configFile=C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\MNIST\Config\Ndl_deprecated/03_ConvBatchNorm_ndl_deprecated.cntk  currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu\TestData  RunDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu  DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu\TestData  ConfigDir=C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\MNIST\Config\Ndl_deprecated  OutputDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu  DeviceId=0  timestamping=true  train=[SGD=[maxEpochs=3]]  imageLayout="hipdnn"  stderr=-
+C:\jenkins\workspace\CNTK-Test-Windows-W1\x64\release\cntk.exe  configFile=C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\MNIST\Config\Ndl_deprecated/03_ConvBatchNorm_ndl_deprecated.cntk  currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu\TestData  RunDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu  DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu\TestData  ConfigDir=C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\MNIST\Config\Ndl_deprecated  OutputDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu  DeviceId=0  timestamping=true  train=[SGD=[maxEpochs=3]]  imageLayout="cudnn"  stderr=-
 
 
 Configuration After Processing and Variable Resolution:
@@ -60,7 +60,7 @@ configparameters: 03_ConvBatchNorm_ndl_deprecated.cntk:ConfigDir=C:\jenkins\work
 configparameters: 03_ConvBatchNorm_ndl_deprecated.cntk:currentDirectory=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu\TestData
 configparameters: 03_ConvBatchNorm_ndl_deprecated.cntk:DataDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu\TestData
 configparameters: 03_ConvBatchNorm_ndl_deprecated.cntk:deviceId=0
-configparameters: 03_ConvBatchNorm_ndl_deprecated.cntk:imageLayout=hipdnn
+configparameters: 03_ConvBatchNorm_ndl_deprecated.cntk:imageLayout=cudnn
 configparameters: 03_ConvBatchNorm_ndl_deprecated.cntk:ModelDir=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu/Models
 configparameters: 03_ConvBatchNorm_ndl_deprecated.cntk:modelPath=C:\Users\svcphil\AppData\Local\Temp\cntk-test-20160913085011.264477\Examples\Image\MNIST_03_ConvBatchNorm_ndl@release_gpu/Models/03_ConvBatchNorm
 configparameters: 03_ConvBatchNorm_ndl_deprecated.cntk:numMBsToShowResult=500
@@ -94,7 +94,7 @@ configparameters: 03_ConvBatchNorm_ndl_deprecated.cntk:traceLevel=1
 configparameters: 03_ConvBatchNorm_ndl_deprecated.cntk:train=[
     action = "train"
     NDLNetworkBuilder = [
-        imageLayout = "hipdnn"
+        imageLayout = "cudnn"
         initOnCPUOnly=true
         ndlMacros = "C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\MNIST\Config\Ndl_deprecated/Macros.ndl"
         networkDescription = "C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\Image\MNIST\Config\Ndl_deprecated/03_ConvBatchNorm.ndl"

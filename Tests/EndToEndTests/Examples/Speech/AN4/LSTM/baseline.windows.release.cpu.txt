@@ -9,7 +9,7 @@ Build info:
 		With 1bit-SGD: no
 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 		CUB_PATH: c:\src\cub-1.4.1
-		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 		Build Branch: HEAD
 		Build SHA1: af96f7cce6c3c78a4f1e9315e061291c79360e12
 		Built by svcphil on cntk-muc01
@@ -26,7 +26,7 @@ Changed current directory to C:\jenkins\workspace\CNTK-Test-Windows-W1\Examples\
 05/03/2016 13:22:28: 		With 1bit-SGD: no
 05/03/2016 13:22:28: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
 05/03/2016 13:22:28: 		CUB_PATH: c:\src\cub-1.4.1
-05/03/2016 13:22:28: 		HIPDNN_PATH: c:\NVIDIA\hipdnn-4.0\cuda
+05/03/2016 13:22:28: 		CUDNN_PATH: c:\NVIDIA\cudnn-4.0\cuda
 05/03/2016 13:22:28: 		Build Branch: HEAD
 05/03/2016 13:22:28: 		Build SHA1: af96f7cce6c3c78a4f1e9315e061291c79360e12
 05/03/2016 13:22:28: 		Built by svcphil on cntk-muc01

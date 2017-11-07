@@ -39,7 +39,7 @@ struct DataFixture
         m_testDataPath = m_parentPath + "/../../Tests/UnitTests/NetworkTests";
 #else
         // The executable path on Linux is e.g. <cntk>/build/cpu/release/bin/
-        m_testDataPath = m_parentPath + "/../../../Tests/UnitTests/NetworkTests";
+        m_testDataPath = m_parentPath + "/../../../../Tests/UnitTests/NetworkTests";
 #endif
         boost::filesystem::path absTestPath(m_testDataPath);
         absTestPath = boost::filesystem::canonical(absTestPath);

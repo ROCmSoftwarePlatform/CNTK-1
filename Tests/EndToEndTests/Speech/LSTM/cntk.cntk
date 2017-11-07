@@ -39,7 +39,7 @@ speechCreate = {
         # define the model function
         # We define three functions here
 
-        # hipdnn5 library
+        # cudnn5 library
         # Note: does not run in truncated mode
         modelUsingCuDNN5 = Sequential
         (
@@ -48,9 +48,9 @@ speechCreate = {
             DenseLayer {labelDim, init='heUniform', initValueScale=1/3}
         )
 
-        # layers library emulation of hipdnn5 above
+        # layers library emulation of cudnn5 above
         # differences:
-        #  - hipDNN.has 2 biases for every bias, for unknown reasons
+        #  - cudnn has 2 biases for every bias, for unknown reasons
         modelUsingLayersLikeCuDNN5 = Sequential
         (
             MeanVarNorm :

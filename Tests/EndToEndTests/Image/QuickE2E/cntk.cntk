@@ -21,7 +21,7 @@ train = [
         // macros
         ConvReLULayer(inp, outMap, inMap, inWCount, kW, kH, hStride, vStride, wScale, bValue) = [  // ReLU non-linearity
             convW = Parameter(outMap, inWCount, init="uniform", initValueScale=wScale, initOnCPUOnly=true)
-            conv = Convolution(convW, inp, (kW : kH : inMap), mapDims=outMap, stride=(hStride : vStride : inMap), autoPadding=false, imageLayout="hipdnn")
+            conv = Convolution(convW, inp, (kW : kH : inMap), mapDims=outMap, stride=(hStride : vStride : inMap), autoPadding=false, imageLayout="cudnn")
             convB = ParameterTensor((1 : 1 : outMap), init="fixedValue", value=bValue)
             convPlusB = conv + convB;
             out = RectifiedLinear(convPlusB);
@@ -44,7 +44,7 @@ train = [
         imageH = 28
         labelDim = 10
 
-        features = ImageInput(imageW, imageH, 1, imageLayout="hipdnn", tag="feature")
+        features = ImageInput(imageW, imageH, 1, imageLayout="cudnn", tag="feature")
         featScale = Constant(0.00390625)
         featScaled = Scale(featScale, features)
         labels = Input(labelDim, tag="label")
@@ -63,7 +63,7 @@ train = [
         pool1H = 2
         pool1hStride = 2
         pool1vStride = 2
-        pool1 = MaxPooling(conv1_act, pool1W, pool1H, pool1hStride, pool1vStride, imageLayout="hipdnn")
+        pool1 = MaxPooling(conv1_act, pool1W, pool1H, pool1hStride, pool1vStride, imageLayout="cudnn")
 
         # conv2
         kW2 = 5
@@ -79,7 +79,7 @@ train = [
         pool2H = 2
         pool2hStride = 2
         pool2vStride = 2
-        pool2 = AveragePooling(conv2_act, pool2W, pool2H, pool2hStride, pool2vStride, imageLayout="hipdnn")
+        pool2 = AveragePooling(conv2_act, pool2W, pool2H, pool2hStride, pool2vStride, imageLayout="cudnn")
 
         h1Dim = 128
         h1 = DNNSigmoidLayer(4 * 4 * cMap2, h1Dim, FlattenDimensions (pool2, 1, 3), 1).out

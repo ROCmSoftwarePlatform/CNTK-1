@@ -26,7 +26,7 @@ ping [mpihelper]: 1 nodes pinging each other
 04/18/2017 06:26:47: 		Math lib: mkl
 04/18/2017 06:26:47: 		CUDA_PATH: /usr/local/cuda-8.0
 04/18/2017 06:26:47: 		CUB_PATH: /usr/local/cub-1.4.1
-04/18/2017 06:26:47: 		HIPDNN_PATH: /usr/local/hipdnn-5.1
+04/18/2017 06:26:47: 		CUDNN_PATH: /usr/local/cudnn-5.1
 04/18/2017 06:26:47: 		Build Branch: fcn_test
 04/18/2017 06:26:47: 		Build SHA1: 351a329b40cd85556eac8aa837ceec8883a77c82
 04/18/2017 06:26:47: 		Built by Source/CNTK/buildinfo.h$$0 on ASAUDGPU1
@@ -218,9 +218,9 @@ configparameters: fcn.cntk:TrainFCN8=[
         imageChannels = 1
         featureChannels = 16
         bnTimeConst = 15992
-        features = ImageInput(imageWidth, imageHeight, imageChannels, imageLayout = "hipdnn", tag = 'feature')
-        labels = ImageInput(imageWidth, imageHeight, classCount, imageLayout = "hipdnn", tag = 'label')
-        ignoreMask = ImageInput(imageWidth, imageHeight, 1, imageLayout = "hipdnn", tag = 'feature')
+        features = ImageInput(imageWidth, imageHeight, imageChannels, imageLayout = "cudnn", tag = 'feature')
+        labels = ImageInput(imageWidth, imageHeight, classCount, imageLayout = "cudnn", tag = 'label')
+        ignoreMask = ImageInput(imageWidth, imageHeight, 1, imageLayout = "cudnn", tag = 'feature')
         featuresFCN4 = Sequential(
             ConvBNReLULayer{featureChannels, /*kernel*/ (7:7), /*stride*/ (2:2), bnTimeConst} :
             MaxPoolingLayer{(3:3), stride = 2, pad = true})(features)

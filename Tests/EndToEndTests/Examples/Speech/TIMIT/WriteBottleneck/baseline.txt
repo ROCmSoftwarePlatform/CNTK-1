@@ -10,7 +10,7 @@ Build info:
 		Math lib: acml
 		CUDA_PATH: /usr/local/cuda-7.5
 		CUB_PATH: /usr/local/cub-1.4.1
-		HIPDNN_PATH: /usr/local/hipdnn-4.0
+		CUDNN_PATH: /usr/local/cudnn-4.0
 		Build Branch: HEAD
 		Build SHA1: af96f7cce6c3c78a4f1e9315e061291c79360e12
 		Built by philly on 0dab4a802707
@@ -28,7 +28,7 @@ Changed current directory to /hdfs/public/CNTKTestData/Speech/ASR
 05/03/2016 21:42:53: 		Math lib: acml
 05/03/2016 21:42:53: 		CUDA_PATH: /usr/local/cuda-7.5
 05/03/2016 21:42:53: 		CUB_PATH: /usr/local/cub-1.4.1
-05/03/2016 21:42:53: 		HIPDNN_PATH: /usr/local/hipdnn-4.0
+05/03/2016 21:42:53: 		CUDNN_PATH: /usr/local/cudnn-4.0
 05/03/2016 21:42:53: 		Build Branch: HEAD
 05/03/2016 21:42:53: 		Build SHA1: af96f7cce6c3c78a4f1e9315e061291c79360e12
 05/03/2016 21:42:53: 		Built by philly on 0dab4a802707
@@ -224,7 +224,7 @@ minibatchutterancesource: 3696 utterances grouped into 13 chunks, av. chunk size
 minibatchutterancesource: 3696 utterances grouped into 13 chunks, av. chunk size: 284.3 utterances, 86524.8 frames
 
 05/03/2016 21:42:53: Creating virgin network.
-SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 
 Post-processing network...
 
@@ -11503,7 +11503,7 @@ Build info:
 		Math lib: acml
 		CUDA_PATH: /usr/local/cuda-7.5
 		CUB_PATH: /usr/local/cub-1.4.1
-		HIPDNN_PATH: /usr/local/hipdnn-4.0
+		CUDNN_PATH: /usr/local/cudnn-4.0
 		Build Branch: HEAD
 		Build SHA1: af96f7cce6c3c78a4f1e9315e061291c79360e12
 		Built by philly on 0dab4a802707
@@ -11521,7 +11521,7 @@ Changed current directory to /tmp/cntk-test-20160503203259.917128/Examples/Speec
 05/03/2016 21:52:46: 		Math lib: acml
 05/03/2016 21:52:46: 		CUDA_PATH: /usr/local/cuda-7.5
 05/03/2016 21:52:46: 		CUB_PATH: /usr/local/cub-1.4.1
-05/03/2016 21:52:46: 		HIPDNN_PATH: /usr/local/hipdnn-4.0
+05/03/2016 21:52:46: 		CUDNN_PATH: /usr/local/cudnn-4.0
 05/03/2016 21:52:46: 		Build Branch: HEAD
 05/03/2016 21:52:46: 		Build SHA1: af96f7cce6c3c78a4f1e9315e061291c79360e12
 05/03/2016 21:52:46: 		Built by philly on 0dab4a802707

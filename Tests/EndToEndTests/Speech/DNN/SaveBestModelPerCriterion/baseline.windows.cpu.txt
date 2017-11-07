@@ -36,7 +36,7 @@ MPI Rank 0: 		With ASGD: yes
 MPI Rank 0: 		Math lib: mkl
 MPI Rank 0: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 MPI Rank 0: 		CUB_PATH: D:\source\CNTK_exp_private\vc140\\cub\1.4.1
-MPI Rank 0: 		HIPDNN_PATH: D:\source\CNTK_exp_private\vc140\\hipdnn\5.1\cuda
+MPI Rank 0: 		CUDNN_PATH: D:\source\CNTK_exp_private\vc140\\cudnn\5.1\cuda
 MPI Rank 0: 		Build Branch: gorand/criterion_ckp_1_master_public_3
 MPI Rank 0: 		Build SHA1: ad93b7be698d3b53f01385e76706254d6510a018
 MPI Rank 0: 		Built by gorand on mdcs-gorand
@@ -403,7 +403,7 @@ MPI Rank 1: 		With ASGD: yes
 MPI Rank 1: 		Math lib: mkl
 MPI Rank 1: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 MPI Rank 1: 		CUB_PATH: D:\source\CNTK_exp_private\vc140\\cub\1.4.1
-MPI Rank 1: 		HIPDNN_PATH: D:\source\CNTK_exp_private\vc140\\hipdnn\5.1\cuda
+MPI Rank 1: 		CUDNN_PATH: D:\source\CNTK_exp_private\vc140\\cudnn\5.1\cuda
 MPI Rank 1: 		Build Branch: gorand/criterion_ckp_1_master_public_3
 MPI Rank 1: 		Build SHA1: ad93b7be698d3b53f01385e76706254d6510a018
 MPI Rank 1: 		Built by gorand on mdcs-gorand
@@ -771,7 +771,7 @@ MPI Rank 0: 		With ASGD: yes
 MPI Rank 0: 		Math lib: mkl
 MPI Rank 0: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 MPI Rank 0: 		CUB_PATH: D:\source\CNTK_exp_private\vc140\\cub\1.4.1
-MPI Rank 0: 		HIPDNN_PATH: D:\source\CNTK_exp_private\vc140\\hipdnn\5.1\cuda
+MPI Rank 0: 		CUDNN_PATH: D:\source\CNTK_exp_private\vc140\\cudnn\5.1\cuda
 MPI Rank 0: 		Build Branch: gorand/criterion_ckp_1_master_public_3
 MPI Rank 0: 		Build SHA1: ad93b7be698d3b53f01385e76706254d6510a018
 MPI Rank 0: 		Built by gorand on mdcs-gorand
@@ -861,7 +861,7 @@ MPI Rank 1: 		With ASGD: yes
 MPI Rank 1: 		Math lib: mkl
 MPI Rank 1: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 MPI Rank 1: 		CUB_PATH: D:\source\CNTK_exp_private\vc140\\cub\1.4.1
-MPI Rank 1: 		HIPDNN_PATH: D:\source\CNTK_exp_private\vc140\\hipdnn\5.1\cuda
+MPI Rank 1: 		CUDNN_PATH: D:\source\CNTK_exp_private\vc140\\cudnn\5.1\cuda
 MPI Rank 1: 		Build Branch: gorand/criterion_ckp_1_master_public_3
 MPI Rank 1: 		Build SHA1: ad93b7be698d3b53f01385e76706254d6510a018
 MPI Rank 1: 		Built by gorand on mdcs-gorand

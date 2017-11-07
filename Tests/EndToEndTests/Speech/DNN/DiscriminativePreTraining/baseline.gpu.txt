@@ -20,7 +20,7 @@ Changed current directory to /home/philly/jenkins/workspace/CNTK-Test-Linux-W1/T
 12/20/2016 16:01:46: 		Math lib: mkl
 12/20/2016 16:01:46: 		CUDA_PATH: /usr/local/cuda-8.0
 12/20/2016 16:01:46: 		CUB_PATH: /usr/local/cub-1.4.1
-12/20/2016 16:01:46: 		HIPDNN_PATH: /usr/local
+12/20/2016 16:01:46: 		CUDNN_PATH: /usr/local
 12/20/2016 16:01:46: 		Build Branch: HEAD
 12/20/2016 16:01:46: 		Build SHA1: bf0ca998cd077aa28c04371fd2093770e819ffd0
 12/20/2016 16:01:46: 		Built by Source/CNTK/buildinfo.h$$0 on b4b39bc07965
@@ -149,7 +149,7 @@ configparameters: cntk_dpt.cntk:traceLevel=1
 12/20/2016 16:01:47: 
 Creating virgin network.
 NDLBuilder Using GPU 0
-SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 reading script file /home/philly/jenkins/workspace/CNTK-Test-Linux-W1/Tests/EndToEndTests/Speech/Data/glob_0000.scp ... 948 entries
 total 132 state names in state list /home/philly/jenkins/workspace/CNTK-Test-Linux-W1/Tests/EndToEndTests/Speech/Data/state.list
 htkmlfreader: reading MLF file /home/philly/jenkins/workspace/CNTK-Test-Linux-W1/Tests/EndToEndTests/Speech/Data/glob_0000.mlf ... total 948 entries

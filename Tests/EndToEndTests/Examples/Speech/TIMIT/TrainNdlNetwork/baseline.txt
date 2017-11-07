@@ -15,7 +15,7 @@ Build info:
 		Math lib: mkl
 		CUDA_PATH: /usr/local/cuda-7.5
 		CUB_PATH: /usr/local/cub-1.4.1
-		HIPDNN_PATH: /usr/local/hipdnn-4.0
+		CUDNN_PATH: /usr/local/cudnn-4.0
 		Build Branch: HEAD
 		Build SHA1: 6cfa51679f61f9d1bdabd997330c1c3ba8b3d085
 		Built by philly on 643085f7f8c2
@@ -33,7 +33,7 @@ Changed current directory to /home/philly/data/CNTKTestData/Speech/ASR
 08/16/2016 14:25:35: 		Math lib: mkl
 08/16/2016 14:25:35: 		CUDA_PATH: /usr/local/cuda-7.5
 08/16/2016 14:25:35: 		CUB_PATH: /usr/local/cub-1.4.1
-08/16/2016 14:25:35: 		HIPDNN_PATH: /usr/local/hipdnn-4.0
+08/16/2016 14:25:35: 		CUDNN_PATH: /usr/local/cudnn-4.0
 08/16/2016 14:25:35: 		Build Branch: HEAD
 08/16/2016 14:25:35: 		Build SHA1: 6cfa51679f61f9d1bdabd997330c1c3ba8b3d085
 08/16/2016 14:25:35: 		Built by philly on 643085f7f8c2
@@ -258,7 +258,7 @@ Node 'CE.BFF.B' (LearnableParameter operation): Initializing Parameter[183] <- 0
 Node 'CE.BFF.W' (LearnableParameter operation): Initializing Parameter[183 x 512] <- 0.000000.
 Node 'L1.BFF.B' (LearnableParameter operation): Initializing Parameter[512] <- 0.000000.
 Node 'L1.BFF.W' (LearnableParameter operation): Initializing Parameter[512 x 792] <- uniform(seed=1, range=0.050000*1.000000, onCPU=false).
-SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 Node 'L2.BFF.B' (LearnableParameter operation): Initializing Parameter[512] <- 0.000000.
 Node 'L2.BFF.W' (LearnableParameter operation): Initializing Parameter[512 x 512] <- uniform(seed=2, range=0.050000*1.000000, onCPU=false).
 Node 'L3.BFF.B' (LearnableParameter operation): Initializing Parameter[512] <- 0.000000.

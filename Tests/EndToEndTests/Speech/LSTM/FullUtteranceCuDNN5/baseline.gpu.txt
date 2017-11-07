@@ -20,7 +20,7 @@ Changed current directory to C:\jenkins\workspace\CNTK-Test-Windows-SlaveTest\Te
 12/20/2016 15:31:06: 		Math lib: mkl
 12/20/2016 15:31:06: 		CUDA_PATH: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0
 12/20/2016 15:31:06: 		CUB_PATH: c:\src\cub-1.4.1
-12/20/2016 15:31:06: 		HIPDNN_PATH: C:\local\hipdnn-8.0-windows10-x64-v5.1
+12/20/2016 15:31:06: 		CUDNN_PATH: C:\local\cudnn-8.0-windows10-x64-v5.1
 12/20/2016 15:31:06: 		Build Branch: HEAD
 12/20/2016 15:31:06: 		Build SHA1: bbb4406fcb69b190109ec665d8c0a619271f1b24 (modified)
 12/20/2016 15:31:06: 		Built by svcphil on liana-08-w

@@ -20,7 +20,7 @@ Changed current directory to /home/philly/jenkins/workspace/CNTK-Test-Linux-Slav
 12/21/2016 09:08:07: 		Math lib: mkl
 12/21/2016 09:08:07: 		CUDA_PATH: /usr/local/cuda-8.0
 12/21/2016 09:08:07: 		CUB_PATH: /usr/local/cub-1.4.1
-12/21/2016 09:08:07: 		HIPDNN_PATH: /usr/local
+12/21/2016 09:08:07: 		CUDNN_PATH: /usr/local
 12/21/2016 09:08:07: 		Build Branch: HEAD
 12/21/2016 09:08:07: 		Build SHA1: bbb4406fcb69b190109ec665d8c0a619271f1b24
 12/21/2016 09:08:07: 		Built by Source/CNTK/buildinfo.h$$0 on 3165e53f9498
@@ -366,7 +366,7 @@ configparameters: rnn.cntk:writeWordAndClassInfo=[
 12/21/2016 09:08:08: 
 Creating virgin network.
 SimpleNetworkBuilder Using GPU 0
-SetUniformRandomValue (GPU): creating hiprng object with seed 1, sizeof(ElemType)==4
+SetUniformRandomValue (GPU): creating curand object with seed 1, sizeof(ElemType)==4
 LMSequenceReader: Label mapping will be created internally on the fly because the labelMappingFile was not found: /tmp/cntk-test-20161221090730.158669/Examples/Text/PennTreebank_RNN@release_gpu/sentenceLabels.txt
 LMSequenceReader: Label mapping will be created internally on the fly because the labelMappingFile was not found: /tmp/cntk-test-20161221090730.158669/Examples/Text/PennTreebank_RNN@release_gpu/sentenceLabels.out.txt
 LMSequenceReader: Label mapping will be created internally on the fly because the labelMappingFile was not found: /tmp/cntk-test-20161221090730.158669/Examples/Text/PennTreebank_RNN@release_gpu/sentenceLabels.out.txt
