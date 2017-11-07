@@ -10,7 +10,7 @@
 configure=$0
 build_top=$PWD
 root_dir=$(dirname "$(readlink -f "$0")")
-external_dir=$root_dir/External/HIP3
+external_dir=$root_dir/External/HIP
 
 cuda_path=
 cuda_check=include/cuda.h
