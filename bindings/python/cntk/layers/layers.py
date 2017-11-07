@@ -1237,7 +1237,7 @@ def BatchNormalization(map_rank=default_override_or(None),  # if given then norm
     def batch_normalize(x):
         return batch_normalization(x, scale, bias, run_mean, run_variance, running_count=run_count,
                                    spatial=map_rank == 1, normalization_time_constant=normalization_time_constant, blend_time_constant=blend_time_constant, epsilon=epsilon,
-                                   use_hipdnn_engine=not use_cntk_engine)
+                                   use_cudnn_engine=not use_cntk_engine)
 
     return batch_normalize
 

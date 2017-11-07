@@ -52,7 +52,7 @@ def convert(root_func, filter, converter):
         if not function_to_convert.output in root_func.outputs:            
             root_func = root_func.clone(C.CloneMethod.share, {function_to_convert.output : converted.output})
         else:
-            # if hipdnn_rnn output is the root_func output, just use converted as root_func and no clone needed
+            # if cudnn_rnn output is the root_func output, just use converted as root_func and no clone needed
             if len(root_func.outputs) > 1:
                 root_func = C.combine([converted if x == function_to_convert.output else x for x in root_func.outputs])
             else:
