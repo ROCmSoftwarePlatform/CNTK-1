@@ -101,30 +101,27 @@ void Bundler::CreateChunkDescriptions()
             bool isValid = true;
             size_t sequenceSamples = sequence.m_numberOfSamples;
 
+            // Need to check the sequence length for all deserializers and create
+            // mapping for chunks.
+            for (size_t deserializerIndex = 1; deserializerIndex < m_deserializers.size(); ++deserializerIndex)
+            {
+                isValid = m_deserializers[deserializerIndex]->GetSequenceInfo(sequenceDescriptions[sequenceIndex], s);
+                if (!isValid)
+                {
+                    invalid.insert(sequenceIndex);
+                    break;
+                }
+
+                sequenceSamples = std::max<size_t>(sequenceSamples, s.m_numberOfSamples);
+                if (std::find(secondaryChunks[deserializerIndex].begin(), secondaryChunks[deserializerIndex].end(), s.m_chunkId) == secondaryChunks[deserializerIndex].end())
+                    secondaryChunks[deserializerIndex].push_back(s.m_chunkId);
+            }
+
             if (m_mbDefiningDeserializer != std::numeric_limits<size_t>::max())
             {
                 // Pick up the sequence from the main deserializer.
                 if (m_deserializers[m_mbDefiningDeserializer]->GetSequenceInfo(sequenceDescriptions[sequenceIndex], s))
                     sequenceSamples = s.m_numberOfSamples;
-                else
-                    invalid.insert(sequenceIndex);
-            }
-            else
-            {
-                // Need to check the sequence length for all deserializers.
-                for (size_t deserializerIndex = 1; deserializerIndex < m_deserializers.size(); ++deserializerIndex)
-                {
-                    isValid = m_deserializers[deserializerIndex]->GetSequenceInfo(sequenceDescriptions[sequenceIndex], s);
-                    if (!isValid)
-                    {
-                        invalid.insert(sequenceIndex);
-                        break;
-                    }
-
-                    sequenceSamples = std::max<size_t>(sequenceSamples, s.m_numberOfSamples);
-                    if (std::find(secondaryChunks[deserializerIndex].begin(), secondaryChunks[deserializerIndex].end(), s.m_chunkId) == secondaryChunks[deserializerIndex].end())
-                        secondaryChunks[deserializerIndex].push_back(s.m_chunkId);
-                }
             }
 
             if (isValid)
