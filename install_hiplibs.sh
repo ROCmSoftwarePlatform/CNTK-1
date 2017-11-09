@@ -60,7 +60,9 @@ if [ "$hipRepo" == "1" ]; then
 else
 	echo -e "\n--------------------- CLONING HIP ---------------------\n"
 	git clone https://github.com/ROCm-Developer-Tools/HIP.git
-	cd HIP && mkdir $build_dir -p && cd $build_dir && $cmake_it/hip .. && make && make install && cd ../../
+	cd HIP && mkdir $build_dir -p && cd $build_dir
+	$cmake_it/hip .. && make && make install
+	cd $rootDir/$externalDir
 fi
 
 #platform deducing
@@ -79,7 +81,9 @@ if [ "$platform" == "hcc" ]; then
 	else
 		echo -e "\n--------------------- CLONING rocBLAS ---------------------\n"
 		$clone/rocBLAS.git
-                cd rocBLAS && mkdir $build_dir -p && cd $build_dir && $cmake_it/rocblas .. && make && make install && cd ../../	
+                cd rocBLAS && mkdir $build_dir -p && cd $build_dir
+		$cmake_it/rocblas .. && make && make install
+		cd $rootDir/$externalDir
 	fi
 fi
 
@@ -100,7 +104,7 @@ do
         else
             make INSTALL_DIR=../hipDNN
         fi
-        cd ../../
+        cd $rootDir/$externalDir
     fi
 done
 
@@ -112,6 +116,7 @@ else
     git clone https://github.com/ROCmSoftwarePlatform/cub-hip.git
     git checkout developer-cub-hip
     git checkout 3effedd23f4e80ccec5d0808d8349f7d570e488e
+    cd $rootDir/$externalDir
 fi
 
 #copying shared objects
