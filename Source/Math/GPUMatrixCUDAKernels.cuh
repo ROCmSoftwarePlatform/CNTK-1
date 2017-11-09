@@ -7254,7 +7254,12 @@ __global__ void _adadelta4BlockSparseCol(CUDA_LONG size,
     ElemType learningRate, ElemType rho, ElemType epsilon, 
     const int* timestamps, int currentTimestamp)
 {
+#ifdef CUDA_COMPILE
     auto sparseIndex = blockDim.x * blockIdx.x + threadIdx.x;
+#elif defined HIP_COMPILE
+    auto sparseIndex = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+#endif
+
     if (sparseIndex >= size)
         return;
     auto blockid = sparseIndex / numRows;
@@ -7283,7 +7288,12 @@ template <class ElemType>
 __global__ void _adadeltaFlush(CUDA_LONG N, size_t rows, ElemType* smoothAda, ElemType* smoothX2, 
     ElemType rho, int* timestamps, int currentTimestamp)
 {
+#ifdef CUDA_COMPILE
     auto col = blockIdx.x * blockDim.x + threadIdx.x;
+#elif defined HIP_COMPILE
+    auto col = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+#endif
+
     if (col >= N)
         return;
     
