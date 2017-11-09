@@ -125,7 +125,7 @@ protected:
         cudnnBatchNormMode_t mode = m_spatial ? CUDNN_BATCHNORM_SPATIAL : CUDNN_BATCHNORM_PER_ACTIVATION;
         // REVIEW alexeyk: change betaParamDiff to 1 and update CNTK BN engine.
         CUDNN_CALL(cudnnBatchNormalizationBackward(*m_cudnn, mode, &C::One, accumulateDataGrad ? &C::One : &C::Zero, &C::One, &C::Zero, m_inOutCuDnnT, ptr(in), m_inOutCuDnnT, ptr(srcGrad), m_inOutCuDnnT, ptr(grad),
-                                                                       m_scaleBiasCuDnnT, ptr(scale), ptr(scaleGrad), ptr(biasGrad), m_cudnnEpsilon, ptr(savedMean), ptr(savedInvStdDev)));
+                                                   m_scaleBiasCuDnnT, ptr(scale), ptr(scaleGrad), ptr(biasGrad), m_cudnnEpsilon, ptr(savedMean), ptr(savedInvStdDev)));
 #elif defined HIP_COMPILE
         hipdnnBatchNormMode_t mode = m_spatial ? HIPDNN_BATCHNORM_SPATIAL : HIPDNN_BATCHNORM_PER_ACTIVATION;
         // REVIEW alexeyk: change betaParamDiff to 1 and update CNTK BN engine.

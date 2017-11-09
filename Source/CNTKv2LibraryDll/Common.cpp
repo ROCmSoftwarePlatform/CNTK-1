@@ -360,6 +360,45 @@ namespace CNTK
         }
 
         template <typename ElementType>
+        bool AreEqual(const SparseCSCDataTuple<ElementType>& t1, const SparseCSCDataTuple<ElementType>& t2, double relativeTolerance, double absoluteTolerance)
+        {
+            if (std::get<3>(t1) != std::get<3>(t2))
+                return false;
+            
+            auto nnzCount = std::get<3>(t1);
+            auto values1 = std::get<0>(t1);
+            auto values2 = std::get<0>(t2);
+
+            for (size_t i = 0; i < nnzCount; ++i)
+            {
+                auto firstValue = values1[i];
+                auto secondValue = values2[i];
+                ElementType allowedTolerance = (std::max<ElementType>)(std::abs((ElementType)absoluteTolerance), std::abs(((ElementType)relativeTolerance) * firstValue));
+                if (std::abs(firstValue - secondValue) > allowedTolerance)
+                    return false;
+            }
+
+            auto rowIndices1 = std::get<2>(t1);
+            auto rowIndices2 = std::get<2>(t2);
+
+            if (memcmp(rowIndices1, rowIndices2, nnzCount * sizeof(SparseIndexType)) != 0)
+                return false;
+            
+            auto colIndices1 = std::get<1>(t1);
+            auto colIndices2 = std::get<1>(t2);
+
+            for (size_t i = 0; i < nnzCount; ++i)
+            {
+                if (colIndices1[i] != colIndices2[i])
+                    return false;
+                if (colIndices1[i] == nnzCount)
+                    break;
+            }
+
+            return true;
+        }
+
+        template <typename ElementType>
         std::pair<ElementType*, NDArrayViewPtr> GetCPUDataPtr(const NDArrayView& view) 
         {
             auto deviceType = view.Device().Type();
@@ -924,18 +963,6 @@ namespace CNTK
         s_defaultUnitGainValue.store(value);
     }
 
-    static std::atomic<bool> s_defaultUseMeanGradient(false);
-
-    bool DefaultUseMeanGradientValue()
-    {
-        return s_defaultUseMeanGradient;
-    }
-
-    void SetDefaultUseMeanGradientValue(bool value)
-    {
-        s_defaultUseMeanGradient.store(value);
-    }
-
     template <class E>
     __declspec_noreturn void ThrowFormatted(const char* format, ...)
     {
@@ -947,6 +974,14 @@ namespace CNTK
 
     namespace Internal
     {
+        void ExtractCUDAVersion(int version, int& major, int& minor, int& patch_level)
+        {
+            //e.g. #define CUDNN_VERSION    (CUDNN_MAJOR * 1000 + CUDNN_MINOR * 100 + CUDNN_PATCHLEVEL)
+            major = version / 1000;
+            minor = (version - major * 1000) / 100;
+            patch_level = version % 100;
+        }
+
         void PrintBuiltInfo()
         {
             LOGPRINTF(stderr, "-------------------------------------------------------------------\n");
@@ -969,23 +1004,23 @@ namespace CNTK
             LOGPRINTF(stderr, "\t\tMath lib: %s\n", _MATHLIB_);
 #endif
 #ifdef _CUDA_PATH_
-            LOGPRINTF(stderr, "\t\tCUDA_PATH: %s\n", _CUDA_PATH_);
-#endif
-#ifdef _CUB_PATH_
-            LOGPRINTF(stderr, "\t\tCUB_PATH: %s\n", _CUB_PATH_);
+            int cudaVersion = 0;
+            if (cudaDriverGetVersion(&cudaVersion) == cudaSuccess)
+            {
+                int major = 0, minor = 0, patchLevel = 0;
+                ExtractCUDAVersion(cudaVersion, major, minor, patchLevel);
+                LOGPRINTF(stderr, "\t\tCUDA version: %d.%d.%d\n", major, minor, patchLevel);
+            }
 #endif
 #ifdef _CUDNN_PATH_
-            LOGPRINTF(stderr, "\t\tCUDNN_PATH: %s\n", _CUDNN_PATH_);
+            size_t cudnnVersion = GetCUDNNVersion();
+            int cudnnMajor = 0, cudnnMinor = 0, cudnnPatchLevel = 0;
+            ExtractCUDAVersion(cudnnVersion, cudnnMajor, cudnnMinor, cudnnPatchLevel);
+            LOGPRINTF(stderr, "\t\tCUDNN version: %d.%d.%d\n", cudnnMajor, cudnnMinor, cudnnPatchLevel);
 #endif
 #ifdef _GIT_EXIST
             LOGPRINTF(stderr, "\t\tBuild Branch: %s\n", _BUILDBRANCH_);
             LOGPRINTF(stderr, "\t\tBuild SHA1: %s\n", _BUILDSHA1_);
-#endif
-#ifdef _BUILDER_
-            LOGPRINTF(stderr, "\t\tBuilt by %s on %s\n", _BUILDER_, _BUILDMACHINE_);
-#endif
-#ifdef _BUILDPATH_
-            LOGPRINTF(stderr, "\t\tBuild Path: %s\n", _BUILDPATH_);
 #endif
 #ifdef _MPI_NAME_
             LOGPRINTF(stderr, "\t\tMPI distribution: %s\n", _MPI_NAME_);

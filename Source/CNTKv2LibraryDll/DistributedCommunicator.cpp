@@ -312,12 +312,12 @@ namespace CNTK
         for (auto i = 0; i < numValues; i++)
         {
             // Push index to packing queue if the gradient's size is less than threshold size
-            if (GetBufferSize(inputValues[i]) < m_packThresholdSizeInBytes && (inputValues[i]->GetDataType() == DataType::Float))
+            if (!inputValues[i]->IsSliceView() && GetBufferSize(inputValues[i]) < m_packThresholdSizeInBytes && (inputValues[i]->GetDataType() == DataType::Float))
             {
                 packedFloatGradientsSizeInBytes += GetBufferSize(inputValues[i]);
                 packedFloatGradientsIndex.push_back(i);
             }
-            else if (GetBufferSize(inputValues[i]) < m_packThresholdSizeInBytes && (inputValues[i]->GetDataType() == DataType::Double))
+            else if (!inputValues[i]->IsSliceView() && GetBufferSize(inputValues[i]) < m_packThresholdSizeInBytes && (inputValues[i]->GetDataType() == DataType::Double))
             {
                 packedDoubleGradientsSizeInBytes += GetBufferSize(inputValues[i]);
                 packedDoubleGradientsIndex.push_back(i);
@@ -514,7 +514,7 @@ namespace CNTK
             {
                 pCol2BlockId = reinterpret_cast<SparseIndexType*>(m_intermediateSBCIndexCPUBuffers[idx].data.get());
 #ifdef CUDA_COMPILE
-		cudaMemcpy(pCol2BlockId, sbcInfo.col2BlockId, sizeof(SparseIndexType) * sbcInfo.numCols, cudaMemcpyDeviceToHost);
+                cudaMemcpy(pCol2BlockId, sbcInfo.col2BlockId, sizeof(SparseIndexType) * sbcInfo.numCols, cudaMemcpyDeviceToHost);
 #elif defined HIP_COMPILE
                 hipMemcpy(pCol2BlockId, sbcInfo.col2BlockId, sizeof(SparseIndexType) * sbcInfo.numCols, hipMemcpyDeviceToHost);
 #endif
@@ -524,7 +524,7 @@ namespace CNTK
                 // aggregate on GPU, since we'll do inplace aggregation for col2BlockId, remember the original one in blockId2Col
                 pCol2BlockId = const_cast<SparseIndexType*>(sbcInfo.col2BlockId);
 #ifdef CUDA_COMPILE
-		cudaMemcpy(const_cast<SparseIndexType*>(sbcInfo.blockId2Col), pCol2BlockId, sizeof(SparseIndexType) * sbcInfo.numCols, cudaMemcpyDeviceToDevice);
+                cudaMemcpy(const_cast<SparseIndexType*>(sbcInfo.blockId2Col), pCol2BlockId, sizeof(SparseIndexType) * sbcInfo.numCols, cudaMemcpyDeviceToDevice);
 #elif defined HIP_COMPILE
                 hipMemcpy(const_cast<SparseIndexType*>(sbcInfo.blockId2Col), pCol2BlockId, sizeof(SparseIndexType) * sbcInfo.numCols, hipMemcpyDeviceToDevice);
 #endif
@@ -551,7 +551,7 @@ namespace CNTK
             if (!aggregateOnCPU)
             {
 #ifdef CUDA_COMPILE
-		cudaMemcpy(aggregatedCol2BlockId, sbcInfo.col2BlockId, sbcInfo.numCols * sizeof(SparseIndexType), cudaMemcpyDeviceToHost);
+                cudaMemcpy(aggregatedCol2BlockId, sbcInfo.col2BlockId, sbcInfo.numCols * sizeof(SparseIndexType), cudaMemcpyDeviceToHost);
 #elif defined HIP_COMPILE
                 hipMemcpy(aggregatedCol2BlockId, sbcInfo.col2BlockId, sbcInfo.numCols * sizeof(SparseIndexType), hipMemcpyDeviceToHost);
 #endif
@@ -588,7 +588,7 @@ namespace CNTK
                     m_intermediateSBCValueCPUBuffers[idx] = AllocateIntermediateBuffer(sbcValues[idx]->Device().Id(), requiredSize);
                 void* nzCPU = m_intermediateSBCValueCPUBuffers[idx].data.get();
 #ifdef CUDA_COMPILE
-		cudaMemcpy(nzCPU, nz, requiredSize, cudaMemcpyDeviceToHost);
+                cudaMemcpy(nzCPU, nz, requiredSize, cudaMemcpyDeviceToHost);
 #elif defined HIP_COMPILE
                 hipMemcpy(nzCPU, nz, requiredSize, hipMemcpyDeviceToHost);
 #endif
@@ -604,7 +604,7 @@ namespace CNTK
             {
                 // since only GPU sparse block column is supported, copy aggregated nz back to GPU
 #ifdef CUDA_COMPILE
-		cudaMemcpy(nzGPU, nz, requiredSize, cudaMemcpyHostToDevice);
+                cudaMemcpy(nzGPU, nz, requiredSize, cudaMemcpyHostToDevice);
 #elif defined HIP_COMPILE
                 hipMemcpy(nzGPU, nz, requiredSize, hipMemcpyHostToDevice);
 #endif

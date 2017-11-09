@@ -44,6 +44,15 @@ ncclRedOp_t ncclRedOpFromMpiOp(MPI_Op op)
     else RuntimeError("Invalid MPI_Op");
 }
 
+ncclRedOp_t ncclRedOpFromMpiOp(MPI_Op op)
+{
+    if (op == MPI_SUM) return ncclSum;
+    else if (op == MPI_MAX) return ncclMax;
+    else if (op == MPI_MIN) return ncclMin;
+    else if (op == MPI_PROD) return ncclProd;
+    else RuntimeError("Invalid MPI_Op");
+}
+
 NcclComm::NcclComm(int deviceId, const MPIWrapperPtr& mpi)
     : m_ncclComm(nullptr), m_stream(nullptr)
 {

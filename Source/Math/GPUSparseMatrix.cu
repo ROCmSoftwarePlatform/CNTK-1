@@ -803,6 +803,49 @@ void GPUSparseMatrix<ElemType>::AdjustCol2BlockId(const GPUSPARSE_INDEX_TYPE* cp
     SetBlockSize(numBlocks);
 }
 
+///
+/// adjusts the sparse block column matrix with the new Col2BlockId
+/// For each column, if new Col2BlockId contains valid index, a corresponding block exists at the index
+/// if old col2BlockId[i] contains value at that column, it would be copied over; otherwise the block would be filled with zeros
+///
+template <class ElemType>
+void GPUSparseMatrix<ElemType>::AdjustCol2BlockId(const GPUSPARSE_INDEX_TYPE* cpuCol2BlockId, size_t numBlocks, bool useBlockId2Col)
+{
+    if (GetFormat() != MatrixFormat::matrixFormatSparseBlockCol)
+        LogicError("Expected sparse block col matrix");
+
+    // create new buffer
+    size_t numRows = GetNumRows();
+    size_t numCols = GetNumCols();
+    size_t numNZ = numBlocks * numRows;
+    size_t bufferSizeNeeded = BufferSizeNeeded(GetNumRows(), GetNumCols(), numNZ, GetFormat());
+    ElemType* pArray = reinterpret_cast<ElemType*>(TracingGPUMemoryAllocator::Allocate<char>(GetComputeDeviceId(), bufferSizeNeeded));
+    GPUSPARSE_INDEX_TYPE* newBlockId2Col = (GPUSPARSE_INDEX_TYPE*)(pArray + numNZ);
+    GPUSPARSE_INDEX_TYPE* newCol2BlockId = newBlockId2Col + numCols;
+
+    CUDA_CALL(cudaMemset(newBlockId2Col, SparseIndex_NotAssigned, numCols * sizeof(GPUSPARSE_INDEX_TYPE)));
+    CUDA_CALL(cudaMemcpy(newCol2BlockId, cpuCol2BlockId, numCols * sizeof(GPUSPARSE_INDEX_TYPE), cudaMemcpyHostToDevice));
+
+    int blocksPerGrid = CeilDiv(numCols, GridDim::maxThreadsPerBlock);
+ 
+    // when useBlockId2Col==true, the original col2BlockId is copied to blockId2Col to avoid getting overwritten 
+    // during the inplace aggregation of col2BlockId prior to this
+    _adjustCol2BlockId<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream >> > (
+        numRows,
+        numCols,
+        useBlockId2Col ? BlockId2ColOrRow() : ColOrRow2BlockId(),
+        Data(),
+        newCol2BlockId,
+        pArray,
+        newBlockId2Col);
+
+    TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), Buffer());
+
+    SetBuffer(pArray, bufferSizeNeeded);
+    SetSizeAllocated(numNZ);
+    SetBlockSize(numBlocks);
+}
+
 template <class ElemType>
 GPUSPARSE_INDEX_TYPE* GPUSparseMatrix<ElemType>::GetCondensedVector() const
 {
@@ -1772,8 +1815,8 @@ void GPUSparseMatrix<ElemType>::MultiplyAndAdd(ElemType alpha, const GPUMatrix<E
         {
             c.Resize(m, n, 0);
 #ifdef CUDA_COMPILE
-	    CUDA_CALL(cudaMemset(c.ColOrRow2BlockId(), SparseIndex_NotAssigned, sizeof(GPUSPARSE_INDEX_TYPE) * (n)));
-	    CUDA_CALL(cudaMemset(c.BlockId2ColOrRow(), SparseIndex_NotAssigned, sizeof(GPUSPARSE_INDEX_TYPE) * (n)));
+            CUDA_CALL(cudaMemset(c.ColOrRow2BlockId(), SparseIndex_NotAssigned, sizeof(GPUSPARSE_INDEX_TYPE) * (n)));
+            CUDA_CALL(cudaMemset(c.BlockId2ColOrRow(), SparseIndex_NotAssigned, sizeof(GPUSPARSE_INDEX_TYPE) * (n)));
 #elif defined HIP_COMPILE
             CUDA_CALL(hipMemset(c.ColOrRow2BlockId(), SparseIndex_NotAssigned, sizeof(GPUSPARSE_INDEX_TYPE) * (n)));
             CUDA_CALL(hipMemset(c.BlockId2ColOrRow(), SparseIndex_NotAssigned, sizeof(GPUSPARSE_INDEX_TYPE) * (n)));
@@ -2016,7 +2059,7 @@ void GPUSparseMatrix<ElemType>::NormalGrad(GPUMatrix<ElemType>& c, const ElemTyp
             Data(),
             BlockId2ColOrRow(),
             c.Data(),
-	    unitGainFactor);
+            unitGainFactor);
 #elif defined HIP_COMPILE
 	auto fc_data = Data(); //TODO:__add__ remove this and below
 	auto fc_bi2cor = BlockId2ColOrRow();
@@ -2151,7 +2194,7 @@ void GPUSparseMatrix<ElemType>::FSAdagrad(
     _fsadagrad4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
         n, Data(), ColOrRow2BlockId(), GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
-	learnRatePerSample, momentum, adaWeight, adaMul, unitGainFactor);
+        learnRatePerSample, momentum, adaWeight, adaMul, unitGainFactor);
 #elif defined HIP_COMPILE
     auto fc_data = Data(); //TODO: __add__  remove all
     auto fc_cor2bi = ColOrRow2BlockId();
@@ -2196,7 +2239,7 @@ void GPUSparseMatrix<ElemType>::Adam(
     _adam4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
         n, Data(), ColOrRow2BlockId(), GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
-	learnRatePerSample, momentum, adaWeight, adaMul, epsilon, unitGainFactor, adamax);
+        learnRatePerSample, momentum, adaWeight, adaMul, epsilon, unitGainFactor, adamax);
 #elif defined HIP_COMPILE
     auto fc_data = Data(); //TODO: __add__ remove
     auto fc_cor2bi = ColOrRow2BlockId();
@@ -2343,8 +2386,17 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
 #endif
 }
 
+__global__ void _updateTimestamps(CUDA_LONG N, const GPUSPARSE_INDEX_TYPE* blockId2ColOrRow, int* timestamps, int currentTimestamp)
+{
+    auto blockid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (blockid >= N)
+        return;
+    auto col = blockId2ColOrRow[blockid];
+    timestamps[col] = currentTimestamp;
+}
+
 template <class ElemType>
-void GPUSparseMatrix<ElemType>::AdaDelta(GPUMatrix<ElemType>&c, GPUMatrix<ElemType>&functionValues, ElemType learningRate, ElemType rho, ElemType epsilon)
+void GPUSparseMatrix<ElemType>::AdaDelta(GPUMatrix<ElemType>&c, GPUMatrix<ElemType>&functionValues, ElemType learningRate, ElemType rho, ElemType epsilon, int* timestamps, int currentTimestamp)
 {
     if (GetFormat() != MatrixFormat::matrixFormatSparseBlockCol)
     {
@@ -2361,13 +2413,13 @@ void GPUSparseMatrix<ElemType>::AdaDelta(GPUMatrix<ElemType>&c, GPUMatrix<ElemTy
 
     assert((c.GetNumRows() == GetNumRows()) && (c.GetNumCols() == numColsNeeded));
 
-    size_t n = GetNumElements();
+    size_t n = GetBlockSize() * GetNumRows();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
 #ifdef CUDA_COMPILE
     _adadelta4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
         n, Data(), ColOrRow2BlockId(), GetNumRows(),
         c.Data(), c.Data() + n, functionValues.Data(),
-	learningRate, rho, epsilon);
+        learningRate, rho, epsilon);
 #elif defined HIP_COMPILE
     auto fc_data = Data(); //TODO: __add__ remove
     auto fc_cor2bi = ColOrRow2BlockId();
@@ -2376,6 +2428,14 @@ void GPUSparseMatrix<ElemType>::AdaDelta(GPUMatrix<ElemType>&c, GPUMatrix<ElemTy
         n, fc_data, fc_cor2bi, fc_gnr,
         c.Data(), c.Data() + n, functionValues.Data(),
         learningRate, rho, epsilon);
+#endif
+=======
+    n = GetBlockSize();
+    blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
+#ifdef CUDA_COMPILE
+    _updateTimestamps<<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(n, BlockId2ColOrRow(), timestamps, currentTimestamp);
+#elif defined HIP_COMPILE
+    hipLaunchKernelGGL(_updateTimestamps, dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, n, BlockId2ColOrRow(), timestamps, currentTimestamp );
 #endif
 }
 
