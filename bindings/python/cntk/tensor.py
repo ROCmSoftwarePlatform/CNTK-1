@@ -106,18 +106,8 @@ class TensorOpsMixin(object):
                     arg, self)
                 raise KeyError(msg)
 
-        if hasattr(self, 'outputs') and len(self.outputs) > 1:
-            try:
-                return self.outputs[arg]
-            except Exception as e:
-                msg = 'Slice for multioutput functions is not supported, ' \
-                      'the fallback to select to output requires ' \
-                      'that only one index is provided. arg: {}, self: {}'.format(
-                    arg, self)
-                raise KeyError(msg)
-
         # int or slice: normalize into a tuple of int or tuple of slice
-        if not isinstance(arg, tuple):
+        if not isinstance(arg, tuple): 
             arg = (arg,)
         r = self
         axis0 = 0
