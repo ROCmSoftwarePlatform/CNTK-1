@@ -1,3 +1,17 @@
+<<<<<<< HEAD
+import numpy as np
+import os
+import sys
+import signal
+import subprocess
+import time
+import re
+import pytest
+import argparse
+import cntk as C
+
+TIMEOUT_SECONDS = 300
+=======
 import argparse
 import collections
 import os
@@ -15,6 +29,7 @@ TIMEOUT_SECONDS = 300
 NUM_WORKERS = 4
 NUM_BATCHES = 10
 BATCH_SIZE_PER_WORKER = 20
+>>>>>>> 58c03089857f442e0bc09fc5bb0385d137b719a7
 
 def mpiexec_execute(script, mpiexec_params, params, timeout_seconds=TIMEOUT_SECONDS):
     cmd = ['mpiexec'] + mpiexec_params + ['python', script] + params

@@ -587,6 +587,17 @@ def sgd(parameters, lr,
         epoch_size (optional, int): number of samples as a scheduling unit for learning rate. See also:  :func:`learning_parameter_schedule`
 
 
+            deprecated:: 2.2
+                Use minibatch_size parameter to specify the reference minbiatch size.
+        minibatch_size (int, default ``None``): The minibatch size that the learner's parameters are designed or pre-tuned for. This
+         size is usually set to the same as the minibatch data source's size. CNTK will perform automatic scaling of the parameters
+         to enable efficient model parameter update implementation while approximate the behavior of pre-designed and pre-tuned parameters.
+         In case that minibatch_size is not specified, CNTK will inherit the minibatch size from the learning rate schedule;
+         if the learning rate schedule does not specify the minibatch_size, CNTK will set it to 1. Setting minibatch_size to 0
+         will have the parameters apply as it is preventing CNTK performing any parameter scaling. See also:  :func:`learning_parameter_schedule`
+        epoch_size (optional, int): number of samples as a scheduling unit for learning rate. See also:  :func:`learning_parameter_schedule`
+
+
     Returns:
         :class:`~cntk.learners.Learner`: learner instance that can be passed to
         the :class:`~cntk.train.trainer.Trainer`
@@ -655,6 +666,16 @@ def momentum_sgd(parameters, lr, momentum, unit_gain=default_unit_gain_value(),
          will have the learner apply as it is preventing CNTK performing any hyper-parameter scaling. See also:  :func:`learning_parameter_schedule`
         epoch_size (optional, int): number of samples as a scheduling unit for learning rate and momentum. See also:  :func:`learning_parameter_schedule`
 
+            deprecated:: 2.2
+                Use minibatch_size parameter to specify the reference minbiatch size.
+        minibatch_size (int, default ``None``): The minibatch size that the learner's parameters are designed or pre-tuned for. This
+         size is usually set to the same as the minibatch data source's size. CNTK will perform automatic scaling of the parameters
+         to enable efficient model parameter update implementation while approximate the behavior of pre-designed and pre-tuned parameters.
+         In case that minibatch_size is not specified, CNTK will inherit the minibatch size from the learning rate schedule;
+         if the learning rate schedule does not specify the minibatch_size, CNTK will set it to 1. Setting minibatch_size to 0
+         will have the parameters apply as it is preventing CNTK performing any parameter scaling.
+        epoch_size (optional, int): number of samples as a scheduling unit for learning rate and momentum. See also:  :func:`learning_parameter_schedule`
+
     Returns:
         :class:`~cntk.learners.Learner`: learner instance that can be passed to
         the :class:`~cntk.train.trainer.Trainer`
@@ -721,6 +742,16 @@ def nesterov(parameters, lr, momentum, unit_gain=default_unit_gain_value(),
          In case that minibatch_size is not specified, CNTK will inherit the minibatch size from the learning rate schedule;
          if the learning rate schedule does not specify the minibatch_size, CNTK will set it to :attr:`IGNORE`. Setting minibatch_size to :attr:`IGNORE`
          will have the learner apply as it is preventing CNTK performing any hyper-parameter scaling. See also:  :func:`learning_parameter_schedule`
+        epoch_size (optional, int): number of samples as a scheduling unit for learning rate and momentum. See also:  :func:`learning_parameter_schedule`
+
+            deprecated:: 2.2
+                Use minibatch_size parameter to specify the reference minbiatch size.
+        minibatch_size (int, default ``None``): The minibatch size that the learner's parameters are designed or pre-tuned for. This
+         size is usually set to the same as the minibatch data source's size. CNTK will perform automatic scaling of the parameters
+         to enable efficient model parameter update implementation while approximate the behavior of pre-designed and pre-tuned parameters.
+         In case that minibatch_size is not specified, CNTK will inherit the minibatch size from the learning rate schedule;
+         if the learning rate schedule does not specify the minibatch_size, CNTK will set it to 1. Setting minibatch_size to 0
+         will have the parameters apply as it is preventing CNTK performing any parameter scaling.
         epoch_size (optional, int): number of samples as a scheduling unit for learning rate and momentum. See also:  :func:`learning_parameter_schedule`
 
     Returns:
@@ -796,6 +827,17 @@ def adadelta(parameters, lr=learning_rate_schedule(1, UnitType.sample), rho=0.95
          will have the learner apply as it is preventing CNTK performing any hyper-parameter scaling. See also:  :func:`learning_parameter_schedule`
         epoch_size (optional, int): number of samples as a scheduling unit for learning rate. See also:  :func:`learning_parameter_schedule`
 
+            deprecated:: 2.2
+                Use minibatch_size parameter to specify the reference minbiatch size.
+        minibatch_size (int, default ``None``): The minibatch size that the learner's parameters are designed or pre-tuned for. This
+         size is usually set to the same as the minibatch data source's size. CNTK will perform automatic scaling of the parameters
+         to enable efficient model parameter update implementation while approximate the behavior of pre-designed and pre-tuned parameters.
+         In case that minibatch_size is not specified, CNTK will inherit the minibatch size from the learning rate schedule;
+         if the learning rate schedule does not specify the minibatch_size, CNTK will set it to 1. Setting minibatch_size to 0
+         will have the parameters apply as it is preventing CNTK performing any parameter scaling. If the learner's learning rate 
+         schedule ``lr`` has its own specification of reference minibatch size, the learning rate schedule's specification takes precedence. 
+        epoch_size (optional, int): number of samples as a scheduling unit for learning rate. See also:  :func:`learning_parameter_schedule`
+
     Returns:
         :class:`~cntk.learners.Learner`: learner instance that can be passed to
         the :class:`~cntk.train.trainer.Trainer`
@@ -861,6 +903,16 @@ def adagrad(parameters, lr, need_ave_multiplier=True,
          In case that minibatch_size is not specified, CNTK will inherit the minibatch size from the learning rate schedule;
          if the learning rate schedule does not specify the minibatch_size, CNTK will set it to :attr:`IGNORE`. Setting minibatch_size to :attr:`IGNORE`
          will have the learner apply as it is preventing CNTK performing any hyper-parameter scaling. See also:  :func:`learning_parameter_schedule`
+        epoch_size (optional, int): number of samples as a scheduling unit for learning rate. See also:  :func:`learning_parameter_schedule`
+
+            deprecated:: 2.2
+                Use minibatch_size parameter to specify the reference minbiatch size.
+        minibatch_size (int, default ``None``): The minibatch size that the learner's parameters are designed or pre-tuned for. This
+         size is usually set to the same as the minibatch data source's size. CNTK will perform automatic scaling of the parameters
+         to enable efficient model parameter update implementation while approximate the behavior of pre-designed and pre-tuned parameters.
+         In case that minibatch_size is not specified, CNTK will inherit the minibatch size from the learning rate schedule;
+         if the learning rate schedule does not specify the minibatch_size, CNTK will set it to 1. Setting minibatch_size to 0
+         will have the parameters apply as it is preventing CNTK performing any parameter scaling.
         epoch_size (optional, int): number of samples as a scheduling unit for learning rate. See also:  :func:`learning_parameter_schedule`
 
     Returns:
@@ -935,6 +987,16 @@ def fsadagrad(parameters, lr, momentum, unit_gain=default_unit_gain_value(),
          In case that minibatch_size is not specified, CNTK will inherit the minibatch size from the learning rate schedule;
          if the learning rate schedule does not specify the minibatch_size, CNTK will set it to :attr:`IGNORE`. Setting minibatch_size to :attr:`IGNORE`
          will have the learner apply as it is preventing CNTK performing any hyper-parameter scaling. See also:  :func:`learning_parameter_schedule`
+        epoch_size (optional, int): number of samples as a scheduling unit for learning rate, momentum and variance_momentum. See also:  :func:`learning_parameter_schedule`
+
+            deprecated:: 2.2
+                Use minibatch_size parameter to specify the reference minbiatch size.
+        minibatch_size (int, default ``None``): The minibatch size that the learner's parameters are designed or pre-tuned for. This
+         size is usually set to the same as the minibatch data source's size. CNTK will perform automatic scaling of the parameters
+         to enable efficient model parameter update implementation while approximate the behavior of pre-designed and pre-tuned parameters.
+         In case that minibatch_size is not specified, CNTK will inherit the minibatch size from the learning rate schedule;
+         if the learning rate schedule does not specify the minibatch_size, CNTK will set it to 1. Setting minibatch_size to 0
+         will have the parameters apply as it is preventing CNTK performing any parameter scaling.
         epoch_size (optional, int): number of samples as a scheduling unit for learning rate, momentum and variance_momentum. See also:  :func:`learning_parameter_schedule`
 
     Returns:
@@ -1092,6 +1154,16 @@ def rmsprop(parameters, lr,
          In case that minibatch_size is not specified, CNTK will inherit the minibatch size from the learning rate schedule;
          if the learning rate schedule does not specify the minibatch_size, CNTK will set it to :attr:`IGNORE`. Setting minibatch_size to :attr:`IGNORE`
          will have the learner apply as it is preventing CNTK performing any hyper-parameter scaling. See also:  :func:`learning_parameter_schedule`
+        epoch_size (optional, int): number of samples as a scheduling unit for learning rate. See also:  :func:`learning_parameter_schedule`
+
+            deprecated:: 2.2
+                Use minibatch_size parameter to specify the reference minbiatch size.
+        minibatch_size (int, default ``None``): The minibatch size that the learner's parameters are designed or pre-tuned for. This
+         size is usually set to the same as the minibatch data source's size. CNTK will perform automatic scaling of the parameters
+         to enable efficient model parameter update implementation while approximate the behavior of pre-designed and pre-tuned parameters.
+         In case that minibatch_size is not specified, CNTK will inherit the minibatch size from the learning rate schedule;
+         if the learning rate schedule does not specify the minibatch_size, CNTK will set it to 1. Setting minibatch_size to 0
+         will have the parameters apply as it is preventing CNTK performing any parameter scaling.
         epoch_size (optional, int): number of samples as a scheduling unit for learning rate. See also:  :func:`learning_parameter_schedule`
 
     Returns:

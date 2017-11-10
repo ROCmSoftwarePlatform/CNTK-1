@@ -19,7 +19,11 @@
 
 namespace msra { namespace cuda {
 
+#ifdef CUDA_COMPILE
 extern void operator||(cudaError_t rc, const char *msg); // TODO: imported from cudamatrix.cpp --better move to cudalib.h
+#elif defined HIP_COMPILE
+extern void operator||(hipError_t rc, const char *msg); // TODO: imported from cudamatrix.cpp --better move to cudalib.h
+#endif
 
 // this implements the basic operations of exported interface vectorbase<>, from which all vectors derive
 // TODO: This really should not be in cudalattice, since it is more general; we need a cudavector.cpp/h

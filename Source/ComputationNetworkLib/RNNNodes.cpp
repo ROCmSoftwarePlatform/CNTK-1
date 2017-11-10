@@ -86,7 +86,7 @@ void OptimizedRNNStackNode<ElemType>::TransposeHelper(const MatrixBasePtr matX, 
     // This function transposes the second and third axes of the input (X), creating a transposed copy in the output (Y).
     //
     // In 'frame mode', CNTK will present the data with the final two axes being the recurrent axis followed by the 
-    // 'minibatch axis'. CUDNN expects these to be in the reverse order, which is accomplished by TransposeHelper().
+    // 'minibatch axis'. HIPDNN expects these to be in the reverse order, which is accomplished by TransposeHelper().
 
     shapeY = shapeX;
     shapeY.SwapDimsInPlace(1, 2);

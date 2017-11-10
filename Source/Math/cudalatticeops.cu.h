@@ -4,8 +4,15 @@
 
 #undef DIRECT_MODE // [v-hansu] use the direct formula for smbr mode, proven makes no difference
 
+#ifdef CUDA_COMPILE
 #include <cuda_runtime_api.h>
 #include <cuda.h>
+#elif defined HIP_COMPILE
+#include <hip/hip_runtime_api.h>
+#ifdef __HIP_PLATFORM_NVCC__
+#include <cuda.h>
+#endif
+#endif
 #include "cudalib.h"
 #include "cudabasetypes.h"
 #include "latticestorage.h"
@@ -26,7 +33,11 @@
 
 namespace msra { namespace cuda {
 
+#ifdef CUDA_COMPILE
 cudaStream_t GetCurrentStream();
+#elif defined HIP_COMPILE
+hipStream_t GetCurrentStream();
+#endif
 
 // auto_timer timer; run(); double seconds = timer; // now can abandon the object
 #ifdef __unix__
@@ -80,9 +91,15 @@ __global__ void edgealignmentj(const vectorref<lrhmmdef> hmms, const vectorref<l
                                vectorref<unsigned short> backptrstorage, const vectorref<size_t> backptroffsets,
                                vectorref<unsigned short> alignresult, vectorref<float> edgeacscores) // output
 {
+#ifdef CUDA_COMPILE
     const size_t tpb = blockDim.x * blockDim.y; // total #threads in a block
     const size_t jinblock = threadIdx.x + threadIdx.y * blockDim.x;
     const size_t j = jinblock + blockIdx.x * tpb;
+#elif defined HIP_COMPILE
+    const size_t tpb = hipBlockDim_x * hipBlockDim_y; // total #threads in a block
+    const size_t jinblock = hipThreadIdx_x + hipThreadIdx_y * hipBlockDim_x;
+    const size_t j = jinblock + hipBlockIdx_x * tpb;
+#endif
     if (j < edges.size()) // note: will cause issues if we ever use __synctreads()
     {
         msra::lattices::latticefunctionskernels::edgealignmentj(j, hmms, transPs, spalignunitid, silalignunitid, logLLs, nodes, edges, aligns, alignoffsets, backptrstorage, backptroffsets, alignresult, edgeacscores);
@@ -104,16 +121,26 @@ void latticefunctionsops::edgealignment(const vectorref<lrhmmdef> &hmms, const v
     dim3 b((unsigned int) ((numedges + tpb - 1) / tpb));
     // cudaarrayref<float> logLLsarray;        // TODO: pass this in, of course
     // passtextureref texref (logLLstex, logLLsarray);    // use the same name as that global texref one, so it will match the name inside the kernel
+#ifdef CUDA_COMPILE
     edgealignmentj<<<b, t, 0, /*GetCurrentStream()*/ cudaStreamDefault>>>(hmms, transPs, spalignunitid, silalignunitid, logLLs, nodes, edges, aligns, alignoffsets, backptrstorage, backptroffsets, alignresult, edgeacscores);
+#elif defined HIP_COMPILE
+    hipLaunchKernelGGL((edgealignmentj), dim3(b), dim3(t), 0, /*GetCurrentStream()*/ hipStreamDefault, hmms, transPs, spalignunitid, silalignunitid, logLLs, nodes, edges, aligns, alignoffsets, backptrstorage, backptroffsets, alignresult, edgeacscores);
+#endif
     checklaunch("edgealignment");
 }
 
 // setvalue --helper to initialize an array to a constant value, e.g. LOGZERO
 __global__ void setvaluej(vectorref<double> arraytoset, double value, size_t nelem)
 {
+#ifdef CUDA_COMPILE
     const size_t tpb = blockDim.x * blockDim.y; // total #threads in a block
     const size_t jinblock = threadIdx.x + threadIdx.y * blockDim.x;
     const size_t j = jinblock + blockIdx.x * tpb;
+#elif defined HIP_COMPILE
+    const size_t tpb = hipBlockDim_x * hipBlockDim_y; // total #threads in a block
+    const size_t jinblock = hipThreadIdx_x + hipThreadIdx_y * hipBlockDim_x;
+    const size_t j = jinblock + hipBlockIdx_x * tpb;
+#endif
     if (j < nelem)
     {
         msra::lattices::latticefunctionskernels::setvaluej(j, arraytoset, value);
@@ -122,7 +149,11 @@ __global__ void setvaluej(vectorref<double> arraytoset, double value, size_t nel
 
 __global__ void expfi(matrixref<float> mata)
 {
+#ifdef CUDA_COMPILE
     const size_t i = threadIdx.x + (blockIdx.x * blockDim.x);
+#elif defined HIP_COMPILE
+    const size_t i = hipThreadIdx_x + (hipBlockIdx_x * hipBlockDim_x);
+#endif
     if (i < mata.rows())
     {
         const size_t m = mata.cols();
@@ -133,7 +164,11 @@ __global__ void expfi(matrixref<float> mata)
 
 __global__ void dotprodi(matrixref<float> mata, matrixref<float> matb)
 {
+#ifdef CUDA_COMPILE
     const size_t i = threadIdx.x + (blockIdx.x * blockDim.x);
+#elif defined HIP_COMPILE 
+    const size_t i = hipThreadIdx_x + (hipBlockIdx_x * hipBlockDim_x);
+#endif
     if (i < mata.rows())
     {
         const size_t m = mata.cols();
@@ -144,7 +179,11 @@ __global__ void dotprodi(matrixref<float> mata, matrixref<float> matb)
 
 __global__ void setunseeni(matrixref<float> errorsignal, matrixref<float> errorsignalauxbuf)
 {
+#ifdef CUDA_COMPILE
     const size_t i = threadIdx.x + (blockIdx.x * blockDim.x);
+#elif defined HIP_COMPILE
+    const size_t i = hipThreadIdx_x + (hipBlockIdx_x * hipBlockDim_x);
+#endif
     if (i < errorsignal.rows())
     {
         const size_t m = errorsignal.cols();
@@ -157,7 +196,11 @@ __global__ void setunseeni(matrixref<float> errorsignal, matrixref<float> errors
 // errorsignal(i,j) = (exp(errorsignal(i,j)) - exp(errorsignal(i,j))) / amf
 __global__ void errorcomputationi(matrixref<float> errorsignal, matrixref<float> errorsignalauxbuf, float amf)
 {
+#ifdef CUDA_COMPILE
     const size_t i = threadIdx.x + (blockIdx.x * blockDim.x);
+#elif defined HIP_COMPILE
+    const size_t i = hipThreadIdx_x + (hipBlockIdx_x * hipBlockDim_x);
+#endif
     if (i < errorsignal.rows())
     {
         const size_t m = errorsignal.cols();
@@ -169,7 +212,11 @@ __global__ void errorcomputationi(matrixref<float> errorsignal, matrixref<float>
 // exp(errorsignal(i,j)) - exp(logEframescorrecttotal+errorsignalauxbuf(i,j))/amf
 __global__ void directerrorcomputationi(matrixref<float> errorsignal, matrixref<float> errorsignalauxbuf, float logEframescorrecttotal, float amf)
 {
+#ifdef CUDA_COMPILE
     const size_t i = threadIdx.x + (blockIdx.x * blockDim.x);
+#elif defined HIP_COMPILE
+    const size_t i = hipThreadIdx_x + (hipBlockIdx_x * hipBlockDim_x);
+#endif
     if (i < errorsignal.rows())
     {
         const size_t m = errorsignal.cols();
@@ -183,7 +230,11 @@ __global__ void directerrorcomputationi(matrixref<float> errorsignal, matrixref<
 __global__ void computesMBRerrorsignals(const matrixref<float> loggammas, const matrixref<float> logEframescorrect,
                                         const double logEframecorrecttotal, const float kappa, matrixref<float> errorsignal)
 {
+#ifdef CUDA_COMPILE
     const size_t s = threadIdx.x + (blockIdx.x * blockDim.x);
+#elif defined HIP_COMPILE
+    const size_t s = hipThreadIdx_x + (hipBlockIdx_x * hipBlockDim_x);
+#endif
     if (s < loggammas.rows())
         msra::lattices::latticefunctionskernels::computesMBRerrorsignals(s, loggammas, logEframescorrect, logEframecorrecttotal, kappa, errorsignal);
 }
@@ -197,7 +248,11 @@ __global__ void forwardlatticej(const size_t batchsize, const size_t startindex,
                                 const bool returnEframescorrect, vectorref<double> logframescorrectedge, vectorref<double> logaccalphas)
 {
     const size_t shufflemode = 1; // [v-hansu] this gives us about 100% speed up than shufflemode = 0 (no shuffle)
+#ifdef CUDA_COMPILE
     const size_t j = msra::lattices::latticefunctionskernels::shuffle(threadIdx.x, blockDim.x, threadIdx.y, blockDim.y, blockIdx.x, gridDim.x, shufflemode);
+#elif defined HIP_COMPILE
+    const size_t j = msra::lattices::latticefunctionskernels::shuffle(hipThreadIdx_x, hipBlockDim_x, hipThreadIdx_y, hipBlockDim_y, hipBlockIdx_x, hipGridDim_x, shufflemode);
+#endif	
     if (j < batchsize) // note: will cause issues if we ever use __synctreads()
     {
         msra::lattices::latticefunctionskernels::forwardlatticej(j + startindex, edgeacscores, spalignunitid, silalignunitid, edges, nodes, aligns, alignments, alignmentoffsets,
@@ -214,9 +269,15 @@ __global__ void backwardlatticej(const size_t batchsize, const size_t startindex
                                  vectorref<double> logframescorrectedge, vectorref<double> logaccalphas,
                                  vectorref<double> logEframescorrect, vectorref<double> logaccbetas)
 {
+#ifdef CUDA_COMPILE
     const size_t tpb = blockDim.x * blockDim.y; // total #threads in a block
     const size_t jinblock = threadIdx.x + threadIdx.y * blockDim.x;
     size_t j = jinblock + blockIdx.x * tpb;
+#elif defined HIP_COMPILE
+    const size_t tpb = hipBlockDim_x * hipBlockDim_y; // total #threads in a block
+    const size_t jinblock = hipThreadIdx_x + hipThreadIdx_y * hipBlockDim_x;
+    size_t j = jinblock + hipBlockIdx_x * tpb;
+#endif
     if (j < batchsize) // note: will cause issues if we ever use __synctreads()
     {
         msra::lattices::latticefunctionskernels::backwardlatticej(j + startindex, edgeacscores, spalignunitid, silalignunitid,
@@ -250,6 +311,7 @@ void latticefunctionsops::forwardbackwardlattice(const size_t *batchsizeforward,
     dim3 b((unsigned int) ((logalphas.size() + tpb - 1) / tpb));
 
     // TODO: is this really efficient? One thread per value?
+#ifdef CUDA_COMPILE
     setvaluej<<<b, t, 0, GetCurrentStream()>>>(logalphas, LOGZERO, logalphas.size());
     checklaunch("setvaluej");
     setvaluej<<<b, t, 0, GetCurrentStream()>>>(logbetas, LOGZERO, logalphas.size());
@@ -261,6 +323,19 @@ void latticefunctionsops::forwardbackwardlattice(const size_t *batchsizeforward,
         setvaluej<<<b, t, 0, GetCurrentStream()>>>(logaccbetas, LOGZERO, logalphas.size());
         checklaunch("setvaluej");
     }
+#elif defined HIP_COMPILE
+    hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), logalphas, LOGZERO, logalphas.size());
+    checklaunch("setvaluej");
+    hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), logbetas, LOGZERO, logalphas.size());
+    checklaunch("setvaluej");
+    if (returnEframescorrect)
+    {
+        hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), logaccalphas, LOGZERO, logalphas.size());
+        checklaunch("setvaluej");
+        hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), logaccbetas, LOGZERO, logalphas.size());
+        checklaunch("setvaluej");
+    }
+#endif
     // set initial tokens to probability 1 (0 in log)
     double log1 = 0.0;
     memcpy(logalphas.get(), 0, &log1, 1);
@@ -271,11 +346,19 @@ void latticefunctionsops::forwardbackwardlattice(const size_t *batchsizeforward,
     for (size_t i = 0; i < numlaunchforward; i++)
     {
         dim3 b2((unsigned int) ((batchsizeforward[i] + tpb - 1) / tpb));
-        forwardlatticej<<<b2, t, 0, GetCurrentStream()>>>(batchsizeforward[i], startindex, edgeacscores,
+#ifdef CUDA_COMPILE
+	forwardlatticej<<<b2, t, 0, GetCurrentStream()>>>(batchsizeforward[i], startindex, edgeacscores,
+                                                         spalignunitid, silalignunitid, edges, nodes, aligns,
+                                                         alignments, aligmentoffsets, logalphas, lmf, wp, amf,
+                                                         boostingfactor, uids, senone2classmap, returnEframescorrect,
+	logframescorrectedge, logaccalphas);
+#elif defined HIP_COMPILE
+        hipLaunchKernelGGL((forwardlatticej), dim3(b2), dim3(t), 0, GetCurrentStream(), batchsizeforward[i], startindex, edgeacscores,
                                                          spalignunitid, silalignunitid, edges, nodes, aligns,
                                                          alignments, aligmentoffsets, logalphas, lmf, wp, amf,
                                                          boostingfactor, uids, senone2classmap, returnEframescorrect,
                                                          logframescorrectedge, logaccalphas);
+#endif
         checklaunch("edgealignment");
         startindex += batchsizeforward[i];
     }
@@ -292,11 +375,19 @@ void latticefunctionsops::forwardbackwardlattice(const size_t *batchsizeforward,
     for (size_t i = 0; i < numlaunchbackward; i++)
     {
         dim3 b2((unsigned int) ((batchsizebackward[i] + tpb - 1) / tpb));
-        backwardlatticej<<<b2, t, 0, GetCurrentStream()>>>(batchsizebackward[i], startindex - batchsizebackward[i],
+#ifdef CUDA_COMPILE
+	backwardlatticej<<<b2, t, 0, GetCurrentStream()>>>(batchsizebackward[i], startindex - batchsizebackward[i],
+                                                          edgeacscores, spalignunitid, silalignunitid, edges, nodes, aligns,
+                                                          totalfwscore, logpps, logalphas, logbetas,
+                                                          lmf, wp, amf, boostingfactor, returnEframescorrect, logframescorrectedge,
+							  logaccalphas, logEframescorrect, logaccbetas);
+#elif defined HIP_COMPILE
+        hipLaunchKernelGGL((backwardlatticej), dim3(b2), dim3(t), 0, GetCurrentStream(), batchsizebackward[i], startindex - batchsizebackward[i],
                                                           edgeacscores, spalignunitid, silalignunitid, edges, nodes, aligns,
                                                           totalfwscore, logpps, logalphas, logbetas,
                                                           lmf, wp, amf, boostingfactor, returnEframescorrect, logframescorrectedge,
                                                           logaccalphas, logEframescorrect, logaccbetas);
+#endif
         checklaunch("edgealignment");
         startindex -= batchsizebackward[i];
     }
@@ -336,7 +427,11 @@ __global__ void sMBRerrorsignalj(const vectorref<unsigned short> alignstateids, 
                                  matrixref<float> errorsignal, matrixref<float> errorsignalneg)
 {
     const size_t shufflemode = 1; // [v-hansu] this gives us about 100% speed up than shufflemode = 0 (no shuffle)
+#ifdef CUDA_COMPILE
     const size_t j = msra::lattices::latticefunctionskernels::shuffle(threadIdx.x, blockDim.x, threadIdx.y, blockDim.y, blockIdx.x, gridDim.x, shufflemode);
+#elif defined HIP_COMPILE
+    const size_t j = msra::lattices::latticefunctionskernels::shuffle(hipThreadIdx_x, hipBlockDim_x, hipThreadIdx_y, hipBlockDim_y, hipBlockIdx_x, hipGridDim_x, shufflemode);
+#endif
     if (j < edges.size()) // note: will cause issues if we ever use __synctreads()
     {
         msra::lattices::latticefunctionskernels::sMBRerrorsignalj(j, alignstateids, alignoffsets, edges, nodes, logpps, amf, logEframescorrect, logEframescorrecttotal, errorsignal, errorsignalneg);
@@ -352,7 +447,11 @@ __global__ void stateposteriorsj(const vectorref<unsigned short> alignstateids, 
                                  const vectorref<double> logqs, matrixref<float> logacc)
 {
     const size_t shufflemode = 1; // [v-hansu] this gives us about 100% speed up than shufflemode = 0 (no shuffle)
+#ifdef CUDA_COMPILE
     const size_t j = msra::lattices::latticefunctionskernels::shuffle(threadIdx.x, blockDim.x, threadIdx.y, blockDim.y, blockIdx.x, gridDim.x, shufflemode);
+#elif defined HIP_COMPILE
+    const size_t j = msra::lattices::latticefunctionskernels::shuffle(hipThreadIdx_x, hipBlockDim_x, hipThreadIdx_y, hipBlockDim_y, hipBlockIdx_x, hipGridDim_x, shufflemode);
+#endif	
     if (j < edges.size()) // note: will cause issues if we ever use __synctreads()
     {
         msra::lattices::latticefunctionskernels::stateposteriorsj(j, alignstateids, alignoffsets, edges, nodes, logqs, logacc);
@@ -361,7 +460,11 @@ __global__ void stateposteriorsj(const vectorref<unsigned short> alignstateids, 
 
 __global__ void setvaluei(matrixref<float> us, float value)
 {
+#ifdef CUDA_COMPILE
     const size_t i = threadIdx.x + (blockIdx.x * blockDim.x);
+#elif defined HIP_COMPILE
+    const size_t i = hipThreadIdx_x + (hipBlockIdx_x * hipBlockDim_x);
+#endif
     if (i >= us.rows())
         return;
     // set all columns
@@ -381,11 +484,19 @@ void latticefunctionsops::stateposteriors(const vectorref<unsigned short> &align
     const size_t tpb = t.x * t.y;
     dim3 b((unsigned int) ((numedges + tpb - 1) / tpb));
 
+#ifdef CUDA_COMPILE
     setvaluei<<<dim3((((unsigned int) logacc.rows()) + 31) / 32), 32, 0, GetCurrentStream()>>>(logacc, LOGZERO);
     checklaunch("setvaluei");
 
     stateposteriorsj<<<b, t, 0, GetCurrentStream()>>>(alignstateids, alignoffsets, edges, nodes, logqs, logacc);
     checklaunch("stateposteriors");
+#elif defined HIP_COMPILE
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) logacc.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), logacc, LOGZERO);
+    checklaunch("setvaluei");
+
+    hipLaunchKernelGGL((stateposteriorsj), dim3(b), dim3(t), 0, GetCurrentStream(), alignstateids, alignoffsets, edges, nodes, logqs, logacc);
+    checklaunch("stateposteriors");
+#endif
 }
 
 void latticefunctionsops::sMBRerrorsignal(const vectorref<unsigned short> &alignstateids, const vectorref<unsigned int> &alignoffsets,
@@ -401,6 +512,7 @@ void latticefunctionsops::sMBRerrorsignal(const vectorref<unsigned short> &align
     dim3 b((unsigned int) ((numedges + tpb - 1) / tpb));
 
 #ifdef DIRECT_MODE // compute Eframescorrect in a more direct way, proven to get same result as below
+#ifdef CUDA_COMPILE
     setvaluei<<<dim3((((unsigned int) errorsignal.rows()) + 31) / 32), 32, 0, GetCurrentStream()>>>(errorsignal, LOGZERO);
     checklaunch("setvaluei");
 
@@ -416,7 +528,25 @@ void latticefunctionsops::sMBRerrorsignal(const vectorref<unsigned short> &align
 
     directerrorcomputationi<<<dim3((((unsigned int) errorsignal.rows()) + 31) / 32), 32, 0, GetCurrentStream()>>>(errorsignal, errorsignalauxbuf, logEframescorrecttotal, amf);
     checklaunch("errorcomputationj");
+#elif defined HIP_COMPILE
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal, LOGZERO);
+    checklaunch("setvaluei");
+
+    hipLaunchKernelGGL((sMBRerrorsignalj), dim3(b), dim3(t), 0, GetCurrentStream(), alignstateids, alignoffsets, edges, nodes, logpps, amf, logEframescorrect, logEframescorrecttotal, errorsignal, errorsignalauxbuf);
+    checklaunch("sMBRerrorsignal"); // now we get state based logEframescorrect
+
+    matrixref<float> &loggammas = errorsignalauxbuf;
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignalauxbuf.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignalauxbuf, LOGZERO);
+    checklaunch("setvaluei");
+
+    hipLaunchKernelGGL((stateposteriorsj), dim3(b), dim3(t), 0, GetCurrentStream(), alignstateids, alignoffsets, edges, nodes, logpps, loggammas);
+    checklaunch("stateposteriorsj"); // now we get state based loggammas
+
+    hipLaunchKernelGGL((directerrorcomputationi), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal, errorsignalauxbuf, logEframescorrecttotal, amf);
+    checklaunch("errorcomputationj");
+#endif
 #else // this saves some computation compared with DIRECT_MODE
+#ifdef CUDA_COMPILE
     setvaluei<<<dim3((((unsigned int) errorsignal.rows()) + 31) / 32), 32, 0, GetCurrentStream()>>>(errorsignal, LOGZERO);
     checklaunch("setvaluei");
     setvaluei<<<dim3((((unsigned int) errorsignalauxbuf.rows()) + 31) / 32), 32, 0, GetCurrentStream()>>>(errorsignalauxbuf, LOGZERO);
@@ -429,6 +559,20 @@ void latticefunctionsops::sMBRerrorsignal(const vectorref<unsigned short> &align
 
     errorcomputationi<<<dim3((((unsigned int) errorsignal.rows()) + 31) / 32), 32, 0, GetCurrentStream()>>>(errorsignal, errorsignalauxbuf, amf);
     checklaunch("errorcomputationj");
+#elif defined HIP_COMPILE
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal, LOGZERO);
+    checklaunch("setvaluei");
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignalauxbuf.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignalauxbuf, LOGZERO);
+    checklaunch("setvaluei");
+    hipLaunchKernelGGL((sMBRerrorsignalj), dim3(b), dim3(t), 0, GetCurrentStream(), alignstateids, alignoffsets, edges, nodes, logpps, amf, logEframescorrect, logEframescorrecttotal, errorsignal, errorsignalauxbuf);
+    checklaunch("sMBRerrorsignal");
+
+    hipLaunchKernelGGL((setunseeni), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal, errorsignalauxbuf);
+    checklaunch("setunseenj");
+
+    hipLaunchKernelGGL((errorcomputationi), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal, errorsignalauxbuf, amf);
+    checklaunch("errorcomputationj");
+#endif
 
 #endif
 }
@@ -443,6 +587,7 @@ void latticefunctionsops::mmierrorsignal(const vectorref<unsigned short> &aligns
     dim3 b((unsigned int) ((numedges + tpb - 1) / tpb));
 
     matrixref<float> &loggammas = errorsignal; // remember--this is an alias to 'errorsignal'
+#ifdef CUDA_COMPILE
     setvaluei<<<dim3((((unsigned int) loggammas.rows()) + 31) / 32), 32, 0, GetCurrentStream()>>>(loggammas, LOGZERO);
     checklaunch("setvaluei");
     stateposteriorsj<<<b, t, 0, GetCurrentStream()>>>(alignstateids, alignoffsets, edges, nodes, logpps, loggammas);
@@ -450,6 +595,15 @@ void latticefunctionsops::mmierrorsignal(const vectorref<unsigned short> &aligns
 
     expfi<<<dim3((((unsigned int) errorsignal.rows()) + 31) / 32), 32, 0, GetCurrentStream()>>>(errorsignal);
     checklaunch("expfi");
+#elif defined HIP_COMPILE
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) loggammas.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), loggammas, LOGZERO);
+    checklaunch("setvaluei");
+    hipLaunchKernelGGL((stateposteriorsj), dim3(b), dim3(t), 0, GetCurrentStream(), alignstateids, alignoffsets, edges, nodes, logpps, loggammas);
+    checklaunch("stateposteriorsj");
+
+    hipLaunchKernelGGL((expfi), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal);
+    checklaunch("expfi");
+#endif
 }
 };
 };

@@ -72,6 +72,7 @@ Get the Release from the [CNTK Releases page](https://github.com/Microsoft/CNTK/
 
 ***2017-08-04.*** CNTK August interation plan posted [here](https://github.com/Microsoft/CNTK/issues/2194).
 
+>>>>>>> 58c03089857f442e0bc09fc5bb0385d137b719a7
 ***2017-07-31.* CNTK 2.1**  
 Release of Cognitive Toolkit v.2.1.
 

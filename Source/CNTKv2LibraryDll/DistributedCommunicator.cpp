@@ -513,13 +513,21 @@ namespace CNTK
             if (aggregateOnCPU)
             {
                 pCol2BlockId = reinterpret_cast<SparseIndexType*>(m_intermediateSBCIndexCPUBuffers[idx].data.get());
+#ifdef CUDA_COMPILE
                 cudaMemcpy(pCol2BlockId, sbcInfo.col2BlockId, sizeof(SparseIndexType) * sbcInfo.numCols, cudaMemcpyDeviceToHost);
+#elif defined HIP_COMPILE
+                hipMemcpy(pCol2BlockId, sbcInfo.col2BlockId, sizeof(SparseIndexType) * sbcInfo.numCols, hipMemcpyDeviceToHost);
+#endif
             }
             else
             {
                 // aggregate on GPU, since we'll do inplace aggregation for col2BlockId, remember the original one in blockId2Col
                 pCol2BlockId = const_cast<SparseIndexType*>(sbcInfo.col2BlockId);
+#ifdef CUDA_COMPILE
                 cudaMemcpy(const_cast<SparseIndexType*>(sbcInfo.blockId2Col), pCol2BlockId, sizeof(SparseIndexType) * sbcInfo.numCols, cudaMemcpyDeviceToDevice);
+#elif defined HIP_COMPILE
+                hipMemcpy(const_cast<SparseIndexType*>(sbcInfo.blockId2Col), pCol2BlockId, sizeof(SparseIndexType) * sbcInfo.numCols, hipMemcpyDeviceToDevice);
+#endif
             }
 
             // all-reduce max to find out the columns that would have value after aggregation
@@ -542,7 +550,11 @@ namespace CNTK
             // if aggregation is done on CPU, the buffer already has valid data, otherwise, copy from gpu
             if (!aggregateOnCPU)
             {
+#ifdef CUDA_COMPILE
                 cudaMemcpy(aggregatedCol2BlockId, sbcInfo.col2BlockId, sbcInfo.numCols * sizeof(SparseIndexType), cudaMemcpyDeviceToHost);
+#elif defined HIP_COMPILE
+                hipMemcpy(aggregatedCol2BlockId, sbcInfo.col2BlockId, sbcInfo.numCols * sizeof(SparseIndexType), hipMemcpyDeviceToHost);
+#endif
             }
 
             // update col2blockId and count new blocks
@@ -575,7 +587,11 @@ namespace CNTK
                 if (m_intermediateSBCValueCPUBuffers[idx].totalSize < requiredSize)
                     m_intermediateSBCValueCPUBuffers[idx] = AllocateIntermediateBuffer(sbcValues[idx]->Device().Id(), requiredSize);
                 void* nzCPU = m_intermediateSBCValueCPUBuffers[idx].data.get();
+#ifdef CUDA_COMPILE
                 cudaMemcpy(nzCPU, nz, requiredSize, cudaMemcpyDeviceToHost);
+#elif defined HIP_COMPILE
+                hipMemcpy(nzCPU, nz, requiredSize, hipMemcpyDeviceToHost);
+#endif
                 nz = nzCPU;
             }
 
@@ -587,7 +603,11 @@ namespace CNTK
             if (aggregateOnCPU)
             {
                 // since only GPU sparse block column is supported, copy aggregated nz back to GPU
+#ifdef CUDA_COMPILE
                 cudaMemcpy(nzGPU, nz, requiredSize, cudaMemcpyHostToDevice);
+#elif defined HIP_COMPILE
+                hipMemcpy(nzGPU, nz, requiredSize, hipMemcpyHostToDevice);
+#endif
             }
         }
 #endif
