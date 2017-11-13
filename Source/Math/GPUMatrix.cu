@@ -2227,7 +2227,8 @@ void GPUMatrix<ElemType>::AdaDeltaFlushTimestamps(size_t cols, ElemType rho, int
 #ifdef CUDA_COMPILE
     _adadeltaFlush<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> > (cols, rows, Data(), Data() + cols * rows, rho, timestamps, currentTimestamp);
 #elif defined HIP_COMPILE
-    hipLaunchKernelGGL(_adadeltaFlush<ElemType>, dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, cols, rows, Data(), Data() + cols * rows, rho, timestamps, currentTimestamp);
+    auto fc_data = Data();
+    hipLaunchKernelGGL(_adadeltaFlush<ElemType>, dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, cols, rows, fc_data, fc_data + cols * rows, rho, timestamps, currentTimestamp);
 #endif
 }
 

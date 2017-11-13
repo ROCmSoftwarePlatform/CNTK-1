@@ -9,9 +9,15 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
 MATH_API std::size_t GetCUDNNVersion()
 {
     return cudnnGetVersion();
+}
+#elif defined HIP_COMPILE
+MATH_API std::size_t GetCUDNNVersion()
+{
+    return hipdnnGetVersion();
 }
 #endif
 template <>
