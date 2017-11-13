@@ -20,6 +20,7 @@ MATH_API std::size_t GetCUDNNVersion()
     return hipdnnGetVersion();
 }
 #endif
+#endif
 template <>
 const float Consts<float>::One = 1;
 template <>
