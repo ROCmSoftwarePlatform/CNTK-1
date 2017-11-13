@@ -360,45 +360,6 @@ namespace CNTK
         }
 
         template <typename ElementType>
-        bool AreEqual(const SparseCSCDataTuple<ElementType>& t1, const SparseCSCDataTuple<ElementType>& t2, double relativeTolerance, double absoluteTolerance)
-        {
-            if (std::get<3>(t1) != std::get<3>(t2))
-                return false;
-            
-            auto nnzCount = std::get<3>(t1);
-            auto values1 = std::get<0>(t1);
-            auto values2 = std::get<0>(t2);
-
-            for (size_t i = 0; i < nnzCount; ++i)
-            {
-                auto firstValue = values1[i];
-                auto secondValue = values2[i];
-                ElementType allowedTolerance = (std::max<ElementType>)(std::abs((ElementType)absoluteTolerance), std::abs(((ElementType)relativeTolerance) * firstValue));
-                if (std::abs(firstValue - secondValue) > allowedTolerance)
-                    return false;
-            }
-
-            auto rowIndices1 = std::get<2>(t1);
-            auto rowIndices2 = std::get<2>(t2);
-
-            if (memcmp(rowIndices1, rowIndices2, nnzCount * sizeof(SparseIndexType)) != 0)
-                return false;
-            
-            auto colIndices1 = std::get<1>(t1);
-            auto colIndices2 = std::get<1>(t2);
-
-            for (size_t i = 0; i < nnzCount; ++i)
-            {
-                if (colIndices1[i] != colIndices2[i])
-                    return false;
-                if (colIndices1[i] == nnzCount)
-                    break;
-            }
-
-            return true;
-        }
-
-        template <typename ElementType>
         std::pair<ElementType*, NDArrayViewPtr> GetCPUDataPtr(const NDArrayView& view) 
         {
             auto deviceType = view.Device().Type();

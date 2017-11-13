@@ -5,7 +5,7 @@ rootDir=$(dirname "$(readlink -f "$0")")
 cd $rootDir
 
 #External Directory
-externalDir=External/HIP
+externalDir=external/HIP
 mkdir ${externalDir} -p
 cd ${externalDir}
 cur_dir=$(pwd)
