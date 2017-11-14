@@ -12,10 +12,10 @@ cur_dir=$(pwd)
 mkdir lib64 -p
 
 #List of repos to be cloned and installed
-repoList=(hipBLAS rocRAND HcSPARSE)
+repoList=(hcBLAS rocRAND HcSPARSE)
 
 #Installation directories
-installDir=("hipblas" " " "hcsparse")
+installDir=("hcblas" " " "hcsparse")
 
 #git command
 clone="git clone https://github.com/ROCmSoftwarePlatform"
@@ -100,7 +100,8 @@ do
         $clone/${repoList[$i]}.git
         cd ${repoList[$i]}
         if [ "${repoList[$i]}" != "hipDNN" ]; then
-            mkdir $build_dir -p && cd $build_dir && $cmake_it/${installDir[$i]} ${build_test[$i]} .. && make && make install
+            mkdir $build_dir -p && cd $build_dir
+            $cmake_it/${installDir[$i]} ${build_test[$i]} .. && make && make install
         else
             make INSTALL_DIR=../hipDNN
         fi

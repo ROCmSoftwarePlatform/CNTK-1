@@ -38,7 +38,13 @@ typedef struct cublasContext* cublasHandle_t;
 struct CUstream_st;
 typedef struct CUstream_st* cudaStream_t;
 #elif defined  HIP_COMPILE
+#ifdef __HIP_PLATFORM_NVCC__
+struct cublasContext;
+typedef struct cublasContext* cublasHandle_t;
+typedef cublasHandle_t hipblasHandle_t;
+#elif defined __HIP_PLATFORM_HCC__
 typedef void* hipblasHandle_t;
+#endif
 #endif
 
 #ifdef _WIN32
