@@ -7,14 +7,19 @@
 
 #include "Basics.h"
 #include "TensorShape.h"
+#ifdef CUDA_COMPILE
 #include <cudnn.h>
-#if CUDNN_MAJOR < 5
-#error CNTK requires the NVIDIA cuDNN library 5.0 or higher to build, cf. https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Windows#cudnn or https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Linux#cudnn for installation instructions.
-#endif
+	#if CUDNN_MAJOR < 5
+	#error CNTK requires the NVIDIA cuDNN library 5.0 or higher to build, cf. https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Windows#cudnn or https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Linux#cudnn for installation instructions.
+	#endif
+#elif defined HIP_COMPILE
+#include <hipDNN.h>
+#endif // hip compile check
 #include <memory>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+#ifdef CUDA_COMPILE
 class CuDnnTensor final
 {
 public:
@@ -43,6 +48,36 @@ struct CuDnn final
 
     DISABLE_COPY_AND_MOVE(CuDnn);
 };
+#elif defined HIP_COMPILE
+class CuDnnTensor final
+{
+public:
+    CuDnnTensor();
+    CuDnnTensor(const TensorShape& src, hipdnnDataType_t dataType);
+    ~CuDnnTensor();
+
+    void Set(const TensorShape& src, hipdnnDataType_t dataType); 
+    void UpdateBatchSize(size_t batchSize);
+
+    operator hipdnnTensorDescriptor_t() const { return m_tensor; }
+
+    template <typename ElemType>
+    static hipdnnDataType_t GetDataType();
+
+    DISABLE_COPY_AND_MOVE(CuDnnTensor);
+
+private:
+    hipdnnTensorDescriptor_t m_tensor;
+};
+
+struct CuDnn final
+{
+    using ptr_t = std::shared_ptr<hipdnnHandle_t>;
+    static ptr_t Instance();
+
+    DISABLE_COPY_AND_MOVE(CuDnn);
+};
+#endif
 
 template <typename ElemType>
 struct Consts
