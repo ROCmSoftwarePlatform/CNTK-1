@@ -2345,7 +2345,11 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
 
 __global__ void _updateTimestamps(CUDA_LONG N, const GPUSPARSE_INDEX_TYPE* blockId2ColOrRow, int* timestamps, int currentTimestamp)
 {
+#ifdef CUDA_COMPILE
     auto blockid = blockIdx.x * blockDim.x + threadIdx.x;
+#elif defined HIP_COMPILE
+    auto blockid = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+#endif
     if (blockid >= N)
         return;
     auto col = blockId2ColOrRow[blockid];
