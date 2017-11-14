@@ -12,10 +12,10 @@ cur_dir=$(pwd)
 mkdir lib64 -p
 
 #List of repos to be cloned and installed
-repoList=(hcBLAS rocRAND HcSPARSE)
+repoList=(hcBLAS rocRAND HcSPARSE hipDNN)
 
 #Installation directories
-installDir=("hcblas" " " "hcsparse")
+installDir=("hcblas" " " "hcsparse" "hipdnn")
 
 #git command
 clone="git clone https://github.com/ROCmSoftwarePlatform"
@@ -23,7 +23,7 @@ clone="git clone https://github.com/ROCmSoftwarePlatform"
 #build steps
 build_dir=build
 cmake_it="cmake -DCMAKE_INSTALL_PREFIX=../.."
-build_test=("" "-DBUILD_TEST=OFF" "")
+build_test=("" "-DCMAKE_MODULE_PATH=$rootDir/$externalDir/hip/cmake -DBUILD_TEST=OFF" "" "")
 remove="rm -rf"
 
 #function for building - TODO:
@@ -65,6 +65,8 @@ else
     cd $rootDir/$externalDir
 fi
 
+export HIP_PATH="$rootDir/$externalDir/hip"
+
 #platform deducing
 platform=$($rootDir/$externalDir/hip/bin/hipconfig --platform)
 
@@ -103,7 +105,7 @@ do
             mkdir $build_dir -p && cd $build_dir
             $cmake_it/${installDir[$i]} ${build_test[$i]} .. && make && make install
         else
-            make INSTALL_DIR=../hipDNN
+            make INSTALL_DIR=../hipdnn
         fi
         cd $rootDir/$externalDir
     fi
