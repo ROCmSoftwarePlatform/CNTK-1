@@ -29,7 +29,10 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 // e.g. exp_ -> exp(double), expf(float). This simplifies templated kernel code.
 // -----------------------------------------------------------------------
 
+
 #pragma push_macro("OverloadUnaryMathFns")
+
+#if defined(CUDA_COMPILE) || defined(__HIP_PLATFORM_NVCC__)
 #define OverloadUnaryMathFns(x) \
     DECL float x##_(float f)    \
     {                           \
@@ -39,6 +42,20 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     {                           \
         return x(f);            \
     }
+
+#elif defined __HIP_PLATFORM_HCC__
+#define OverloadUnaryMathFns(x) \
+    DECL float x##_(float f)    \
+    {                           \
+        return x##f(f);         \
+    }                           
+/*
+    DECL double x##_(double f)  \
+    {                           \
+        return x(f);            \
+    }
+*///TODO: __add__ this when ambiguity is resolved
+#endif
 
 OverloadUnaryMathFns(exp);
 OverloadUnaryMathFns(log);
@@ -59,6 +76,8 @@ OverloadUnaryMathFns(atanh);
 #pragma pop_macro("OverloadUnaryMathFns")
 
 #pragma push_macro("OverloadBinaryMathFns")
+
+#if defined(CUDA_COMPILE) || defined(__HIP_PLATFORM_NVCC__)
 #define OverloadBinaryMathFns(x)         \
     DECL float x##_(float f, float y)    \
     {                                    \
@@ -68,7 +87,19 @@ OverloadUnaryMathFns(atanh);
     {                                    \
         return x(f, y);                  \
     }
-
+#elif defined(__HIP_PLATFORM_HCC__)
+#define OverloadBinaryMathFns(x)         \
+    DECL float x##_(float f, float y)    \
+    {                                    \
+        return x##f(f, y);               \
+    }                                    
+/*
+    DECL double x##_(double f, double y) \
+    {                                    \
+        return x(f, y);                  \
+    }
+*///TODO:  __add__ this when ambiguity is resolved
+#endif
 // Because we compile with fast math the following produces nan for negative numbers raised to integer power.
 // To avoid this we define safepow_ further below.
 // Is there an nvcc pragma to disable fast math temporarily? Something like 

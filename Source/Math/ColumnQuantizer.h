@@ -2,6 +2,9 @@
 #define __COLUMN_QUANTIZER_H__
 #include "ValueQuantizer.h"
 #include <math.h>
+#ifdef HIP_COMPILE
+#include "hip/hip_runtime.h"
+#endif
 
 #pragma warning(disable : 4127) // conditional expression is constant
 

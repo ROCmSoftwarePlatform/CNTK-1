@@ -337,7 +337,11 @@ private:
                 // First sync_g_to_c_copy
                 // TODO: we need a CopyGPUToCPUSync
                 #ifndef CPUONLY
+                #ifdef CUDA_COMPILE
                 cudaMemcpy(m_intermediateCPUBuffers[gpuToCpuIndex].get(), gpuCopyBuffer->Data(), gpuCopyBuffer->GetNumElements() * sizeof(ElemType), cudaMemcpyDeviceToHost);
+                #elif defined HIP_COMPILE
+                hipMemcpy(m_intermediateCPUBuffers[gpuToCpuIndex].get(), gpuCopyBuffer->Data(), gpuCopyBuffer->GetNumElements() * sizeof(ElemType), hipMemcpyDeviceToHost);
+                #endif
                 #endif
                 gpuToCpuIndex++;
 

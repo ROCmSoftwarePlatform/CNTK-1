@@ -1,8 +1,12 @@
 #pragma once
 
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
 #include <cuda_runtime_api.h>
 #include <cuda.h>
+#elif defined HIP_COMPILE
+#include <hip/hip_runtime_api.h>
+#endif
 #endif // !CPUONLY
 
 #include "Basics.h"
@@ -27,7 +31,11 @@ class MATH_API GranularGPUDataTransferer : public DataTransferer
 {
 public:
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
     GranularGPUDataTransferer(int deviceId, const cudaStream_t& fetchStream, const cudaStream_t& assignStream, bool blocking = false);
+#elif defined HIP_COMPILE
+    GranularGPUDataTransferer(int deviceId, const hipStream_t& fetchStream, const hipStream_t& assignStream, bool blocking = false);
+#endif
 #else
     GranularGPUDataTransferer() {}
 #endif // !CPUONLY
@@ -49,11 +57,17 @@ public:
 #ifndef CPUONLY
 private:
     // Not owned by this class, are always injected.
+#ifdef CUDA_COMPILE
     const cudaStream_t& m_fetchStream;
     const cudaStream_t& m_assignStream;
+#elif defined HIP_COMPILE
+    const hipStream_t& m_fetchStream;
+    const hipStream_t& m_assignStream;
+#endif
 
 protected:
 
+#ifdef CUDA_COMPILE
     virtual const cudaStream_t& GetAssignStream() const
     {
         return m_assignStream;
@@ -67,6 +81,21 @@ protected:
     mutable cudaEvent_t m_fetchCompleteEvent;
     mutable cudaEvent_t m_assignCompleteEvent;
     mutable cudaEvent_t m_syncEvent;
+#elif defined HIP_COMPILE
+    virtual const hipStream_t& GetAssignStream() const
+    {
+        return m_assignStream;
+    }
+
+    virtual const hipStream_t& GetFetchStream() const
+    {
+        return m_fetchStream;
+    }
+
+    mutable hipEvent_t m_fetchCompleteEvent;
+    mutable hipEvent_t m_assignCompleteEvent;
+    mutable hipEvent_t m_syncEvent;
+#endif
 #endif // !CPUONLY
 
 protected:
@@ -115,17 +144,28 @@ public:
     void WaitForCopyCPUToGPUAsync();
 
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
     static cudaStream_t GetFetchStream();
+#elif defined HIP_COMPILE
+    static hipStream_t GetFetchStream();
+#endif
 #endif // !CPUONLY
 
 private:
 #ifndef CPUONLY
 
     // TODO: this needs to be refactored to get rid of all statics
+#ifdef CUDA_COMPILE
     static void SyncEvent(cudaEvent_t ev);
 
     static cudaStream_t s_fetchStream;
     static cudaStream_t s_assignStream;
+#elif defined HIP_COMPILE
+    static void SyncEvent(hipEvent_t ev);
+
+    static hipStream_t s_fetchStream;
+    static hipStream_t s_assignStream;
+#endif
 #endif // !CPUONLY
 };
 
@@ -137,12 +177,21 @@ public:
 
 private:
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
     cudaStream_t m_stream;
 
     virtual const cudaStream_t& GetAssignStream() const override
     {
         return m_stream;
     }
+#elif defined HIP_COMPILE
+    hipStream_t m_stream;
+
+    virtual const hipStream_t& GetAssignStream() const override
+    {
+        return m_stream;
+    }
+#endif
 #endif
 
     DISABLE_COPY_AND_MOVE(PrefetchGPUDataTransferer);
