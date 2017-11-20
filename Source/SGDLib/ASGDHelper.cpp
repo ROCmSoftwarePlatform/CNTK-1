@@ -31,15 +31,23 @@
 
 
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
 #include <cuda_runtime.h>
-#pragma comment (lib, "cudart.lib")     // for cudaMemcpyAsync()
+#pragma comment (lib, "cudart.lib") // for cudaMemcpyAsync()
+#elif defined HIP_COMPILE
+#include <hip/hip_runtime.h>
+#endif
 #endif
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 #ifndef CPUONLY
 
+#ifdef CUDA_COMPILE
 #include <cuda_runtime.h>
+#elif defined HIP_COMPILE
+#include <hip/hip_runtime.h>
+#endif
 
 // -----------------------------------------------------------------------
 // Error handling
@@ -60,7 +68,11 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
                 strcpy(hostname, "?");
 #endif
             int currentCudaDevice;
-            cudaGetDevice(&currentCudaDevice);
+#ifdef CUDA_COMPILE
+	    cudaGetDevice(&currentCudaDevice);
+#elif defined HIP_COMPILE
+            hipGetDevice(&currentCudaDevice);
+#endif
             Microsoft::MSR::CNTK::RuntimeError("%s failure %d; GPU=%d ; hostname=%s ; expr=%s", libName, (int)retCode, currentCudaDevice, hostname ? hostname : "?", exprString);
         }
         catch (const std::exception& e) // catch, log, and rethrow since CUDA code sometimes hangs in destruction, so we'd never get to see the error
@@ -71,7 +83,11 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
     }
 }
 
+#ifdef CUDA_COMPILE
 #define CUDA_CALL(expr)     (CudaCall((expr), #expr, "CUDA",     cudaSuccess))
+#elif defined HIP_COMPILE
+#define CUDA_CALL(expr)     (CudaCall((expr), #expr, "HIP",     hipSuccess))
+#endif
 #endif // CPUONLY
 
 #ifdef ASGD_PARALLEL_SUPPORT
@@ -119,7 +135,11 @@ public:
         // GPU asynchronous buffer
         m_gpuAsyncBuffer.resize(m_localBufferNum);
         // creat an communication stream for the data tranfer between GPU and CPU
-        CUDA_CALL(cudaStreamCreate(&_commStream));
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaStreamCreate(&_commStream));
+#elif defined HIP_COMPILE
+        CUDA_CALL(hipStreamCreate(&_commStream));
+#endif
 #endif
         m_bufferIndexInUse = 0;
         for (int i = 0; i < m_localBufferNum; i++)
@@ -148,14 +168,22 @@ public:
         for (size_t i = 0; i < m_localBufferNum; i++)
         {
 #ifndef CPUONLY
-            CUDA_CALL(cudaFreeHost(m_cpuAsyncBuffer[i]));
+#ifdef CUDA_COMPILE
+	    CUDA_CALL(cudaFreeHost(m_cpuAsyncBuffer[i]));
+#elif defined HIP_COMPILE
+            CUDA_CALL(hipFreeHost(m_cpuAsyncBuffer[i]));
+#endif
 #else
             delete m_cpuAsyncBuffer[i];
 #endif
         }
         delete m_cpuAsyncBuffer;
 #ifndef CPUONLY
-        CUDA_CALL(cudaStreamDestroy(_commStream));
+#ifdef CUDA_COMPILE
+	CUDA_CALL(cudaStreamDestroy(_commStream));
+#elif defined HIP_COMPILE
+        CUDA_CALL(hipStreamDestroy(_commStream));
+#endif
 #endif
         multiverso::MV_ShutDown(false);
     }
@@ -228,7 +256,8 @@ public:
                 ComputationNodePtr node = dynamic_pointer_cast<ComputationNode<ElemType>>(*nodeIter);
                 Microsoft::MSR::CNTK::Matrix<ElemType> &mat = node->Value();
 #ifndef CPUONLY
-                // CNTK model -> GPU buffer
+#ifdef CUDA_COMPILE
+		// CNTK model -> GPU buffer
                 CUDA_CALL(cudaMemcpy(m_gpuAsyncBuffer[m_bufferIndexInUse][i].Data(),
                     mat.Data(),
                     mat.GetNumElements() * sizeof(ElemType),
@@ -238,7 +267,20 @@ public:
                 CUDA_CALL(cudaMemcpy(mat.Data(),
                     m_gpuAsyncBuffer[m_bufferSwapIndex[m_bufferIndexInUse]][i].Data(),
                     mat.GetNumElements() * sizeof(ElemType),
-                    cudaMemcpyDeviceToDevice));
+		    cudaMemcpyDeviceToDevice));
+#elif defined HIP_COMPILE
+                // CNTK model -> GPU buffer
+                CUDA_CALL(hipMemcpy(m_gpuAsyncBuffer[m_bufferIndexInUse][i].Data(),
+                    mat.Data(),
+                    mat.GetNumElements() * sizeof(ElemType),
+                    hipMemcpyDeviceToDevice));
+
+                // GPU buffer -> CNTK model
+                CUDA_CALL(hipMemcpy(mat.Data(),
+                    m_gpuAsyncBuffer[m_bufferSwapIndex[m_bufferIndexInUse]][i].Data(),
+                    mat.GetNumElements() * sizeof(ElemType),
+                    hipMemcpyDeviceToDevice));
+#endif
 #else
                 ElemType * px = m_cpuAsyncBuffer[m_bufferIndexInUse] + m_tableOffsets[i];
                 mat.CopyToArray(px, m_tableLength[i]);
@@ -258,22 +300,40 @@ public:
                 float factor = DecayCoefficient();
                 int deviceId = m_gpuAsyncBuffer[m_bufferIndexInUse][0].GetDeviceId();
 
-                CUDA_CALL(cudaSetDevice(deviceId));
+#ifdef CUDA_COMPILE
+		CUDA_CALL(cudaSetDevice(deviceId));
+#elif defined HIP_COMPILE
+                CUDA_CALL(hipSetDevice(deviceId));
+#endif	
 
                 Timer threadTimer;
                 threadTimer.Restart();
                 for (int widx = 0; widx < m_tableCount; widx++)
                 {
                     ElemType * px = m_deltaArray + m_tableOffsets[widx];
-                    // GPU buffer -> CPU buffer
+#ifdef CUDA_COMPILE
+		    // GPU buffer -> CPU buffer
                     CUDA_CALL(cudaMemcpyAsync(px,
                         m_gpuAsyncBuffer[m_bufferIndexInUse][widx].Data(),
                         m_gpuAsyncBuffer[m_bufferIndexInUse][widx].GetNumElements() * sizeof(ElemType),
                         cudaMemcpyDeviceToHost,
+			_commStream));
+#elif defined HIP_COMPILE
+                    // GPU buffer -> CPU buffer
+                    CUDA_CALL(hipMemcpyAsync(px,
+                        m_gpuAsyncBuffer[m_bufferIndexInUse][widx].Data(),
+                        m_gpuAsyncBuffer[m_bufferIndexInUse][widx].GetNumElements() * sizeof(ElemType),
+                        hipMemcpyDeviceToHost,
                         _commStream));
+#endif
                 }
+#ifdef CUDA_COMPILE
+		// waiting copy from GPU to CPU has finished
+		CUDA_CALL(cudaStreamSynchronize(_commStream));
+#elif defined HIP_COMPILE
                 // waiting copy from GPU to CPU has finished
-                CUDA_CALL(cudaStreamSynchronize(_commStream));
+                CUDA_CALL(hipStreamSynchronize(_commStream));
+#endif
                 threadTimer.Stop();
 
                 if (m_traceLevel > 3)
@@ -314,13 +374,25 @@ public:
                 {
                     ElemType * py2 = m_cpuAsyncBuffer[m_bufferIndexInUse] + m_tableOffsets[widx];
 
-                    CUDA_CALL(cudaMemcpyAsync(m_gpuAsyncBuffer[m_bufferIndexInUse][widx].Data(),
+#ifdef CUDA_COMPILE
+		    CUDA_CALL(cudaMemcpyAsync(m_gpuAsyncBuffer[m_bufferIndexInUse][widx].Data(),
                         py2,
                         m_gpuAsyncBuffer[m_bufferIndexInUse][widx].GetNumElements() * sizeof(ElemType),
                         cudaMemcpyHostToDevice,
+			_commStream));
+#elif defined HIP_COMPILE
+                    CUDA_CALL(hipMemcpyAsync(m_gpuAsyncBuffer[m_bufferIndexInUse][widx].Data(),
+                        py2,
+                        m_gpuAsyncBuffer[m_bufferIndexInUse][widx].GetNumElements() * sizeof(ElemType),
+                        hipMemcpyHostToDevice,
                         _commStream));
+#endif
                 }
-                CUDA_CALL(cudaStreamSynchronize(_commStream));
+#ifdef CUDA_COMPILE
+		CUDA_CALL(cudaStreamSynchronize(_commStream));
+#elif defined HIP_COMPILE
+                CUDA_CALL(hipStreamSynchronize(_commStream));
+#endif
                 threadTimer.Stop();
                 if (m_traceLevel > 3)
                 {
@@ -471,11 +543,19 @@ private:
         for (int i2 = 0; i2 < m_localBufferNum; i2++)
             m_gpuAsyncBuffer[i2].reserve(m_tableCount);
 
-        // create pinned memory
+#ifdef CUDA_COMPILE
+	// create pinned memory
         for (int i3 = 0; i3 < m_localBufferNum; ++i3)
             CUDA_CALL(cudaMallocHost((void **)&m_cpuAsyncBuffer[i3], sizeof(ElemType) * (m_totalModelSize), cudaHostAllocPortable));
 
-        CUDA_CALL(cudaMallocHost((void **)&m_deltaArray, sizeof(ElemType) * (m_totalModelSize), cudaHostAllocPortable));
+	CUDA_CALL(cudaMallocHost((void **)&m_deltaArray, sizeof(ElemType) * (m_totalModelSize), cudaHostAllocPortable));
+#elif defined HIP_COMPILE
+        // create pinned memory
+        for (int i3 = 0; i3 < m_localBufferNum; ++i3)
+            CUDA_CALL(hipMallocHost((void **)&m_cpuAsyncBuffer[i3], sizeof(ElemType) * (m_totalModelSize), cudaHostAllocPortable));
+
+        CUDA_CALL(hipMallocHost((void **)&m_deltaArray, sizeof(ElemType) * (m_totalModelSize), cudaHostAllocPortable));
+#endif
 #else
         for (int i4 = 0; i4 < m_localBufferNum; i4++)
             m_cpuAsyncBuffer[i4] = new ElemType[m_totalModelSize];
@@ -589,7 +669,11 @@ private:
     int m_tableCount;
 
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
     cudaStream_t _commStream;
+#elif defined HIP_COMPILE
+    hipStream_t _commStream;
+#endif
 #endif
 };  // Class MultiversoHelper
 

@@ -223,6 +223,39 @@ def test_sequence_softmax_with_large_numbers():
         assert np.allclose(val_i, expected_i)
 
 
+def test_sequence_max_with_variable_lengths():
+    np.random.seed(0)
+    a = [-np.ones(i, dtype=np.float32) for i in (7, 11, 13)]
+    src = C.sequence.input_variable(shape=(1), sequence_axis=C.Axis("Seq"))
+    out = C.sequence.reduce_max(src)
+    val = out.eval({src: a})
+    expected = [np.max(a_i) for a_i in a]
+    for val_i, expected_i in zip(val, expected):
+        assert np.allclose(val_i, expected_i)
+
+
+def test_sequence_softmax_with_variable_lengths():
+    np.random.seed(0)
+    a = [-5*np.ones(i, dtype=np.float32) for i in (7, 11, 13)]
+    src = C.sequence.input_variable(shape=(1), sequence_axis=C.Axis("Seq"))
+    out = C.sequence.softmax(src)
+    val = out.eval({src: a})
+    expected = [np_softmax(a_i, 0) for a_i in a]
+    for val_i, expected_i in zip(val, expected):
+        assert np.allclose(val_i, expected_i)
+
+
+def test_sequence_softmax_with_large_numbers():
+    np.random.seed(0)
+    a = [500000*np.ones(i, dtype=np.float32) for i in (7, 7, 7)]
+    src = C.sequence.input_variable(shape=(1), sequence_axis=C.Axis("Seq"))
+    out = C.sequence.softmax(src)
+    val = out.eval({src: a})
+    expected = [np_softmax(a_i, 0) for a_i in a]
+    for val_i, expected_i in zip(val, expected):
+        assert np.allclose(val_i, expected_i)
+
+
 def test_to_sequence_basic(device_id):
     dev = cntk_device(device_id)
     x = C.input_variable((C.FreeDimension, 2))

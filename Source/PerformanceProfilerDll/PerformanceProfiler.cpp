@@ -21,7 +21,11 @@
 #include <mutex>
 #include <stdio.h>
 #ifndef CPUONLY
+#ifdef CUDA_COMPILE
 #include <cuda_runtime_api.h>
+#elif defined HIP_COMPILE
+#include <hip/hip_runtime_api.h>
+#endif
 #endif
 
 #ifdef _WIN32
@@ -292,8 +296,13 @@ void PERF_PROFILER_API ProfilerSyncGpu()
     if(!g_profilerState->enabled)
         return;
 
+#ifdef CUDA_COMPILE
     if (g_profilerState->syncGpu)
-        cudaDeviceSynchronize();
+	cudaDeviceSynchronize();
+#elif defined HIP_COMPILE
+    if (g_profilerState->syncGpu)
+        hipDeviceSynchronize();
+#endif
 #endif
 }
 
