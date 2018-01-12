@@ -60,8 +60,8 @@ struct ProcessorData
 #ifdef __HIP_PLATFORM_NVCC__
     nvmlMemory_t memory;
     nvmlUtilization_t utilization;
-    hipDeviceProp_t deviceProp;
 #endif
+    hipDeviceProp_t deviceProp;
     bool mlAppsFound;
     int deviceId; // the deviceId (cuda side) for this processor
 };

@@ -15,6 +15,9 @@
 #endif
 #include "hip/hip_runtime.h"
 #include <cub/cub.cuh>
+#ifdef __HIP_PLATFORM_HCC__ //TODO: __add__ remove when CUB is integrated
+#define CUB_PTX_WARP_THREADS 32
+#endif
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
