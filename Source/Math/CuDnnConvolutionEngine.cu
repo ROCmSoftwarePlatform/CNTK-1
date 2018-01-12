@@ -525,11 +525,11 @@ private:
     {
     	*newalgo = (*algotype).fwd_algo ;
     }
-    void algomatch(miopenConvBwdDataAlgorithm_t* newalgo, hipdnnConvolutionFwdAlgoPerf_t* algotype)
+    void algomatch(miopenConvBwdDataAlgorithm_t* newalgo, hipdnnConvolutionBwdDataAlgoPerf_t* algotype)
     {
         *newalgo = (*algotype).bwd_data_algo ;
     }
-    void algomatch(miopenConvBwdWeightsAlgorithm_t* newalgo, hipdnnConvolutionFwdAlgoPerf_t* algotype)
+    void algomatch(miopenConvBwdWeightsAlgorithm_t* newalgo, hipdnnConvolutionBwdFilterAlgoPerf_t* algotype)
     {
         *newalgo = (*algotype).bwd_weights_algo ;
     }
