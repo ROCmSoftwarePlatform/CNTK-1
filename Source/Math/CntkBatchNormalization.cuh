@@ -6,6 +6,10 @@
 
 #pragma once
 
+#ifdef __HIP_PLATFORM_HCC__ //TODO: __add__ remove when CUB is integrated
+#define CUB_PTX_WARP_THREADS 32
+#endif
+
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 size_t RoundUpToMultiple(size_t n, size_t blockSize)
