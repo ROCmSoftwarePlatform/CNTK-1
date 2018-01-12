@@ -100,7 +100,6 @@ CPPFLAGS:=
 CXXFLAGS:= $(SSE_FLAGS) -std=c++0x -fopenmp -fpermissive -fPIC -Werror -fcheck-new
 
 ifdef HIP_PATH
-COMMON_FLAGS += -DHIP_COMPILE
 ifeq ($(HIP_PLATFORM), nvcc)
 	CXXFLAGS += -D__HIP_PLATFORM_NVCC__
 	COMPILE_FLAGS = -Xcompiler "-fPIC"
@@ -110,8 +109,6 @@ ifeq ($(HIP_PLATFORM), hcc)
 	COMPILE_FLAGS = "-fPIC"
 endif
 endif
-else
-COMMON_FLAGS += -DCUDA_COMPILE
 endif
         
 LIBPATH:=
@@ -178,7 +175,7 @@ endif
 
 ifeq ($(HIP_PLATFORM), hcc)
   LIBS_LIST += hipblas hip_hcc hiprand hipsparse MIOpen
-  INCLUDEPATH += /opt/rocm/miopen/include/
+  INCLUDEPATH += $(EXTERNAL_DIR)/miopen/include/
 endif
 
   ifndef CUB_PATH
@@ -199,11 +196,13 @@ endif
     COMMON_FLAGS +=-DUSE_HIPDNN
   endif
   INCLUDEPATH += $(HIP_PATH)/include
-  INCLUDEPATH += $(EXTERNAL_DIR)/hcblas/include/
+  INCLUDEPATH += $(EXTERNAL_DIR)/hipblas/include/
+  INCLUDEPATH += $(EXTERNAL_DIR)/rocblas/include/
   INCLUDEPATH += $(EXTERNAL_DIR)/hiprand/include/
   INCLUDEPATH += $(EXTERNAL_DIR)/rocrand/include/
   INCLUDEPATH += $(EXTERNAL_DIR)/hcsparse/include/
   LIBPATH += $(EXTERNAL_DIR)/lib64
+  LIBPATH += /opt/rocm/hip/lib
 
 else
   DEVICE = cpu
@@ -472,7 +471,7 @@ $(CNTKMATH_LIB): $(MATH_OBJ) | $(PERF_PROFILER_LIB)
 	@echo $(SEPARATOR)
 	@echo creating $@ for $(ARCH) with build type $(BUILDTYPE)
 	@mkdir -p $(dir $@)
-	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ $(LIBS) -fopenmp -l$(PERF_PROFILER)
+	$(HIPCC) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) -o $@ $^ $(LIBS) -fopenmp=libiomp5 -l$(PERF_PROFILER)
 
 
 # Any executable using Common or ReaderLib needs to link these libraries. 
@@ -1366,7 +1365,7 @@ $(UNITTEST_MATH): $(UNITTEST_MATH_OBJ) | $(READER_LIBS)
 	@echo $(SEPARATOR)
 	@mkdir -p $(dir $@)
 	@echo building $@ for $(ARCH) with build type $(BUILDTYPE)
-	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(GDK_NVML_LIB_PATH) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH) $(BOOSTLIB_PATH)) -o $@ $^ $(BOOSTLIBS) $(LIBS)  $(L_READER_LIBS) -ldl -fopenmp
+	$(HIPCC) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(GDK_NVML_LIB_PATH) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH) $(BOOSTLIB_PATH)) -g -o $@ $^ $(BOOSTLIBS) $(LIBS)  $(L_READER_LIBS) -ldl -fopenmp=libiomp5 -pthread -Wl,-rpath -Wl,/usr/local/mpi/lib -Wl,--enable-new-dtags -L/usr/local/mpi/lib -lmpi_cxx -lmpi
 
 UNITTEST_BRAINSCRIPT_SRC = \
 	$(SOURCEDIR)/CNTK/BrainScript/BrainScriptEvaluator.cpp \
