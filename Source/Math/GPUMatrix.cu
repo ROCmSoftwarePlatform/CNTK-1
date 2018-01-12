@@ -1155,7 +1155,6 @@ void GPUMatrix<ElemType>::SetValue(const ElemType v)
         int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
         PrepareDevice();
         SyncGuard syncGuard;
-	auto fc_data = Data();
         hipLaunchKernelGGL((_setValue<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, Data(), v, N);
     }
 }
@@ -1307,7 +1306,6 @@ void GPUMatrix<ElemType>::SetDiagonalValue(const ElemType v)
     int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
     PrepareDevice();
     SyncGuard syncGuard;
-    auto fc_data = Data();
     hipLaunchKernelGGL((_setDiagonalValue<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, Data(), v, N, (CUDA_LONG) GetNumRows());
 }
 
@@ -1569,7 +1567,6 @@ void GPUMatrix<ElemType>::Adam(GPUMatrix<ElemType>& gradients,
 
     size_t n = gradients.GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    auto fc_data = Data();
     hipLaunchKernelGGL((_adam<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, n, gradients.Data(), Data(), Data() + n, functionValues.Data(),
         learnRatePerSample, momentum, adaWeight, adaMul, epsilon, unitGainFactor, adamax);
 }
@@ -1675,7 +1672,6 @@ void GPUMatrix<ElemType>::AdaDeltaFlushTimestamps(size_t cols, ElemType rho, int
     // where decay is rho ** (currentTimestamp - timestamp for that column)
     size_t rows = GetNumRows();
     int blocksPerGrid = (cols + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    auto fc_data = Data();
     hipLaunchKernelGGL(_adadeltaFlush<ElemType>, dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, cols, rows, Data(), Data() + cols * rows, rho, timestamps, currentTimestamp);
 }
 
@@ -2124,7 +2120,8 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignSigmoidOf(const GPUMatrix<ElemTy
 #if 0
     hipLaunchKernelGGL((_elementWiseSigmoidOnCuda), dim3(blocksPerGrid), dim3(threadsPerBlock), 0, t_stream, a.Data(), Data(), N);
 #else
-    hipLaunchKernelGGL((_assignSigmoidOf), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a.Data(), Data(), N);
+    hipLaunchKernelGGL((_assignSigmoidOf), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, static_cast<const ElemType*>(a.Data()), static_cast<ElemType*>(Data()), static_cast<const 
+CUDA_LONG>(N));
 #endif
     return *this;
 }
@@ -2293,7 +2290,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignLogSoftmaxOf(const GPUMatrix<Ele
         CUDA_LONG M = (CUDA_LONG) GetNumRows();
         SyncGuard syncGuard;
         // note: kernel uses hard-coded thread dimension
-        hipLaunchKernelGGL((_assignColumnwiseLogSoftmaxOf512Threads), dim3(N), dim3(512), 0, t_stream, a.Data(), Data(), N, M);
+        hipLaunchKernelGGL((_assignColumnwiseLogSoftmaxOf512Threads), dim3(N), dim3(512), 0, t_stream, static_cast<const ElemType*>(a.Data()), static_cast<ElemType*>(Data()), static_cast<const CUDA_LONG>(N), static_cast<const CUDA_LONG>(M));
     }
     else
     {
@@ -2320,7 +2317,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignHardmaxOf(const GPUMatrix<ElemTy
         CUDA_LONG M = (CUDA_LONG) GetNumRows();
         SyncGuard syncGuard;
         // note: kernel uses hard-coded thread dimension
-        hipLaunchKernelGGL((_assignColumnwiseHardmaxOf512Threads), dim3(N), dim3(512), 0, t_stream, a.Data(), Data(), N, M);
+        hipLaunchKernelGGL((_assignColumnwiseHardmaxOf512Threads), dim3(N), dim3(512), 0, t_stream, static_cast<const ElemType*>(a.Data()), static_cast<ElemType*>(Data()), static_cast<const CUDA_LONG>(N), static_cast<const CUDA_LONG>(M));
     }
     else
     {
@@ -3023,7 +3020,7 @@ void GPUMatrix<ElemType>::VectorMax(GPUMatrix<ElemType>& maxIndexes, GPUMatrix<E
     CUDA_CALL(cub::DeviceRadixSort::SortPairs(ptmp, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
     // Copy results.
     cblock = (topK * n + ThreadsPerBlock - 1) / ThreadsPerBlock;
-    hipLaunchKernelGGL((_copyTopKResults), dim3(cblock), dim3(ThreadsPerBlock), 0, t_stream, inIdx, outVal2, maxIndexes.Data(), maxValues.Data(), m, n, topK);
+    hipLaunchKernelGGL((_copyTopKResults), dim3(cblock), dim3(ThreadsPerBlock), 0, t_stream, static_cast<const uint64_t*>(inIdx), static_cast<const ElemType*>(outVal2), static_cast<ElemType*>(maxIndexes.Data()), static_cast<ElemType*>(maxValues.Data()), static_cast<CUDA_LONG>(m), static_cast<CUDA_LONG>(n), static_cast<int>(topK));
 
     ReleaseWorkspace(std::move(workspace));
 
@@ -3086,7 +3083,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignNumOfDiff(const GPUMatrix<ElemTy
     else
     {
         const int blockSize = 1024;
-        hipLaunchKernelGGL((_assignNumOfDiffCol<blockSize>), dim3(1), dim3(blockSize), 0, t_stream, a.Data(), b.Data(), Data(),
+        hipLaunchKernelGGL((_assignNumOfDiffCol<blockSize>), dim3(1), dim3(blockSize), 0, t_stream, static_cast<const ElemType*>(a.Data()), static_cast<const ElemType*>(b.Data()), static_cast<ElemType*>(Data()),
                                                                       static_cast<CUDA_LONG>(b.GetNumRows()), static_cast<CUDA_LONG>(a.GetNumCols()));
     }
     return *this;
@@ -3155,12 +3152,12 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignPackedConvolutionInput(const GPU
     dim3 blocksPerGrid((inputWidth * inputHeight * inputChannels + numThreadPerBlock - 1) / numThreadPerBlock, smallBatchSize);
 #endif
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_assignPackedConvolutionInput), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, Data(),
-                                                                                     inputSubBatch.Data(),
-                                                                                     smallBatchSize,
-                                                                                     inputWidth, inputHeight, inputChannels,
-                                                                                     outputWidth, outputHeight, outputChannels,
-                                                                                     kernelWidth, kernelHeight, horizontalSubsample, verticalSubsample, zeroPadding);
+    hipLaunchKernelGGL((_assignPackedConvolutionInput), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, static_cast<ElemType*>(Data()),
+                                                                                     static_cast<const ElemType*>(inputSubBatch.Data()),
+                                                                                     static_cast<const CUDA_LONG>(smallBatchSize),
+                                                                                     static_cast<const CUDA_LONG>(inputWidth), static_cast<const CUDA_LONG>(inputHeight), static_cast<const CUDA_LONG>(inputChannels),
+                                                                                     static_cast<const CUDA_LONG>(outputWidth), static_cast<const CUDA_LONG>(outputHeight), static_cast<const CUDA_LONG>(outputChannels),
+                                                                                     static_cast<const CUDA_LONG>(kernelWidth), static_cast<const CUDA_LONG>(kernelHeight), static_cast<const CUDA_LONG>(horizontalSubsample), static_cast<const CUDA_LONG>(verticalSubsample), static_cast<const bool>(zeroPadding));
 
     return *this;
 }
@@ -3185,12 +3182,12 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::UnpackConvolutionInput(GPUMatrix<ElemT
     dim3 blocksPerGrid((inputWidth * inputHeight * inputChannels + numThreadPerBlock - 1) / numThreadPerBlock, smallBatchSize);
 #endif
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_unpackConvolutionInput), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, Data(),
-                                                                               inputSubBatch.Data(),
-                                                                               smallBatchSize,
-                                                                               inputWidth, inputHeight, inputChannels,
-                                                                               outputWidth, outputHeight, outputChannels,
-                                                                               kernelWidth, kernelHeight, horizontalSubsample, verticalSubsample, zeroPadding);
+    hipLaunchKernelGGL((_unpackConvolutionInput), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, static_cast<const ElemType*>(Data()),
+                                                                               static_cast<ElemType*>(inputSubBatch.Data()),
+                                                                               static_cast<const CUDA_LONG>(smallBatchSize),
+                                                                               static_cast<const CUDA_LONG>(inputWidth), static_cast<const CUDA_LONG>(inputHeight), static_cast<const CUDA_LONG>(inputChannels),
+                                                                               static_cast<const CUDA_LONG>(outputWidth), static_cast<const CUDA_LONG>(outputHeight), static_cast<const CUDA_LONG>(outputChannels),
+                                                                               static_cast<const CUDA_LONG>(kernelWidth), static_cast<const CUDA_LONG>(kernelHeight), static_cast<const CUDA_LONG>(horizontalSubsample), static_cast<const CUDA_LONG>(verticalSubsample), static_cast<const bool>(zeroPadding));
 
     return inputSubBatch;
 }
@@ -3211,10 +3208,10 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignMaxPoolingResult(const GPUMatrix
 
     PrepareDevice();
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_assignMaxPoolingResult), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, Data(), inputBatch.Data(), batchSize, channels,
-                                                                               inputWidth, inputHeight, inputSizePerSample,
-                                                                               outputWidth, outputHeight, outputSizePerSample,
-                                                                               windowWidth, windowHeight, horizontalSubsample, verticalSubsample);
+    hipLaunchKernelGGL((_assignMaxPoolingResult), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, static_cast<ElemType*>(Data()), static_cast<const ElemType*>(inputBatch.Data()), static_cast<const CUDA_LONG>(batchSize), static_cast<const CUDA_LONG>(channels),
+                                                                               static_cast<const CUDA_LONG>(inputWidth), static_cast<const CUDA_LONG>(inputHeight), static_cast<const CUDA_LONG>(inputSizePerSample),
+                                                                               static_cast<const CUDA_LONG>(outputWidth), static_cast<const CUDA_LONG>(outputHeight), static_cast<const CUDA_LONG>(outputSizePerSample),
+                                                                               static_cast<const CUDA_LONG>(windowWidth), static_cast<const CUDA_LONG>(windowHeight), static_cast<const CUDA_LONG>(horizontalSubsample), static_cast<const CUDA_LONG>(verticalSubsample));
 
     return *this;
 }
@@ -3235,10 +3232,10 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AddMaxPoolingGradient(const GPUMatrix<
     SyncGuard syncGuard;
 
     int blocksPerGrid = (batchSize * inputSizePerSample + numThreadPerBlock - 1) / numThreadPerBlock;
-    hipLaunchKernelGGL((_addMaxPoolingGradient), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, Data(), outputGradientBatch.Data(), inputBatch.Data(), outputBatch.Data(), batchSize, channels,
-                                                                              inputWidth, inputHeight, inputSizePerSample,
-                                                                              outputWidth, outputHeight, outputSizePerSample,
-                                                                              windowWidth, windowHeight, horizontalSubsample, verticalSubsample);
+    hipLaunchKernelGGL((_addMaxPoolingGradient), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, static_cast<ElemType*>(Data()), static_cast<const ElemType*>(outputGradientBatch.Data()), static_cast<const ElemType*>(inputBatch.Data()), static_cast<const ElemType*>(outputBatch.Data()), static_cast<const CUDA_LONG>(batchSize), static_cast<const CUDA_LONG>(channels),
+                                                                              static_cast<const CUDA_LONG>(inputWidth), static_cast<const CUDA_LONG>(inputHeight), static_cast<const CUDA_LONG>(inputSizePerSample),
+                                                                              static_cast<const CUDA_LONG>(outputWidth), static_cast<const CUDA_LONG>(outputHeight), static_cast<const CUDA_LONG>(outputSizePerSample),
+                                                                              static_cast<const CUDA_LONG>(windowWidth), static_cast<const CUDA_LONG>(windowHeight), static_cast<const CUDA_LONG>(horizontalSubsample), static_cast<const CUDA_LONG>(verticalSubsample));
 
     return *this;
 }
@@ -3259,10 +3256,10 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignAveragePoolingResult(const GPUMa
 
     PrepareDevice();
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_assignAveragePoolingResult), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, Data(), inputBatch.Data(), batchSize, channels,
-                                                                                   inputWidth, inputHeight, inputSizePerSample,
-                                                                                   outputWidth, outputHeight, outputSizePerSample,
-                                                                                   windowWidth, windowHeight, horizontalSubsample, verticalSubsample);
+    hipLaunchKernelGGL((_assignAveragePoolingResult), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, static_cast<ElemType*>(Data()), static_cast<const ElemType*>(inputBatch.Data()), static_cast<const CUDA_LONG>(batchSize), static_cast<const CUDA_LONG>(channels),
+                                                                                   static_cast<const CUDA_LONG>(inputWidth), static_cast<const CUDA_LONG>(inputHeight), static_cast<const CUDA_LONG>(inputSizePerSample),
+                                                                                   static_cast<const CUDA_LONG>(outputWidth), static_cast<const CUDA_LONG>(outputHeight), static_cast<const CUDA_LONG>(outputSizePerSample),
+                                                                                   static_cast<const CUDA_LONG>(windowWidth), static_cast<const CUDA_LONG>(windowHeight), static_cast<const CUDA_LONG>(horizontalSubsample), static_cast<const CUDA_LONG>(verticalSubsample));
 
     return *this;
 }
@@ -3282,10 +3279,10 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AddAveragePoolingGradient(const GPUMat
     PrepareDevice();
     SyncGuard syncGuard;
     size_t blocksPerGrid = (batchSize * inputSizePerSample + numThreadPerBlock - 1) / numThreadPerBlock;
-    hipLaunchKernelGGL((_addAveragePoolingGradient), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, Data(), outputGradientBatch.Data(), (CUDA_LONG) batchSize, channels,
-                                                                                  inputWidth, inputHeight, inputSizePerSample,
-                                                                                  outputWidth, outputHeight, outputSizePerSample,
-                                                                                  windowWidth, windowHeight, horizontalSubsample, verticalSubsample);
+    hipLaunchKernelGGL((_addAveragePoolingGradient), dim3(blocksPerGrid), dim3(numThreadPerBlock), 0, t_stream, static_cast<ElemType*>(Data()), static_cast<const ElemType*>(outputGradientBatch.Data()), (CUDA_LONG) batchSize, static_cast<const CUDA_LONG>(channels),
+                                                                                  static_cast<const CUDA_LONG>(inputWidth), static_cast<const CUDA_LONG>(inputHeight), static_cast<const CUDA_LONG>(inputSizePerSample),
+                                                                                  static_cast<const CUDA_LONG>(outputWidth), static_cast<const CUDA_LONG>(outputHeight), static_cast<const CUDA_LONG>(outputSizePerSample),
+                                                                                  static_cast<const CUDA_LONG>(windowWidth), static_cast<const CUDA_LONG>(windowHeight), static_cast<const CUDA_LONG>(horizontalSubsample), static_cast<const CUDA_LONG>(verticalSubsample));
 
     return *this;
 }
@@ -3300,8 +3297,8 @@ void GPUMatrix<ElemType>::ConvolutionForward(const GPUMatrix<ElemType>& kernel, 
     auto gdim = dim3((output.GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)GetNumCols(), 65535));
     PrepareDevice();
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((kConvolutionForward), dim3(gdim), dim3(BlockSize), 0, t_stream, (int) GetNumCols(), kernel.Data(), mpRowCol.Data(), mpRowIwht.Data(), mpRowRun.Data(),
-                                                            runs.Data(), Data(), (int) GetNumRows(), output.Data(), (int)output.GetNumRows());
+    hipLaunchKernelGGL((kConvolutionForward), dim3(gdim), dim3(BlockSize), 0, t_stream, (int) GetNumCols(), static_cast<const ElemType*>(kernel.Data()), static_cast<const int*>(mpRowCol.Data()), static_cast<const int*>(mpRowIwht.Data()), static_cast<const int*>(mpRowRun.Data()),
+                                                            static_cast<const int*>(runs.Data()), static_cast<const ElemType*>(Data()), (int) GetNumRows(), static_cast<ElemType*>(output.Data()), (int)output.GetNumRows());
 }
 
 template <class ElemType>
@@ -3312,8 +3309,8 @@ void GPUMatrix<ElemType>::ConvolutionBackwardData(const GPUMatrix<ElemType>& ker
     auto gdim = dim3((GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)GetNumCols(), 65535));
     PrepareDevice();
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((kConvolutionBackwardData), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), kernel.Data(), mpRowCol.Data(), mpRowIwht.Data(), mpRowRun.Data(),
-                                                                 runs.Data(), Data(), (int)GetNumRows(), grad.Data(), (int)grad.GetNumRows());
+    hipLaunchKernelGGL((kConvolutionBackwardData), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), static_cast<const ElemType*>(kernel.Data()), static_cast<const int*>(mpRowCol.Data()), static_cast<const int*>(mpRowIwht.Data()), static_cast<const int*>(mpRowRun.Data()),
+                                                                 static_cast<const int*>(runs.Data()), static_cast<const ElemType*>(Data()), (int)GetNumRows(), static_cast<ElemType*>(grad.Data()), (int)grad.GetNumRows());
 }
 
 template <class ElemType>
@@ -3325,8 +3322,8 @@ void GPUMatrix<ElemType>::ConvolutionBackwardKernel(const GPUMatrix<ElemType>& i
     PrepareDevice();
     SyncGuard syncGuard;
     hipLaunchKernelGGL((kConvolutionBackwardKernel), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), (int)in.GetNumRows(), (int)GetNumRows(),
-                                                                   in.Data(), mpRowCol.Data(), mpRowIwht.Data(), mpRowRun.Data(),
-                                                                   runs.Data(), Data(), kernelGrad.Data());
+                                                                   static_cast<const ElemType*>(in.Data()), static_cast<const int*>(mpRowCol.Data()), static_cast<const int*>(mpRowIwht.Data()), static_cast<const int*>(mpRowRun.Data()),
+                                                                   static_cast<const int*>(runs.Data()), static_cast<const ElemType*>(Data()), static_cast<ElemType*>(kernelGrad.Data()));
 }
 
 template <class ElemType>
@@ -3336,8 +3333,8 @@ void GPUMatrix<ElemType>::MaxPoolingForward(const GPUMatrix<int>& mpRowCol, cons
     auto gdim = dim3((output.GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)GetNumCols(), 65535));
     PrepareDevice();
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((kMaxPoolingForward), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), mpRowCol.Data(), mpRowIndices.Data(), indices.Data(),
-                                                           Data(), (int)GetNumRows(), output.Data(), (int)output.GetNumRows());
+    hipLaunchKernelGGL((kMaxPoolingForward), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), static_cast<const int*>(mpRowCol.Data()), static_cast<const int*>(mpRowIndices.Data()), static_cast<const int*>(indices.Data()),
+                                                           static_cast<const ElemType*>(Data()), (int)GetNumRows(), static_cast<ElemType*>(output.Data()), (int)output.GetNumRows());
 }
 
 template <class ElemType>
@@ -3353,9 +3350,9 @@ void GPUMatrix<ElemType>::MaxPoolingBackward(const GPUMatrix<ElemType>& out, con
         grad.SetValue((ElemType)0);
 
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((kMaxPoolingBackward), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), out.Data(), in.Data(),
-                                                            mpRowCol.Data(), mpRowIndices.Data(), indices.Data(),
-                                                            Data(), (int)GetNumRows(), grad.Data(), (int)grad.GetNumRows());
+    hipLaunchKernelGGL((kMaxPoolingBackward), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), static_cast<const ElemType*>(out.Data()), static_cast<const ElemType*>(in.Data()),
+                                                            static_cast<const int*>(mpRowCol.Data()), static_cast<const int*>(mpRowIndices.Data()), static_cast<const int*>(indices.Data()),
+                                                            static_cast<const ElemType*>(Data()), (int)GetNumRows(), static_cast<ElemType*>(grad.Data()), (int)grad.GetNumRows());
 }
 
 template <class ElemType>
@@ -3369,8 +3366,8 @@ void GPUMatrix<ElemType>::MaxROIPoolingForward(const size_t numRois, const size_
     int count = numRois * numImg * channels * pooledHeight * pooledWidth;
     const int blockSize = GridDim::maxThreadsPerBlock;
     auto numThreads = dim3((int)floor((double)(count + blockSize - 1) / blockSize));
-    hipLaunchKernelGGL((kMaxROIPoolingForward), dim3(numThreads), dim3(blockSize), 0, t_stream, count, numRois, numImg, channels, width, height, 
-                                                                  pooledWidth, pooledHeight, Data(), roiData.Data(), output.Data(), argmax.Data(), spatialScale);
+    hipLaunchKernelGGL((kMaxROIPoolingForward), dim3(numThreads), dim3(blockSize), 0, t_stream, static_cast<const int>(count), static_cast<const int>(numRois), static_cast<const int>(numImg), static_cast<const int>(channels), static_cast<const int>(width), static_cast<const int>(height), 
+                                                                  static_cast<const int>(pooledWidth), static_cast<const int>(pooledHeight), static_cast<const ElemType*>(Data()), static_cast<const ElemType*>(roiData.Data()), static_cast<ElemType*>(output.Data()), static_cast<ElemType*>(argmax.Data()), static_cast<double>(spatialScale));
 }
 
 template <class ElemType>
@@ -3384,8 +3381,8 @@ void GPUMatrix<ElemType>::MaxROIPoolingBackward(const size_t numRois, const size
     int count = numImg * channels * height * width;
     const int blockSize = GridDim::maxThreadsPerBlock;
     auto numThreads = dim3((int)floor((double)(count + blockSize - 1) / blockSize));
-    hipLaunchKernelGGL((kMaxROIPoolingBackward), dim3(numThreads), dim3(blockSize), 0, t_stream, count, numRois, numImg, channels, width, height, 
-                                                                   pooledWidth, pooledHeight, Data(), roiData.Data(), grad.Data(), argmax.Data(), spatialScale);
+    hipLaunchKernelGGL((kMaxROIPoolingBackward), dim3(numThreads), dim3(blockSize), 0, t_stream, static_cast<const int>(count), static_cast<const int>(numRois), static_cast<const int>(numImg), static_cast<const int>(channels), static_cast<const int>(width), static_cast<const int>(height), 
+                                                                   static_cast<const int>(pooledWidth), static_cast<const int>(pooledHeight), static_cast<const ElemType*>(Data()), static_cast<const ElemType*>(roiData.Data()), static_cast<ElemType*>(grad.Data()), static_cast<const ElemType*>(argmax.Data()), static_cast<double>(spatialScale));
 }
 
 template <class ElemType>
@@ -3395,8 +3392,8 @@ void GPUMatrix<ElemType>::MaxUnpooling(const GPUMatrix<int>& mpRowCol, const GPU
     auto gdim = dim3((GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)GetNumCols(), 65535));
     PrepareDevice();
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((kMaxUnpooling), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), mpRowCol.Data(), mpRowIndices.Data(), indices.Data(),
-                                                     Data(), poolInput.Data(), (int)GetNumRows(), input.Data(), (int)input.GetNumRows());
+    hipLaunchKernelGGL((kMaxUnpooling), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), static_cast<const int*>(mpRowCol.Data()), static_cast<const int*>(mpRowIndices.Data()), static_cast<const int*>(indices.Data()),
+                                                     static_cast<const ElemType*>(Data()), static_cast<const ElemType*>(poolInput.Data()), (int)GetNumRows(), static_cast<ElemType*>(input.Data()), (int)input.GetNumRows());
 }
 
 template <class ElemType>
@@ -3406,8 +3403,8 @@ void GPUMatrix<ElemType>::AveragePoolingForward(const GPUMatrix<int>& mpRowCol, 
     auto gdim = dim3((output.GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)GetNumCols(), 65535));
     PrepareDevice();
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((kAveragePoolingForward), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), mpRowCol.Data(), mpRowIndices.Data(), indices.Data(),
-                                                               Data(), (int)GetNumRows(), output.Data(), (int)output.GetNumRows());
+    hipLaunchKernelGGL((kAveragePoolingForward), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), static_cast<const int*>(mpRowCol.Data()), static_cast<const int*>(mpRowIndices.Data()), static_cast<const int*>(indices.Data()),
+                                                               static_cast<const ElemType*>(Data()), (int)GetNumRows(), static_cast<ElemType*>(output.Data()), (int)output.GetNumRows());
 }
 
 template <class ElemType>
@@ -3421,8 +3418,8 @@ void GPUMatrix<ElemType>::AveragePoolingBackward(const GPUMatrix<int>& mpRowCol,
         grad.SetValue((ElemType)0);
 
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((kAveragePoolingBackward), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), mpRowCol.Data(), mpRowIndices.Data(), indices.Data(),
-                                                                Data(), (int)GetNumRows(), grad.Data(), (int)grad.GetNumRows());
+    hipLaunchKernelGGL((kAveragePoolingBackward), dim3(gdim), dim3(BlockSize), 0, t_stream, (int)GetNumCols(), static_cast<const int*>(mpRowCol.Data()), static_cast<const int*>(mpRowIndices.Data()), static_cast<const int*>(indices.Data()),
+                                                                static_cast<const ElemType*>(Data()), (int)GetNumRows(), static_cast<ElemType*>(grad.Data()), (int)grad.GetNumRows());
 }
 
 // returns savedMean/savedInvStdDev which are the actual values used to perform the normalization, except for blendFactor 1, in which case they are unused and set to empty
@@ -4601,24 +4598,24 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignCTCScore(const GPUMatrix<ElemTyp
         dim3 block_tail((uttNum + DEFAULT_THREAD_PER_DIM - 1) / DEFAULT_THREAD_PER_DIM, (maxPhoneNum + DEFAULT_THREAD_PER_DIM - 1) / DEFAULT_THREAD_PER_DIM);
         for (long t = 0; t < maxFrameNum; t++)
         {
-            hipLaunchKernelGGL((_assignAlphaScore), dim3(block_tail), dim3(thread_tail), 0, t_stream, prob.Data(), alpha.Data(), phoneSeq.Data(), phoneBoundary.Data(), gpuUttToChanInd,
-                gpuFrameNum, gpuBeginFrame, gpuPhoneNum, numParallelSequences, uttNum, t, maxPhoneNum, totalPhoneNum, blankTokenId, delayConstraint);
+            hipLaunchKernelGGL((_assignAlphaScore), dim3(block_tail), dim3(thread_tail), 0, t_stream, static_cast<const ElemType*>(prob.Data()), static_cast<ElemType*>(alpha.Data()), static_cast<ElemType*>(phoneSeq.Data()), static_cast<ElemType*>(phoneBoundary.Data()), static_cast<const size_t*>(gpuUttToChanInd),
+                static_cast<const size_t*>(gpuFrameNum), static_cast<const size_t*>(gpuBeginFrame), static_cast<const size_t*>(gpuPhoneNum), static_cast<size_t>(numParallelSequences), static_cast<const size_t>(uttNum), static_cast<const size_t>(t), static_cast<const size_t>(maxPhoneNum), static_cast<const size_t>(totalPhoneNum), static_cast<const size_t>(blankTokenId), static_cast<const int>(delayConstraint));
         }
 
         for (long t = maxFrameNum - 1; t >= 0; t--)
         {
-            hipLaunchKernelGGL((_assignBetaScore), dim3(block_tail), dim3(thread_tail), 0, t_stream, prob.Data(), beta.Data(), phoneSeq.Data(), phoneBoundary.Data(), gpuUttToChanInd,
-                gpuFrameNum, gpuBeginFrame, gpuPhoneNum, numParallelSequences, uttNum, t, maxPhoneNum, totalPhoneNum, blankTokenId, delayConstraint);
+            hipLaunchKernelGGL((_assignBetaScore), dim3(block_tail), dim3(thread_tail), 0, t_stream, static_cast<const ElemType*>(prob.Data()), static_cast<ElemType*>(beta.Data()), static_cast<ElemType*>(phoneSeq.Data()), static_cast<ElemType*>(phoneBoundary.Data()), static_cast<const size_t*>(gpuUttToChanInd),
+                static_cast<const size_t*>(gpuFrameNum), static_cast<const size_t*>(gpuBeginFrame), static_cast<const size_t*>(gpuPhoneNum), static_cast<const size_t>(numParallelSequences), static_cast<const size_t>(uttNum), static_cast<const size_t>(t), static_cast<const size_t>(maxPhoneNum), static_cast<const size_t>(totalPhoneNum), static_cast<const size_t>(blankTokenId), static_cast<const int>(delayConstraint));
         }
 
         ElemType zerVar = 0.0;
         totalScore.SetColumn(&zerVar, 0);
-        hipLaunchKernelGGL((_assignTotalScore), dim3(uttNum), dim3(1), 0, t_stream, beta.Data(), totalScore.Data(), uttNum, gpuUttToChanInd, gpuBeginFrame, numParallelSequences, maxPhoneNum);
+        hipLaunchKernelGGL((_assignTotalScore), dim3(uttNum), dim3(1), 0, t_stream, static_cast<ElemType*>(beta.Data()), static_cast<ElemType*>(totalScore.Data()), static_cast<const size_t>(uttNum), static_cast<const size_t*>(gpuUttToChanInd), static_cast<const size_t*>(gpuBeginFrame), static_cast<const size_t>(numParallelSequences), static_cast<const size_t>(maxPhoneNum));
 
         dim3 block_tail_2((uttNum + DEFAULT_THREAD_PER_DIM - 1) / DEFAULT_THREAD_PER_DIM, (maxFrameNum + DEFAULT_THREAD_PER_DIM - 1) / DEFAULT_THREAD_PER_DIM);
 
-        hipLaunchKernelGGL((_assignCTCScore), dim3(block_tail_2), dim3(thread_tail), 0, t_stream, Data(), prob.Data(), alpha.Data(), beta.Data(), phoneSeq.Data(), uttNum, gpuUttToChanInd,
-            gpuBeginFrame, gpuPhoneNum, gpuFrameNum, numParallelSequences, maxPhoneNum, totalPhoneNum);
+        hipLaunchKernelGGL((_assignCTCScore), dim3(block_tail_2), dim3(thread_tail), 0, t_stream, static_cast<ElemType*>(Data()), static_cast<ElemType*>(prob.Data()), static_cast<ElemType*>(alpha.Data()), static_cast<ElemType*>(beta.Data()), static_cast<ElemType*>(phoneSeq.Data()), static_cast<const size_t>(uttNum), static_cast<const size_t*>(gpuUttToChanInd),
+            static_cast<const size_t*>(gpuBeginFrame), static_cast<const size_t*>(gpuPhoneNum), static_cast<const size_t*>(gpuFrameNum), static_cast<const long>(numParallelSequences), static_cast<const long>(maxPhoneNum), static_cast<const long>(totalPhoneNum));
 
         CUDA_CALL(hipFree(gpuFrameNum));
         CUDA_CALL(hipFree(gpuPhoneNum));
@@ -4703,7 +4700,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::DropFrame(const GPUMatrix<ElemType>& l
     long N = (long) GetNumCols(); // one kernel per column
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_DropFrame), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, Data(), label.Data(), gamma.Data(), threshhold, (long) m_numCols, (long) m_numRows);
+    hipLaunchKernelGGL((_DropFrame), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, static_cast<ElemType*>(Data()), static_cast<const ElemType*>(label.Data()), static_cast<const ElemType*>(gamma.Data()), static_cast<const ElemType>(threshhold), (long) m_numCols, (long) m_numRows);
     return *this;
 }
 
@@ -4719,7 +4716,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignSequenceError(const ElemType hsm
     SyncGuard syncGuard;
     long N = (LONG64) label.GetNumElements();
     int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
-    hipLaunchKernelGGL((_AssignSequenceError), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, hsmoothingWeight, Data(), label.Data(), dnnoutput.Data(), gamma.Data(), alpha, N);
+    hipLaunchKernelGGL((_AssignSequenceError), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, static_cast<const ElemType>(hsmoothingWeight), static_cast<ElemType*>(Data()), static_cast<const ElemType*>(label.Data()), static_cast<const ElemType*>(dnnoutput.Data()), static_cast<const ElemType*>(gamma.Data()), static_cast<ElemType>(alpha), static_cast<long>(N));
     return *this;
 }
 
