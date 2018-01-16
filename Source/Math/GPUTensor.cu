@@ -176,9 +176,6 @@ struct FixedMatrix
             }
         }
     }
-#ifdef __HIP_PLATFORM_HCC__
-   __host__ __device__ FixedMatrix(T[N][K]); //TODO: __revert__ resolve constructor prob
-#endif
 };
 template <typename T, size_t N> // specialized version for 0 elements
 struct FixedMatrix<T, N, 0>
