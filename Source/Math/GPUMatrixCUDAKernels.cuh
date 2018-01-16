@@ -349,7 +349,7 @@ __global__ void _elementWiseSqrtOnCuda(
     const CUDA_LONG N)
 {
     CALCULATE_ELEMENTWISE_INDEX_OR_EXIT(id, N);
-    res[id] = sqrt_(max((ElemType) 0, a[id]));
+    res[id] = sqrt_(static_cast<ElemType>(max((ElemType) 0, a[id])));
 };
 
 template <class ElemType>
