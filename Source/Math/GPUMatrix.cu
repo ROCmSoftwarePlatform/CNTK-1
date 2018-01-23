@@ -1368,7 +1368,26 @@ void RescaleToRange(const GPUMatrix<ElemType>& matrix, const ElemType low, const
     //Nobody is ever calling SetStream so all work is done one the same stream
     //Therefore we don't need to sync
     //SyncGuard syncGuard;
+#ifdef __HIP_PLATFORM_HCC__
+    const ElemType *low_h, *high_h;
+    ElemType *low_d, *high_d;
+
+    low_h = &low;
+    high_h = &high;
+
+    hipMalloc(&low_d, 1 * sizeof(ElemType));
+    hipMalloc(&high_d, 1 * sizeof(ElemType));
+
+    hipMemcpy(low_d, low_h, 1 * sizeof(ElemType), hipMemcpyHostToDevice);
+    hipMemcpy(high_d, high_h, 1 * sizeof(ElemType), hipMemcpyHostToDevice);
+
+    hipLaunchKernelGGL((_rescaleToRange<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, matrix.Data(), N, low_d, high_d);
+
+    hipFree(&low_d);
+    hipFree(&high_d);
+#elif defined __HIP_PLATFORM_NVCC__
     hipLaunchKernelGGL((_rescaleToRange<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, matrix.Data(), N, low, high);
+#endif
 }
 
 template <class ElemType>

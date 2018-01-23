@@ -1744,6 +1744,8 @@ __global__ void _rmsprop4BlockSparseCol(
         multipliers[i] = temp;
 }
 
+#ifdef __HIP_PLATFORM_NVCC__
+
 template <class ElemType>
 __global__ void _rescaleToRange(
     ElemType* a,
@@ -1756,6 +1758,23 @@ __global__ void _rescaleToRange(
         return;
     a[id] = a[id] * (high - low) + low;
 }
+
+#elif defined __HIP_PLATFORM_HCC__
+
+template <class ElemType>
+__global__ void _rescaleToRange(
+    ElemType* a,
+    const CUDA_LONG N,
+    const ElemType* low,
+    const ElemType* high)
+{
+    CUDA_LONG id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    if (id >= N)
+        return;
+    a[id] = a[id] * ((*high) - (*low)) + (*low);
+}
+
+#endif
 
 template <class ElemType>
 __global__ void _truncated_normal_transform(
