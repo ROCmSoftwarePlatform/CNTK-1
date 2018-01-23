@@ -47,6 +47,10 @@
 
 #define IDX2C(i, j, ld) (((j) * (ld)) + (i)) // 0 based indexing
 
+#ifdef __HIP_PLATFORM_HCC__
+#define max_macro(i,j) (i > j ? i : j)
+#endif
+
 #ifdef __HIP_PLATFORM_NVCC__
 // On older GPUs, CUDA atomicAdd() only exists for 'float'. This is the 'double' version.
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600 //TODO: __mcw_cuda__ find perfect match and replace
@@ -349,7 +353,11 @@ __global__ void _elementWiseSqrtOnCuda(
     const CUDA_LONG N)
 {
     CALCULATE_ELEMENTWISE_INDEX_OR_EXIT(id, N);
-    res[id] = sqrt_(static_cast<ElemType>(max((ElemType) 0, a[id])));
+#ifdef __HIP_PLATFORM_NVCC__
+    res[id] = sqrt_(max((ElemType) 0, a[id]));
+#elif defined __HIP_PLATFORM_HCC__
+    res[id] = sqrt_(static_cast<ElemType>(max_macro((ElemType) 0, a[id])));
+#endif
 };
 
 template <class ElemType>
