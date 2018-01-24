@@ -9,14 +9,13 @@
 #ifndef CPUONLY
 
 #include "GPUWatcher.h"
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 int GPUWatcher::GetGPUIdWithTheMostFreeMemory()
 {
     int deviceCount = 0;
-    cudaError_t error_id = cudaGetDeviceCount(&deviceCount);
-    if (error_id != cudaSuccess || deviceCount == 0)
+    hipError_t error_id = hipGetDeviceCount(&deviceCount);
+    if (error_id != hipSuccess || deviceCount == 0)
     {
         return -1;
     }
@@ -36,16 +35,16 @@ int GPUWatcher::GetGPUIdWithTheMostFreeMemory()
 
 size_t GPUWatcher::GetFreeMemoryOnCUDADevice(int devId)
 {
-    cudaError_t result = cudaSetDevice(devId);
-    if (result != cudaSuccess)
+    hipError_t result = hipSetDevice(devId);
+    if (result != hipSuccess)
     {
         return 0;
     }
     // get the amount of free memory on the graphics card
     size_t free = 0;
     size_t total = 0;
-    result = cudaMemGetInfo(&free, &total);
-    if (result != cudaSuccess)
+    result = hipMemGetInfo(&free, &total);
+    if (result != hipSuccess)
     {
         return 0;
     }

@@ -1,10 +1,10 @@
 #ifndef __MATRIX_QUANTIZER_KERNEL_CUH__
 #define __MATRIX_QUANTIZER_KERNEL_CUH__
 #include <float.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
+#ifdef __HIP_PLATFORM_NVCC__
 #include <device_launch_parameters.h>
+#endif
 
 #include "ValueQuantizer.h"
 #include "ColumnQuantizer.h"
@@ -26,7 +26,7 @@ __host__ static void ParallelizeOverRangeDim(size_t size, dim3& griddim, dim3& b
 // get the array index for the current thread
 __device__ __inline__ static size_t ParallelizeOverRangeIndex()
 {
-    return threadIdx.x + (blockIdx.x * blockDim.x);
+    return hipThreadIdx_x + (hipBlockIdx_x * hipBlockDim_x);
 }
 
 // =======================================================================
@@ -40,82 +40,82 @@ __device__ void allreduce(T& var)
     __shared__ T buf[BLOCKSIZE];
     volatile T* vBuf = buf;
 
-    buf[threadIdx.x] = var;
+    buf[hipThreadIdx_x] = var;
     __syncthreads();
 
     // We assume BLOCKSIZE is a power of 2
     if (BLOCKSIZE >= 1024)
     {
-        if (threadIdx.x < 512)
+        if (hipThreadIdx_x < 512)
         {
-            var = var + buf[threadIdx.x + 512];
-            buf[threadIdx.x] = var;
+            var = var + buf[hipThreadIdx_x + 512];
+            buf[hipThreadIdx_x] = var;
         }
         __syncthreads();
     }
 
     if (BLOCKSIZE >= 512)
     {
-        if (threadIdx.x < 256)
+        if (hipThreadIdx_x < 256)
         {
-            var = var + buf[threadIdx.x + 256];
-            buf[threadIdx.x] = var;
+            var = var + buf[hipThreadIdx_x + 256];
+            buf[hipThreadIdx_x] = var;
         }
         __syncthreads();
     }
 
     if (BLOCKSIZE >= 256)
     {
-        if (threadIdx.x < 128)
+        if (hipThreadIdx_x < 128)
         {
-            var = var + buf[threadIdx.x + 128];
-            buf[threadIdx.x] = var;
+            var = var + buf[hipThreadIdx_x + 128];
+            buf[hipThreadIdx_x] = var;
         }
         __syncthreads();
     }
 
     if (BLOCKSIZE >= 128)
     {
-        if (threadIdx.x < 64)
+        if (hipThreadIdx_x < 64)
         {
-            var = var + buf[threadIdx.x + 64];
-            buf[threadIdx.x] = var;
+            var = var + buf[hipThreadIdx_x + 64];
+            buf[hipThreadIdx_x] = var;
         }
         __syncthreads();
     }
 
     // Intra warp reduce
-    if ((BLOCKSIZE >= 64) && (threadIdx.x < 32))
+    if ((BLOCKSIZE >= 64) && (hipThreadIdx_x < 32))
     {
-        var = var + vBuf[threadIdx.x + 32];
-        vBuf[threadIdx.x] = var;
+        var = var + vBuf[hipThreadIdx_x + 32];
+        vBuf[hipThreadIdx_x] = var;
     }
 
-    if ((BLOCKSIZE >= 32) && (threadIdx.x < 16))
+    if ((BLOCKSIZE >= 32) && (hipThreadIdx_x < 16))
     {
-        var = var + vBuf[threadIdx.x + 16];
-        vBuf[threadIdx.x] = var;
+        var = var + vBuf[hipThreadIdx_x + 16];
+        vBuf[hipThreadIdx_x] = var;
     }
 
-    if ((BLOCKSIZE >= 16) && (threadIdx.x < 8))
+    if ((BLOCKSIZE >= 16) && (hipThreadIdx_x < 8))
     {
-        var = var + vBuf[threadIdx.x + 8];
-        vBuf[threadIdx.x] = var;
+        var = var + vBuf[hipThreadIdx_x + 8];
+        vBuf[hipThreadIdx_x] = var;
     }
 
-    if ((BLOCKSIZE >= 8) && (threadIdx.x < 4))
+    if ((BLOCKSIZE >= 8) && (hipThreadIdx_x < 4))
     {
-        var = var + vBuf[threadIdx.x + 4];
-        vBuf[threadIdx.x] = var;
+        var = var + vBuf[hipThreadIdx_x + 4];
+        vBuf[hipThreadIdx_x] = var;
     }
 
-    if ((BLOCKSIZE >= 4) && (threadIdx.x < 2))
+    if ((BLOCKSIZE >= 4) && (hipThreadIdx_x < 2))
     {
-        var = var + vBuf[threadIdx.x + 2];
-        vBuf[threadIdx.x] = var;
+        var = var + vBuf[hipThreadIdx_x + 2];
+        vBuf[hipThreadIdx_x] = var;
     }
 
-    if ((BLOCKSIZE >= 2) && (threadIdx.x == 0))
+    if ((BLOCKSIZE >= 2) && (hipThreadIdx_x == 0))
     {
         var = var + vBuf[1];
         vBuf[0] = var;
@@ -132,16 +132,18 @@ __device__ void allreduce(T& var)
 template <class ElemType, bool ZeroThresholdFor1Bit>
 __global__ void _ComputeQuantiStatParj(const ElemType* us, const ElemType* inResidual, long M, long N, size_t ldNbits, char* qpackage)
 {
-    size_t subset = threadIdx.x; // first thread computes 0, 64, 128; second thread 1, 65, 129 etc.
-    size_t j = blockIdx.x;       // we process one column per *block*, j=column index; note: j is never out of range
+    size_t subset = hipThreadIdx_x; // first thread computes 0, 64, 128; second thread 1, 65, 129 etc.
+    size_t j = hipBlockIdx_x;       // we process one column per *block*, j=column index; note: j is never out of range
 
     size_t rows = M; // we compute from 0..rows-1
     size_t bits = 1 << ldNbits;
     const size_t colSizeByte = Microsoft::MSR::CNTK::QuantizedColumn<ElemType>::QuantizedColumnSize(bits, rows);
     auto& qcol = *(Microsoft::MSR::CNTK::QuantizedColumn<ElemType>*) &qpackage[colSizeByte * j];
-
-    Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,
-                                                                                                      subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int, REDUCTION_BLOCK_SIZE>);
+#ifdef __HIP_PLATFORM_NVCC__
+    Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int,REDUCTION_BLOCK_SIZE>);
+#elif defined __HIP_PLATFORM_HCC__
+   Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::template ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int,REDUCTION_BLOCK_SIZE>);
+#endif
 }
 
 //caller: griddim and blockdim should be both 1d
@@ -175,7 +177,11 @@ __global__ void _QuantizeStripjOneQWord(
     const Microsoft::MSR::CNTK::ColumnQuantizer<ElemType> q(ldNbits, qCol.lower, qCol.upper);
 
     // quantize one QWord to qCol[iQWord]
+#ifdef __HIP_PLATFORM_NVCC__
     qCol.bits[iQWord] = q.QuantizeOneQWord<ZeroThresholdFor1Bit>(us, curResidual, M, iQWord, M, numQWordsPerCol, j, newResidual);
+#elif defined __HIP_PLATFORM_HCC__
+    qCol.bits[iQWord] = q.template QuantizeOneQWord<ZeroThresholdFor1Bit>(us, curResidual, M, iQWord, M, numQWordsPerCol, j, newResidual);
+#endif
 }
 
 template <class ElemType>
@@ -209,7 +215,7 @@ void _QuantizeMatrix(
     long M, long N,
     char* qPackage,
     size_t Nbits,
-    cudaStream_t stream,
+    hipStream_t stream,
     ElemType* newResidual,
     bool zeroThresholdFor1Bit)
 {
@@ -235,11 +241,11 @@ void _QuantizeMatrix(
 
     if (zeroThresholdFor1Bit)
     {
-        _ComputeQuantiStatParj<ElemType, true><<<mvgriddim, mvblockdim, 0, stream>>>(us, curResidual, M, N, ldNbits, qPackage);
+        hipLaunchKernelGGL((_ComputeQuantiStatParj<ElemType, true>), dim3(mvgriddim), dim3(mvblockdim), 0, stream, us, curResidual, M, N, ldNbits, qPackage);
     }
     else
     {
-        _ComputeQuantiStatParj<ElemType, false><<<mvgriddim, mvblockdim, 0, stream>>>(us, curResidual, M, N, ldNbits, qPackage);
+        hipLaunchKernelGGL((_ComputeQuantiStatParj<ElemType, false>), dim3(mvgriddim), dim3(mvblockdim), 0, stream, us, curResidual, M, N, ldNbits, qPackage);
     }
 
     // quantize data (also computing the residual at once)
@@ -263,11 +269,11 @@ void _QuantizeMatrix(
     ParallelizeOverRangeDim(totalQWords, griddim, blockdim, 256);
     if (zeroThresholdFor1Bit)
     {
-        _QuantizeStripjOneQWord<ElemType, true><<<griddim, blockdim, 0, stream>>>(us, curResidual, M, N, qPackage, colsizebyte, numQWordsPerCol, ldNbits, newResidual);
+        hipLaunchKernelGGL((_QuantizeStripjOneQWord<ElemType, true>), dim3(griddim), dim3(blockdim), 0, stream, us, curResidual, M, N, qPackage, colsizebyte, numQWordsPerCol, ldNbits, newResidual);
     }
     else
     {
-        _QuantizeStripjOneQWord<ElemType, false><<<griddim, blockdim, 0, stream>>>(us, curResidual, M, N, qPackage, colsizebyte, numQWordsPerCol, ldNbits, newResidual);
+        hipLaunchKernelGGL((_QuantizeStripjOneQWord<ElemType, false>), dim3(griddim), dim3(blockdim), 0, stream, us, curResidual, M, N, qPackage, colsizebyte, numQWordsPerCol, ldNbits, newResidual);
     }
 }
 
@@ -276,7 +282,7 @@ void _QuantizeMatrix(
 template <class ElemType>
 void _UnquantizeMatrix(const char* gpuBuffer, size_t gpuBufferSize,
                        ElemType* us, long M, long N,
-                       size_t nBits, bool add, cudaStream_t stream)
+                       size_t nBits, bool add, hipStream_t stream)
 {
     // verify buffer allocation size
     /*if (msra::math::matrixquantizer::buffersize(bits, rows(), cols()) != gpubuffer.size())
@@ -300,7 +306,7 @@ void _UnquantizeMatrix(const char* gpuBuffer, size_t gpuBufferSize,
 
     dim3 griddim, blockdim;
     ParallelizeOverRangeDim(totalQWords, griddim, blockdim, 256);
-    UnquantizeStripejOneQWord<<<griddim, blockdim, 0, stream>>>(us, M, N, gpuBuffer, colsize, numQWordsPerCol, ldNbits, add);
+    hipLaunchKernelGGL((UnquantizeStripejOneQWord), dim3(griddim), dim3(blockdim), 0, stream, us, M, N, gpuBuffer, colsize, numQWordsPerCol, ldNbits, add);
 }
 }
 }

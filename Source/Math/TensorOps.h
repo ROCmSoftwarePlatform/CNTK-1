@@ -29,7 +29,9 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 // e.g. exp_ -> exp(double), expf(float). This simplifies templated kernel code.
 // -----------------------------------------------------------------------
 
+
 #pragma push_macro("OverloadUnaryMathFns")
+
 #define OverloadUnaryMathFns(x) \
     DECL float x##_(float f)    \
     {                           \
@@ -59,6 +61,7 @@ OverloadUnaryMathFns(atanh);
 #pragma pop_macro("OverloadUnaryMathFns")
 
 #pragma push_macro("OverloadBinaryMathFns")
+
 #define OverloadBinaryMathFns(x)         \
     DECL float x##_(float f, float y)    \
     {                                    \
@@ -68,7 +71,6 @@ OverloadUnaryMathFns(atanh);
     {                                    \
         return x(f, y);                  \
     }
-
 // Because we compile with fast math the following produces nan for negative numbers raised to integer power.
 // To avoid this we define safepow_ further below.
 // Is there an nvcc pragma to disable fast math temporarily? Something like 

@@ -2892,7 +2892,7 @@ public:
                 }
             }
 
-            double cudnnMinEps = 1e-5; // CUDNN_BN_MIN_EPSILON
+            double cudnnMinEps = 1e-5; // HIPDNN_BN_MIN_EPSILON
             if (!m_useCntkEngine && m_epsilon < cudnnMinEps) 
                 fprintf(stderr, "\nWARNING: cuDNN batch normalization requires epsilon >= %e. Epsilon will be reset to that value.\n", cudnnMinEps);
 

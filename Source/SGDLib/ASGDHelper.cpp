@@ -31,15 +31,14 @@
 
 
 #ifndef CPUONLY
-#include <cuda_runtime.h>
-#pragma comment (lib, "cudart.lib")     // for cudaMemcpyAsync()
+#include <hip/hip_runtime.h>
 #endif
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 #ifndef CPUONLY
 
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 // -----------------------------------------------------------------------
 // Error handling
@@ -60,7 +59,7 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
                 strcpy(hostname, "?");
 #endif
             int currentCudaDevice;
-            cudaGetDevice(&currentCudaDevice);
+            hipGetDevice(&currentCudaDevice);
             Microsoft::MSR::CNTK::RuntimeError("%s failure %d; GPU=%d ; hostname=%s ; expr=%s", libName, (int)retCode, currentCudaDevice, hostname ? hostname : "?", exprString);
         }
         catch (const std::exception& e) // catch, log, and rethrow since CUDA code sometimes hangs in destruction, so we'd never get to see the error
@@ -71,7 +70,7 @@ static void CudaCall(ERRTYPE retCode, const char* exprString, const char* libNam
     }
 }
 
-#define CUDA_CALL(expr)     (CudaCall((expr), #expr, "CUDA",     cudaSuccess))
+#define CUDA_CALL(expr)     (CudaCall((expr), #expr, "HIP",     hipSuccess))
 #endif // CPUONLY
 
 #ifdef ASGD_PARALLEL_SUPPORT
@@ -119,7 +118,7 @@ public:
         // GPU asynchronous buffer
         m_gpuAsyncBuffer.resize(m_localBufferNum);
         // creat an communication stream for the data tranfer between GPU and CPU
-        CUDA_CALL(cudaStreamCreate(&_commStream));
+        CUDA_CALL(hipStreamCreate(&_commStream));
 #endif
         m_bufferIndexInUse = 0;
         for (int i = 0; i < m_localBufferNum; i++)
@@ -148,14 +147,14 @@ public:
         for (size_t i = 0; i < m_localBufferNum; i++)
         {
 #ifndef CPUONLY
-            CUDA_CALL(cudaFreeHost(m_cpuAsyncBuffer[i]));
+            CUDA_CALL(hipFreeHost(m_cpuAsyncBuffer[i]));
 #else
             delete m_cpuAsyncBuffer[i];
 #endif
         }
         delete m_cpuAsyncBuffer;
 #ifndef CPUONLY
-        CUDA_CALL(cudaStreamDestroy(_commStream));
+        CUDA_CALL(hipStreamDestroy(_commStream));
 #endif
         multiverso::MV_ShutDown(false);
     }
@@ -229,16 +228,16 @@ public:
                 Microsoft::MSR::CNTK::Matrix<ElemType> &mat = node->Value();
 #ifndef CPUONLY
                 // CNTK model -> GPU buffer
-                CUDA_CALL(cudaMemcpy(m_gpuAsyncBuffer[m_bufferIndexInUse][i].Data(),
+                CUDA_CALL(hipMemcpy(m_gpuAsyncBuffer[m_bufferIndexInUse][i].Data(),
                     mat.Data(),
                     mat.GetNumElements() * sizeof(ElemType),
-                    cudaMemcpyDeviceToDevice));
+                    hipMemcpyDeviceToDevice));
 
                 // GPU buffer -> CNTK model
-                CUDA_CALL(cudaMemcpy(mat.Data(),
+                CUDA_CALL(hipMemcpy(mat.Data(),
                     m_gpuAsyncBuffer[m_bufferSwapIndex[m_bufferIndexInUse]][i].Data(),
                     mat.GetNumElements() * sizeof(ElemType),
-                    cudaMemcpyDeviceToDevice));
+                    hipMemcpyDeviceToDevice));
 #else
                 ElemType * px = m_cpuAsyncBuffer[m_bufferIndexInUse] + m_tableOffsets[i];
                 mat.CopyToArray(px, m_tableLength[i]);
@@ -258,7 +257,7 @@ public:
                 float factor = DecayCoefficient();
                 int deviceId = m_gpuAsyncBuffer[m_bufferIndexInUse][0].GetDeviceId();
 
-                CUDA_CALL(cudaSetDevice(deviceId));
+                CUDA_CALL(hipSetDevice(deviceId));
 
                 Timer threadTimer;
                 threadTimer.Restart();
@@ -266,14 +265,14 @@ public:
                 {
                     ElemType * px = m_deltaArray + m_tableOffsets[widx];
                     // GPU buffer -> CPU buffer
-                    CUDA_CALL(cudaMemcpyAsync(px,
+                    CUDA_CALL(hipMemcpyAsync(px,
                         m_gpuAsyncBuffer[m_bufferIndexInUse][widx].Data(),
                         m_gpuAsyncBuffer[m_bufferIndexInUse][widx].GetNumElements() * sizeof(ElemType),
-                        cudaMemcpyDeviceToHost,
+                        hipMemcpyDeviceToHost,
                         _commStream));
                 }
                 // waiting copy from GPU to CPU has finished
-                CUDA_CALL(cudaStreamSynchronize(_commStream));
+                CUDA_CALL(hipStreamSynchronize(_commStream));
                 threadTimer.Stop();
 
                 if (m_traceLevel > 3)
@@ -314,13 +313,13 @@ public:
                 {
                     ElemType * py2 = m_cpuAsyncBuffer[m_bufferIndexInUse] + m_tableOffsets[widx];
 
-                    CUDA_CALL(cudaMemcpyAsync(m_gpuAsyncBuffer[m_bufferIndexInUse][widx].Data(),
+                    CUDA_CALL(hipMemcpyAsync(m_gpuAsyncBuffer[m_bufferIndexInUse][widx].Data(),
                         py2,
                         m_gpuAsyncBuffer[m_bufferIndexInUse][widx].GetNumElements() * sizeof(ElemType),
-                        cudaMemcpyHostToDevice,
+                        hipMemcpyHostToDevice,
                         _commStream));
                 }
-                CUDA_CALL(cudaStreamSynchronize(_commStream));
+                CUDA_CALL(hipStreamSynchronize(_commStream));
                 threadTimer.Stop();
                 if (m_traceLevel > 3)
                 {
@@ -473,9 +472,9 @@ private:
 
         // create pinned memory
         for (int i3 = 0; i3 < m_localBufferNum; ++i3)
-            CUDA_CALL(cudaMallocHost((void **)&m_cpuAsyncBuffer[i3], sizeof(ElemType) * (m_totalModelSize), cudaHostAllocPortable));
+            CUDA_CALL(hipMallocHost((void **)&m_cpuAsyncBuffer[i3], sizeof(ElemType) * (m_totalModelSize), cudaHostAllocPortable));
 
-        CUDA_CALL(cudaMallocHost((void **)&m_deltaArray, sizeof(ElemType) * (m_totalModelSize), cudaHostAllocPortable));
+        CUDA_CALL(hipMallocHost((void **)&m_deltaArray, sizeof(ElemType) * (m_totalModelSize), cudaHostAllocPortable));
 #else
         for (int i4 = 0; i4 < m_localBufferNum; i4++)
             m_cpuAsyncBuffer[i4] = new ElemType[m_totalModelSize];
@@ -589,7 +588,7 @@ private:
     int m_tableCount;
 
 #ifndef CPUONLY
-    cudaStream_t _commStream;
+    hipStream_t _commStream;
 #endif
 };  // Class MultiversoHelper
 

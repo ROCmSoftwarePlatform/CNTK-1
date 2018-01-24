@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include "Basics.h"
 #include "BestGpu.h"
+#include "hip/hip_runtime.h"
 
 #ifndef CPUONLY
 
@@ -14,9 +15,9 @@ namespace msra { namespace cuda {
 // This is non-blocking. It catches launch failures, but not crashes during execution.
 static void checklaunch(const char* fn)
 {
-    cudaError_t rc = cudaGetLastError();
-    if (rc != cudaSuccess)
-        RuntimeError("%s: launch failure: %s (cuda error %d)", fn, cudaGetErrorString(rc), (int) rc);
+    hipError_t rc = hipGetLastError();
+    if (rc != hipSuccess)
+        RuntimeError("%s: launch failure: %s (cuda error %d)", fn, hipGetErrorString(rc), (int) rc);
 }
 };
 };
