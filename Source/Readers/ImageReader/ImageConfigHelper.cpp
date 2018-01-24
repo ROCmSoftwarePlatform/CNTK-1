@@ -37,7 +37,7 @@ ImageConfigHelper::ImageConfigHelper(const ConfigParameters& config)
     {
         m_dataFormat = HWC;
     }
-    else if (!AreEqualIgnoreCase(mbFmt, "nchw") || AreEqualIgnoreCase(mbFmt, "cudnn"))
+    else if (!AreEqualIgnoreCase(mbFmt, "nchw") || AreEqualIgnoreCase(mbFmt, "hipdnn"))
     {
         RuntimeError("ImageReader does not support the sample format '%s', only 'nchw' and 'nhwc' are supported.", mbFmt.c_str());
     }

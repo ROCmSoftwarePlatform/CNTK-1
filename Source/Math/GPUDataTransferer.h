@@ -1,8 +1,7 @@
 #pragma once
 
 #ifndef CPUONLY
-#include <cuda_runtime_api.h>
-#include <cuda.h>
+#include <hip/hip_runtime_api.h>
 #endif // !CPUONLY
 
 #include "Basics.h"
@@ -27,7 +26,7 @@ class MATH_API GranularGPUDataTransferer : public DataTransferer
 {
 public:
 #ifndef CPUONLY
-    GranularGPUDataTransferer(int deviceId, const cudaStream_t& fetchStream, const cudaStream_t& assignStream, bool blocking = false);
+    GranularGPUDataTransferer(int deviceId, const hipStream_t& fetchStream, const hipStream_t& assignStream, bool blocking = false);
 #else
     GranularGPUDataTransferer() {}
 #endif // !CPUONLY
@@ -49,24 +48,24 @@ public:
 #ifndef CPUONLY
 private:
     // Not owned by this class, are always injected.
-    const cudaStream_t& m_fetchStream;
-    const cudaStream_t& m_assignStream;
+    const hipStream_t& m_fetchStream;
+    const hipStream_t& m_assignStream;
 
 protected:
 
-    virtual const cudaStream_t& GetAssignStream() const
+    virtual const hipStream_t& GetAssignStream() const
     {
         return m_assignStream;
     }
 
-    virtual const cudaStream_t& GetFetchStream() const
+    virtual const hipStream_t& GetFetchStream() const
     {
         return m_fetchStream;
     }
 
-    mutable cudaEvent_t m_fetchCompleteEvent;
-    mutable cudaEvent_t m_assignCompleteEvent;
-    mutable cudaEvent_t m_syncEvent;
+    mutable hipEvent_t m_fetchCompleteEvent;
+    mutable hipEvent_t m_assignCompleteEvent;
+    mutable hipEvent_t m_syncEvent;
 #endif // !CPUONLY
 
 protected:
@@ -115,17 +114,17 @@ public:
     void WaitForCopyCPUToGPUAsync();
 
 #ifndef CPUONLY
-    static cudaStream_t GetFetchStream();
+    static hipStream_t GetFetchStream();
 #endif // !CPUONLY
 
 private:
 #ifndef CPUONLY
 
     // TODO: this needs to be refactored to get rid of all statics
-    static void SyncEvent(cudaEvent_t ev);
+    static void SyncEvent(hipEvent_t ev);
 
-    static cudaStream_t s_fetchStream;
-    static cudaStream_t s_assignStream;
+    static hipStream_t s_fetchStream;
+    static hipStream_t s_assignStream;
 #endif // !CPUONLY
 };
 
@@ -137,9 +136,9 @@ public:
 
 private:
 #ifndef CPUONLY
-    cudaStream_t m_stream;
+    hipStream_t m_stream;
 
-    virtual const cudaStream_t& GetAssignStream() const override
+    virtual const hipStream_t& GetAssignStream() const override
     {
         return m_stream;
     }

@@ -161,7 +161,7 @@ protected:
     void EnsureCompatible() override
     {
         if (m_imageLayout != ImageLayoutKind::CHW)
-            RuntimeError("Reference convolution engine supports only CHW/cudnn layout.");
+            RuntimeError("Reference convolution engine supports only CHW/hipdnn layout.");
     }
 
     void EnsureConvolutionInitialized() override
@@ -587,7 +587,7 @@ protected:
     void EnsureCompatible() override
     {
         if (m_imageLayout != ImageLayoutKind::CHW)
-            LogicError("GEMM convolution engine supports only CHW/cudnn layout.");
+            LogicError("GEMM convolution engine supports only CHW/hipdnn layout.");
         if (IsGpu(m_deviceId))
             LogicError("GEMM convolution engine currently supports only CPU device.");
     }
