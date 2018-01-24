@@ -10,7 +10,7 @@
 #include "RNGHandle.h"
 
 #ifndef CPUONLY
-#include <curand.h>
+#include <hiprand.h>
 #endif // !CPUONLY
 
 namespace Microsoft { namespace MSR { namespace CNTK {
@@ -22,13 +22,13 @@ public:
     virtual ~GPURNGHandle();
 
 #ifndef CPUONLY
-    curandGenerator_t Generator()
+    hiprandGenerator_t Generator()
     {
         return m_generator;
     }
 
 private:
-    curandGenerator_t m_generator;
+    hiprandGenerator_t m_generator;
 #endif // !CPUONLY
 };
 

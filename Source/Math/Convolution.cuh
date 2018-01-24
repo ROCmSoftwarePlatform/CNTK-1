@@ -5,9 +5,12 @@
 
 #pragma once
 
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
+#ifdef __HIP_PLATFORM_NVCC__
 #include <device_launch_parameters.h>
 #include <math_constants.h>
+#endif
+
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -28,14 +31,14 @@ __global__ void kConvolutionForward(int batchSize, const ElemType* __restrict__ 
                                     const ElemType* __restrict__ src, int srcVecSize,
                                     ElemType* dst, int dstVecSize)
 {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (row >= dstVecSize)
         return;
 
-    src += blockIdx.y * srcVecSize;
-    dst += blockIdx.y * dstVecSize;
+    src += hipBlockIdx_y * srcVecSize;
+    dst += hipBlockIdx_y * dstVecSize;
 
-    for (int sample = blockIdx.y; sample < batchSize; sample += gridDim.y)
+    for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
         int ivBase = mpRowIwht[row];
@@ -55,9 +58,8 @@ __global__ void kConvolutionForward(int batchSize, const ElemType* __restrict__ 
             sum += kernel[ivBase + skip + i] * src[colBase + dcol];
         }
         dst[row] = sum;
-
-        src += blockDim.y * srcVecSize;
-        dst += blockDim.y * dstVecSize;
+        src += hipBlockDim_y * srcVecSize;
+        dst += hipBlockDim_y * dstVecSize;
     }
 }
 
@@ -68,14 +70,13 @@ __global__ void kConvolutionBackwardData(int batchSize, const ElemType* __restri
                                          const ElemType* __restrict__ srcGrad, int srcVecSize,
                                          ElemType* grad, int dstVecSize)
 {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (row >= srcVecSize)
         return;
 
-    srcGrad += blockIdx.y * srcVecSize;
-    grad += blockIdx.y * dstVecSize;
-
-    for (int sample = blockIdx.y; sample < batchSize; sample += gridDim.y)
+    srcGrad += hipBlockIdx_y * srcVecSize;
+    grad += hipBlockIdx_y * dstVecSize;
+    for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
         int ivBase = mpRowIwht[row];
@@ -94,9 +95,8 @@ __global__ void kConvolutionBackwardData(int batchSize, const ElemType* __restri
             assert(0 <= colBase + dcol && colBase + dcol < dstVecSize);
             atomicAdd(&grad[colBase + dcol], g * kernel[ivBase + skip + i]);
         }
-
-        srcGrad += blockDim.y * srcVecSize;
-        grad += blockDim.y * dstVecSize;
+        srcGrad += hipBlockDim_y * srcVecSize;
+        grad += hipBlockDim_y * dstVecSize;
     }
 }
 
@@ -108,14 +108,13 @@ __global__ void kConvolutionBackwardKernel(int batchSize, int inVecSize, int out
                                            const ElemType* __restrict__ srcGrad,
                                            ElemType* kernelGrad)
 {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (row >= outVecSize)
         return;
 
-    in += blockIdx.y * inVecSize;
-    srcGrad += blockIdx.y * outVecSize;
-
-    for (int sample = blockIdx.y; sample < batchSize; sample += gridDim.y)
+    in += hipBlockIdx_y * inVecSize;
+    srcGrad += hipBlockIdx_y * outVecSize;
+    for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
         int ivBase = mpRowIwht[row];
@@ -134,9 +133,8 @@ __global__ void kConvolutionBackwardKernel(int batchSize, int inVecSize, int out
             assert(0 <= colBase + dcol && colBase + dcol < inVecSize);
             atomicAdd(&kernelGrad[ivBase + skip + i], g * in[colBase + dcol]);
         }
-
-        in += blockDim.y * inVecSize;
-        srcGrad += blockDim.y * outVecSize;
+        in += hipBlockDim_y * inVecSize;
+        srcGrad += hipBlockDim_y * outVecSize;
     }
 }
 
@@ -145,14 +143,14 @@ __global__ void kMaxPoolingForward(int batchSize, const int* mpRowCol, const int
                                    const ElemType* __restrict__ src, int srcVecSize,
                                    ElemType* dst, int dstVecSize)
 {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (row >= dstVecSize)
         return;
 
-    src += blockIdx.y * srcVecSize;
-    dst += blockIdx.y * dstVecSize;
+    src += hipBlockIdx_y * srcVecSize;
+    dst += hipBlockIdx_y * dstVecSize;
 
-    for (int sample = blockIdx.y; sample < batchSize; sample += gridDim.y)
+    for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
         assert(0 <= colBase && colBase < srcVecSize);
@@ -168,8 +166,8 @@ __global__ void kMaxPoolingForward(int batchSize, const int* mpRowCol, const int
         }
         dst[row] = res;
 
-        src += blockDim.y * srcVecSize;
-        dst += blockDim.y * dstVecSize;
+        src += hipBlockDim_y * srcVecSize;
+        dst += hipBlockDim_y * dstVecSize;
     }
 }
 
@@ -179,16 +177,16 @@ __global__ void kMaxPoolingBackward(int batchSize, const ElemType* out, const El
                                     const ElemType* __restrict__ srcGrad, int srcVecSize,
                                     ElemType* grad, int dstVecSize)
 {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (row >= srcVecSize)
         return;
 
-    in += blockIdx.y * dstVecSize;
-    out += blockIdx.y * srcVecSize;
-    srcGrad += blockIdx.y * srcVecSize;
-    grad += blockIdx.y * dstVecSize;
+    in += hipBlockIdx_y * dstVecSize;
+    out += hipBlockIdx_y * srcVecSize;
+    srcGrad += hipBlockIdx_y * srcVecSize;
+    grad += hipBlockIdx_y * dstVecSize;
 
-    for (int sample = blockIdx.y; sample < batchSize; sample += gridDim.y)
+    for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
         assert(0 <= colBase && colBase < dstVecSize);
@@ -209,10 +207,10 @@ __global__ void kMaxPoolingBackward(int batchSize, const ElemType* out, const El
             }
         }
 
-        in += blockDim.y * dstVecSize;
-        out += blockDim.y * srcVecSize;
-        srcGrad += blockDim.y * srcVecSize;
-        grad += blockDim.y * dstVecSize;
+        in += hipBlockDim_y * dstVecSize;
+        out += hipBlockDim_y * srcVecSize;
+        srcGrad += hipBlockDim_y * srcVecSize;
+        grad += hipBlockDim_y * dstVecSize;
     }
 }
 
@@ -246,8 +244,8 @@ __global__ void kMaxROIPoolingForward(const int totalIterations,
     const ElemType* roiData, ElemType* dst, ElemType* argmax, double spatialScale)
 {
     // index loops over all totalRois*c*pooledHeight*pooledWidth output locations.
-    for (int index = blockIdx.x * blockDim.x + threadIdx.x;
-        index < (totalIterations); index += blockDim.x * gridDim.x)
+    for (int index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+        index < (totalIterations); index += hipBlockDim_x * hipGridDim_x)
     {
 
         // output is [W x H x C x N]
@@ -286,7 +284,11 @@ __global__ void kMaxROIPoolingForward(const int totalIterations,
 
         bool isempty = (hend <= hstart) || (wend <= wstart);
         // Define an empty pooling region to be zero
-        ElemType maxval = isempty ? (ElemType)0 : -CUDART_INF_F;
+#ifdef __HIP_PLATFORM_NVCC__
+        ElemType maxval = isempty ? (ElemType)0 : -CUDART_INF_F;    
+#elif defined __HIP_PLATFORM_HCC__
+        ElemType maxval = isempty ? (ElemType)0 :  -(__int_as_float(0x7f800000));//TODO: __add__ -CUDART_INF_F;
+#endif
         int maxidx = -1;
 
         int imgIdx = n / numROIs;
@@ -320,8 +322,8 @@ __global__ void kMaxROIPoolingBackward(const int totalIterations,
     const ElemType* roiData, ElemType* grad, const ElemType* argmax, double spatialScale)
 {
     // index loops over all input locations (locations in the original input tensor).
-    for (int index = blockIdx.x * blockDim.x + threadIdx.x;
-        index < (totalIterations); index += blockDim.x * gridDim.x)
+    for (int index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+        index < (totalIterations); index += hipBlockDim_x * hipGridDim_x)
     {
         // images are laid out [W x H x C x N]
         // (n, c, h, w) is an element in the input image
@@ -396,15 +398,15 @@ __global__ void kMaxUnpooling(int batchSize, const int* mpRowCol, const int* mpR
                               const ElemType* __restrict__ src, const ElemType* poolIn, int srcVecSize,
                               ElemType* dst, int dstVecSize)
 {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (row >= srcVecSize)
         return;
 
-    src    += blockIdx.y * srcVecSize;
-    poolIn += blockIdx.y * dstVecSize;
-    dst    += blockIdx.y * dstVecSize;
+    src    += hipBlockIdx_y * srcVecSize;
+    poolIn += hipBlockIdx_y * dstVecSize;
+    dst    += hipBlockIdx_y * dstVecSize;
 
-    for (int sample = blockIdx.y; sample < batchSize; sample += gridDim.y)
+    for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
         assert(0 <= colBase && colBase < dstVecSize);
@@ -432,9 +434,9 @@ __global__ void kMaxUnpooling(int batchSize, const int* mpRowCol, const int* mpR
 
         dst[colBase + dcol] = src[row];
 
-        src    += blockIdx.y * srcVecSize;
-        poolIn += blockIdx.y * dstVecSize;
-        dst    += blockIdx.y * dstVecSize;
+        src    += hipBlockIdx_y * srcVecSize;
+        poolIn += hipBlockIdx_y * dstVecSize;
+        dst    += hipBlockIdx_y * dstVecSize;
     }
 }
 
@@ -443,14 +445,14 @@ __global__ void kAveragePoolingForward(int batchSize, const int* mpRowCol, const
                                        const ElemType* __restrict__ src, int srcVecSize,
                                        ElemType* dst, int dstVecSize)
 {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (row >= dstVecSize)
         return;
 
-    src += blockIdx.y * srcVecSize;
-    dst += blockIdx.y * dstVecSize;
+    src += hipBlockIdx_y * srcVecSize;
+    dst += hipBlockIdx_y * dstVecSize;
 
-    for (int sample = blockIdx.y; sample < batchSize; sample += gridDim.y)
+    for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
         assert(0 <= colBase && colBase < srcVecSize);
@@ -466,8 +468,8 @@ __global__ void kAveragePoolingForward(int batchSize, const int* mpRowCol, const
         }
         dst[row] = sum / size;
 
-        src += blockDim.y * srcVecSize;
-        dst += blockDim.y * dstVecSize;
+        src += hipBlockDim_y * srcVecSize;
+        dst += hipBlockDim_y * dstVecSize;
     }
 }
 
@@ -476,14 +478,14 @@ __global__ void kAveragePoolingBackward(int batchSize, const int* mpRowCol, cons
                                         const ElemType* __restrict__ srcGrad, int srcVecSize,
                                         ElemType* grad, int dstVecSize)
 {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if (row >= srcVecSize)
         return;
 
-    srcGrad += blockIdx.y * srcVecSize;
-    grad += blockIdx.y * dstVecSize;
+    srcGrad += hipBlockIdx_y * srcVecSize;
+    grad += hipBlockIdx_y * dstVecSize;
 
-    for (int sample = blockIdx.y; sample < batchSize; sample += gridDim.y)
+    for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
         assert(0 <= colBase && colBase < dstVecSize);
@@ -499,8 +501,8 @@ __global__ void kAveragePoolingBackward(int batchSize, const int* mpRowCol, cons
             atomicAdd(&grad[colBase + dcol], g);
         }
 
-        srcGrad += blockDim.y * srcVecSize;
-        grad += blockDim.y * dstVecSize;
+        srcGrad += hipBlockDim_y * srcVecSize;
+        grad += hipBlockDim_y * dstVecSize;
     }
 }
 

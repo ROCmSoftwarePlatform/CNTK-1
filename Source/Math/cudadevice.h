@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
+
 #include <assert.h>
 #include <math.h>
 #include <vector>
@@ -40,9 +41,9 @@ class ondevice
 public:
     ondevice(size_t deviceid)
     {
-        auto rc = cudaSetDevice((int)deviceid);
-        if (rc != cudaSuccess)
-            RuntimeError("Cannot set cuda device: %s (cuda error %d)", cudaGetErrorString(rc), (int)rc);
+        auto rc = hipSetDevice((int)deviceid);
+        if (rc != hipSuccess)
+            RuntimeError("Cannot set cuda device: %s (cuda error %d)", hipGetErrorString(rc), (int)rc);
     }
 };
 } }
