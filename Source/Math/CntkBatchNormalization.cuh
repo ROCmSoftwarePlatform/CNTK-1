@@ -564,19 +564,19 @@ __global__ void kComputeSpatialBatchMeanAndInvStdDev(int vectorSize, int spatial
             xMean[hipBlockIdx_x] = blendFactor * runMean[hipBlockIdx_x] + (1.0 - blendFactor) * mean[0];
 
             comp_t runV = batchSize * spatialSize == 1 ? 0 : m2[0] / (batchSize * spatialSize - 1);
-            runVariance[hipblockIdx_x] = expAvgFactor * runV + (1.0 - expAvgFactor) * runVariance[hipblockIdx_x];
-            xInvStdDev[hipblockIdx_x] = Operations::RSqrt(static_cast<comp_t>(m2[0] / (batchSize * spatialSize) + (comp_t)epsilon));
+            runVariance[hipBlockIdx_x] = expAvgFactor * runV + (1.0 - expAvgFactor) * runVariance[hipBlockIdx_x];
+            xInvStdDev[hipBlockIdx_x] = Operations::RSqrt(static_cast<comp_t>(m2[0] / (batchSize * spatialSize) + (comp_t)epsilon));
             if (blendFactor != 0)
             {
-                comp_t runInvStdDev = Operations::RSqrt(static_cast<comp_t>((comp_t)runVariance[hipblockIdx_x] + (comp_t)epsilon));
-                xInvStdDev[hipblockIdx_x] = blendFactor * runInvStdDev + (1.0 - blendFactor) * xInvStdDev[hipblockIdx_x];
+                comp_t runInvStdDev = Operations::RSqrt(static_cast<comp_t>((comp_t)runVariance[hipBlockIdx_x] + (comp_t)epsilon));
+                xInvStdDev[hipBlockIdx_x] = blendFactor * runInvStdDev + (1.0 - blendFactor) * xInvStdDev[hipBlockIdx_x];
             }
         }
     }
     else if (hipThreadIdx_y == 0 && hipThreadIdx_x == 0)
     {
-        xMean[hipblockIdx_x] = runMean[hipblockIdx_x];
-        xInvStdDev[hipblockIdx_x] = Operations::RSqrt(static_cast<comp_t>((comp_t)runVariance[hipblockIdx_x] + (comp_t)epsilon));
+        xMean[hipBlockIdx_x] = runMean[hipBlockIdx_x];
+        xInvStdDev[hipBlockIdx_x] = Operations::RSqrt(static_cast<comp_t>((comp_t)runVariance[hipBlockIdx_x] + (comp_t)epsilon));
     }
 }
 
@@ -669,7 +669,7 @@ __global__ void kNormalizeBatchTraining(int vectorSize, int spatialSize, int bat
     __shared__ comp_t invStdDevS[BlockDimX * U];
     __shared__ comp_t scaleS[BlockDimX * U];
     __shared__ comp_t biasS[BlockDimX * U];
-    int offs = hipthreadIdx_x * U;
+    int offs = hipThreadIdx_x * U;
 
     // REVIEW alexeyk: optimize smem usage, reduce transaction count (is it worth it?).
     if (hipThreadIdx_y == 0)
@@ -867,8 +867,8 @@ __global__ void kComputeScaleAndBiasGradients(int vectorSize, int batchSize, con
     // Final reduction.
     __shared__ comp_t dsS[BlockDimY][BlockDimX * U];
     __shared__ comp_t dbS[BlockDimY][BlockDimX * U];
-    StoreValues<U>(ds, &dsS[hipthreadIdx_y][hipthreadIdx_x * U]);
-    StoreValues<U>(db, &dbS[hipthreadIdx_y][hipthreadIdx_x * U]);
+    StoreValues<U>(ds, &dsS[hipThreadIdx_y][hipThreadIdx_x * U]);
+    StoreValues<U>(db, &dbS[hipThreadIdx_y][hipThreadIdx_x * U]);
     __syncthreads();
     // Very simple block reduction. As the block y dim is small (e.g. 16) then the loop
     // is executed very few times (e.g. 4) so the performance is good.
