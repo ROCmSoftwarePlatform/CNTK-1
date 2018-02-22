@@ -199,7 +199,7 @@ endif
     COMMON_FLAGS +=-DUSE_HIPDNN
   endif
   INCLUDEPATH += $(HIP_PATH)/include
-  INCLUDEPATH += $(EXTERNAL_DIR)/hcblas/include/
+  INCLUDEPATH += $(EXTERNAL_DIR)/hipblas/include/
   INCLUDEPATH += $(EXTERNAL_DIR)/hiprand/include/
   INCLUDEPATH += $(EXTERNAL_DIR)/rocrand/include/
   INCLUDEPATH += $(EXTERNAL_DIR)/hcsparse/include/

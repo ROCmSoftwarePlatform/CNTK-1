@@ -144,6 +144,7 @@ default_kaldis="kaldi-trunk kaldi-c024e8aa"
 default_gdk_includes="include/nvidia/gdk cuda/include"
 default_gdk_nvml_libs="src/gdk/nvml/lib cuda/lib64/stubs"
 default_cubs="cub-1.7.4"
+default_cubhips="cub-hip"
 default_cudnns="cudnn-7.0"
 default_hipdnn="hipDNN"
 default_opencvs="opencv-3.1.0 opencv-3.0.0"
@@ -301,7 +302,7 @@ function check_version ()
 
 function default_use_cuda ()
 {
-    if test x$(find_cuda) = x || test x$(find_gdk_include) = x || test x$(find_gdk_nvml_lib) = x || test x$(find_cudnn) = x || test x$(find_cub) = x
+    if test x$(find_cuda) = x || test x$(find_gdk_include) = x || test x$(find_gdk_nvml_lib) = x || test x$(find_cudnn) = x
     then
         echo no
     else
@@ -1095,6 +1096,7 @@ if test x$buildtype = x
 then
     buildtype=$default_buildtype
     echo Defaulting to --with-buildtype=release
+    /bin/bash $root_dir/install_hiplibs.sh
 fi
 
 # If no math library was specified, search for mkl
@@ -1126,7 +1128,6 @@ fi
 
 if test x$enable_hip = xyes && test x$hip_path = x
 then
-    /bin/bash $root_dir/install_hiplibs.sh
     hip_path=$(find_hip)
     if test x$hip_path = x ; then
         echo Cannot locate a HIP directory
