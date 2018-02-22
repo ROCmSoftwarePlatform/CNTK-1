@@ -147,7 +147,7 @@ public:
         for (size_t i = 0; i < m_localBufferNum; i++)
         {
 #ifndef CPUONLY
-            CUDA_CALL(hipFreeHost(m_cpuAsyncBuffer[i]));
+            CUDA_CALL(hipHostFree(m_cpuAsyncBuffer[i]));
 #else
             delete m_cpuAsyncBuffer[i];
 #endif
@@ -472,9 +472,9 @@ private:
 
         // create pinned memory
         for (int i3 = 0; i3 < m_localBufferNum; ++i3)
-            CUDA_CALL(hipMallocHost((void **)&m_cpuAsyncBuffer[i3], sizeof(ElemType) * (m_totalModelSize), cudaHostAllocPortable));
+            CUDA_CALL(hipHostMalloc((void **)&m_cpuAsyncBuffer[i3], sizeof(ElemType) * (m_totalModelSize), hipHostMallocPortable));
 
-        CUDA_CALL(hipMallocHost((void **)&m_deltaArray, sizeof(ElemType) * (m_totalModelSize), cudaHostAllocPortable));
+        CUDA_CALL(hipHostMalloc((void **)&m_deltaArray, sizeof(ElemType) * (m_totalModelSize), hipHostMallocPortable));
 #else
         for (int i4 = 0; i4 < m_localBufferNum; i4++)
             m_cpuAsyncBuffer[i4] = new ElemType[m_totalModelSize];

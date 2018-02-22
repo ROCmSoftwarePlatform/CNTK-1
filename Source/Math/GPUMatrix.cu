@@ -107,7 +107,7 @@ const char* CudaErrString<hipblasStatus_t>(hipblasStatus_t e)
     case HIPBLAS_STATUS_INTERNAL_ERROR:   return "HIPBLAS_STATUS_INTERNAL_ERROR";
     case HIPBLAS_STATUS_NOT_SUPPORTED:    return "HIPBLAS_STATUS_NOT_SUPPORTED/HIPBLAS_STATUS_LICENSE_ERROR/HIPBLAS_STATUS_ARCH_MISMATCH";
     //case HIPBLAS_STATUS_LICENSE_ERROR:    return "HIPBLAS_STATUS_LICENSE_ERROR";
-    default:                             return "(look for HIPBLAS_STATUS_xxx in hipblas_api.h)";
+    default:                             return "(look for HIPBLAS_STATUS_xxx in cublas_api.h)";
     }
 }
 template <>
@@ -3070,7 +3070,8 @@ void GPUMatrix<ElemType>::VectorMax(GPUMatrix<ElemType>& maxIndexes, GPUMatrix<E
     CUDA_CALL(SortPairsDescending(nullptr, cbtemp, inVal, outVal1, inIdx, outIdx, celt, 0, sizeof(ElemType) * 8, t_stream));
     size_t ctemp1 = (cbtemp + sizeof(ElemType) - 1) / sizeof(ElemType);
     cbtemp = 0;
-    CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
+    CUDA_CALL(hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairs(nullptr, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream)));
+    //CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
     size_t ctemp2 = (cbtemp + sizeof(ElemType) - 1) / sizeof(ElemType);
     size_t ctemp = std::max(ctemp1, ctemp2);
     cbtemp = ctemp * sizeof(ElemType);
@@ -3098,7 +3099,8 @@ void GPUMatrix<ElemType>::VectorMax(GPUMatrix<ElemType>& maxIndexes, GPUMatrix<E
     // Sort by values.
     CUDA_CALL(SortPairsDescending(ptmp, cbtemp, inVal, outVal1, inIdx, outIdx, celt, 0, sizeof(ElemType) * 8, t_stream));
     // Sort by column indices. outIdx contains indices after the first pass so it's used as an input.
-    CUDA_CALL(cub::DeviceRadixSort::SortPairs(ptmp, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
+    CUDA_CALL(hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairs(ptmp, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream)));
+    //CUDA_CALL(cub::DeviceRadixSort::SortPairs(ptmp, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
     // Copy results.
     cblock = (topK * n + ThreadsPerBlock - 1) / ThreadsPerBlock;
     hipLaunchKernelGGL((_copyTopKResults), dim3(cblock), dim3(ThreadsPerBlock), 0, t_stream, inIdx, outVal2, maxIndexes.Data(), maxValues.Data(), m, n, topK);
@@ -4248,9 +4250,9 @@ void GPUMatrix<ElemType>::BatchMatMul(ElemType beta, const GPUMatrix<ElemType>& 
     if (!isColWise)
         LogicError("Only column wise is supported.");
 
-    cublasHandle_t cuHandle = GetCublasHandle(b.GetComputeDeviceId());
-    cublasOperation_t transA = transposeA ? CUBLAS_OP_T : CUBLAS_OP_N;
-    cublasOperation_t transB = transposeB ? CUBLAS_OP_T : CUBLAS_OP_N;
+    hipblasHandle_t cuHandle = GetCublasHandle(b.GetComputeDeviceId());
+    hipblasOperation_t transA = transposeA ? HIPBLAS_OP_T : HIPBLAS_OP_N;
+    hipblasOperation_t transB = transposeB ? HIPBLAS_OP_T : HIPBLAS_OP_N;
 
     const int aSampleElemNum = (int)a.GetNumRows();
     const int aBatchSize = (int)a.GetNumCols();
@@ -4296,17 +4298,17 @@ void GPUMatrix<ElemType>::BatchMatMul(ElemType beta, const GPUMatrix<ElemType>& 
     ElemType** devAList = 0;
     ElemType** devBList = 0;
     ElemType** devCList = 0;
-    CUDA_CALL(cudaMalloc(&devAList, aBatchSize * sizeof(ElemType*)));
-    CUDA_CALL(cudaMalloc(&devBList, aBatchSize * sizeof(ElemType*)));
-    CUDA_CALL(cudaMalloc(&devCList, aBatchSize * sizeof(ElemType*)));
-    CUDA_CALL(cudaMemcpy(devAList, &Aarray[0], sizeof(ElemType*) * aBatchSize, cudaMemcpyHostToDevice));
-    CUDA_CALL(cudaMemcpy(devBList, &Barray[0], sizeof(ElemType*) * aBatchSize, cudaMemcpyHostToDevice));
-    CUDA_CALL(cudaMemcpy(devCList, &Carray[0], sizeof(ElemType*) * aBatchSize, cudaMemcpyHostToDevice));
+    CUDA_CALL(hipMalloc(&devAList, aBatchSize * sizeof(ElemType*)));
+    CUDA_CALL(hipMalloc(&devBList, aBatchSize * sizeof(ElemType*)));
+    CUDA_CALL(hipMalloc(&devCList, aBatchSize * sizeof(ElemType*)));
+    CUDA_CALL(hipMemcpy(devAList, &Aarray[0], sizeof(ElemType*) * aBatchSize, hipMemcpyHostToDevice));
+    CUDA_CALL(hipMemcpy(devBList, &Barray[0], sizeof(ElemType*) * aBatchSize, hipMemcpyHostToDevice));
+    CUDA_CALL(hipMemcpy(devCList, &Carray[0], sizeof(ElemType*) * aBatchSize, hipMemcpyHostToDevice));
 
-    CUBLAS_CALL(cublasGemmBatchedHelper(cuHandle, transA, transB, m, n, k, &alpha, (const ElemType**)devAList, lda, (const ElemType**)devBList, ldb, &beta, devCList, ldc, aBatchSize));
-    CUDA_CALL(cudaFree(devAList));
-    CUDA_CALL(cudaFree(devBList));
-    CUDA_CALL(cudaFree(devCList));
+    HIPBLAS_CALL(hipblasGemmBatchedHelper(cuHandle, transA, transB, m, n, k, &alpha, (const ElemType**)devAList, lda, (const ElemType**)devBList, ldb, &beta, devCList, ldc, aBatchSize));
+    CUDA_CALL(hipFree(devAList));
+    CUDA_CALL(hipFree(devBList));
+    CUDA_CALL(hipFree(devCList));
 }
 
 template <class ElemType>

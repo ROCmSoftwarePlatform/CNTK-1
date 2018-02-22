@@ -30,9 +30,10 @@
 #endif
 
 #ifdef __HIP_PLATFORM_NVCC__
-struct cublasContext;
+/*struct cublasContext;
 typedef struct cublasContext* cublasHandle_t;
-typedef cublasHandle_t hipblasHandle_t;
+typedef cublasHandle_t hipblasHandle_t;*/ //TODO: PRAS_2.4 use this if hcblas is used, instead of hipblas
+typedef void* hipblasHandle_t;
 #elif defined __HIP_PLATFORM_HCC__
 typedef void* hipblasHandle_t;
 #endif

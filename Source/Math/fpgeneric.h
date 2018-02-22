@@ -16,10 +16,12 @@
 
 #ifndef CPUONLY
 
-#include <cublas_v2.h>
-#include <cusparse_v2.h>
-#include <cudnn.h>
-#include <curand_kernel.h>
+#include "hip/hip_runtime.h"
+#include <hipblas.h>
+#include <hipsparse.h>
+#include <hipDNN.h>
+#include <hiprand.h>
+#include <hiprand_kernel.h>
 #include <time.h>
 
 #ifdef _MSC_VER
@@ -42,6 +44,9 @@
 #define COPY_TILE_DIM 1024
 #define COPY_BLOCK_DIM 256
 
+#ifdef __HIP_PLATFORM_NVCC__
+typedef hiprandState_t hiprandState;
+#endif
 // kernel(s) for half functions with no library support
 namespace {
 __global__ void transposeNoOverlap(half *odata, const half *idata, const int m, const int n)
@@ -66,37 +71,37 @@ __global__ void transposeNoOverlap(half *odata, const half *idata, const int m, 
         odata[(y+j)*n + x] = tile[threadIdx.x][threadIdx.y + j];
     }
 }
-// set up curand state, need to move up layer to remove calling for each generate call
-__global__ void setup_state(curandState *state, unsigned long long seed)
+// set up hiprand state, need to move up layer to remove calling for each generate call
+__global__ void setup_state(hiprandState *state, unsigned long long seed)
 {
-    curand_init(seed, 0, 0, state);
+    hiprand_init(seed, 0, 0, state);
 }
 
-__global__ void GenerateUniformHalf(curandState *state, half *result, int n)
+__global__ void GenerateUniformHalf(hiprandState *state, half *result, int n)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if(id >= n) return;
 
-    curandState localState = *state;
+    hiprandState localState = *state;
 
     float x;
     skipahead(id, &localState);
-    x = curand_uniform(&localState);
+    x = hiprand_uniform(&localState);
 
     result[id] = x;
     if(id == n-1) *state = localState;
 }
 
-__global__ void GenerateNormalHalf(curandState *state, half *result, int n, half mean, half stddev)
+__global__ void GenerateNormalHalf(hiprandState *state, half *result, int n, half mean, half stddev)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if(id >= n) return;
 
-    curandState localState = *state;
+    hiprandState localState = *state;
 
     float x;
     skipahead(id, &localState);
-    x = curand_normal(&localState);
+    x = hiprand_normal(&localState);
 
     result[id] = (float)mean + (float)stddev * x;
     if(id == n-1) *state = localState;
@@ -136,119 +141,119 @@ __global__ void copyFloat2Half(half *odata, const float *idata, const int n)
 // Generalize library calls to be use in template functions
 
 // gemm
-inline cublasStatus_t cublasgemmHelper(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, int k, const float* alpha, const float* A, int lda, const float* B, int ldb, const float* beta, float* C, int ldc)
+inline hipblasStatus_t hipblasgemmHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, int k, const float* alpha, const float* A, int lda, const float* B, int ldb, const float* beta, float* C, int ldc)
 {
-    return cublasSgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+    return hipblasSgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
 }
-inline cublasStatus_t cublasgemmHelper(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, int k, const double* alpha, const double* A, int lda, const double* B, int ldb, const double* beta, double* C, int ldc)
+inline hipblasStatus_t hipblasgemmHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, int k, const double* alpha, const double* A, int lda, const double* B, int ldb, const double* beta, double* C, int ldc)
 {
-    return cublasDgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+    return hipblasDgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
 }
-inline cublasStatus_t cublasgemmHelper(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, int k, const half* alpha, const half* A, int lda, const half* B, int ldb, const half* beta, half* C, int ldc)
+inline hipblasStatus_t hipblasgemmHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, int k, const half* alpha, const half* A, int lda, const half* B, int ldb, const half* beta, half* C, int ldc)
 {
     // This does true FP16 computation which is slow for non-Volta GPUs
-    //return cublasHgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+    //return hipblasHgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
     // This does pseudo FP16 computation (input/output in fp16, computation in fp32)
     float h_a = *alpha;
     float h_b = *beta;
-    cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH);
-    return cublasGemmEx(handle, transa, transb, m, n, k, &h_a, A, CUDA_R_16F, lda, B, CUDA_R_16F, ldb, &h_b, C, CUDA_R_16F, ldc, CUDA_R_32F, CUBLAS_GEMM_DFALT);
+    //hipblasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH); //TODO:PRAS_2.4
+    return HIPBLAS_STATUS_NOT_SUPPORTED;//hipblasGemmEx(handle, transa, transb, m, n, k, &h_a, A, CUDA_R_16F, lda, B, CUDA_R_16F, ldb, &h_b, C, CUDA_R_16F, ldc, CUDA_R_32F, CUBLAS_GEMM_DFALT); //TODO:PRAS_2.4
 }
 
 // batched gemm
-inline cublasStatus_t cublasGemmBatchedHelper(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, int k, const float* alpha, const float *Aarray[], int lda, const float *Barray[], int ldb, const float *beta, float *Carray[], int ldc, int batchCount)
+inline hipblasStatus_t hipblasGemmBatchedHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, int k, const float* alpha, const float *Aarray[], int lda, const float *Barray[], int ldb, const float *beta, float *Carray[], int ldc, int batchCount)
 {
-    return cublasSgemmBatched(handle, transa, transb, m, n, k, alpha, Aarray, lda, Barray, ldb, beta, Carray, ldc, batchCount);
+    return hipblasSgemmBatched(handle, transa, transb, m, n, k, alpha, Aarray, lda, Barray, ldb, beta, Carray, ldc, batchCount);
 }
-inline cublasStatus_t cublasGemmBatchedHelper(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, int k, const double* alpha, const double *Aarray[], int lda, const double *Barray[], int ldb, const double *beta, double *Carray[], int ldc, int batchCount)
+inline hipblasStatus_t hipblasGemmBatchedHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, int k, const double* alpha, const double *Aarray[], int lda, const double *Barray[], int ldb, const double *beta, double *Carray[], int ldc, int batchCount)
 {
-    return cublasDgemmBatched(handle, transa, transb, m, n, k, alpha, Aarray, lda, Barray, ldb, beta, Carray, ldc, batchCount);
+    return hipblasDgemmBatched(handle, transa, transb, m, n, k, alpha, Aarray, lda, Barray, ldb, beta, Carray, ldc, batchCount);
 }
-inline cublasStatus_t cublasGemmBatchedHelper(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, int k, const half* alpha, const half *Aarray[], int lda, const half *Barray[], int ldb, const half *beta, half *Carray[], int ldc, int batchCount)
+inline hipblasStatus_t hipblasGemmBatchedHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, int k, const half* alpha, const half *Aarray[], int lda, const half *Barray[], int ldb, const half *beta, half *Carray[], int ldc, int batchCount)
 {
-    return cublasHgemmBatched(handle, transa, transb, m, n, k, alpha, (const __half**)Aarray, lda, (const __half**)Barray, ldb, beta, (__half**)Carray, ldc, batchCount);
+    return HIPBLAS_STATUS_NOT_SUPPORTED;//hipblasHgemmBatched(handle, transa, transb, m, n, k, alpha, (const __half**)Aarray, lda, (const __half**)Barray, ldb, beta, (__half**)Carray, ldc, batchCount);/TODO:PRAS_2.4
 }
 
 // axpy
-inline cublasStatus_t cublasaxpyHelper(cublasHandle_t handle, int n, const float* alpha, const float* x, int incx, float* y, int incy)
+inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const float* alpha, const float* x, int incx, float* y, int incy)
 {
-    return cublasSaxpy(handle, n, alpha, x, incx, y, incy);
+    return hipblasSaxpy(handle, n, alpha, x, incx, y, incy);
 }
-inline cublasStatus_t cublasaxpyHelper(cublasHandle_t handle, int n, const double* alpha, const double* x, int incx, double* y, int incy)
+inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const double* alpha, const double* x, int incx, double* y, int incy)
 {
-    return cublasDaxpy(handle, n, alpha, x, incx, y, incy);
+    return hipblasDaxpy(handle, n, alpha, x, incx, y, incy);
 }
-inline cublasStatus_t cublasaxpyHelper(cublasHandle_t handle, int n, const half* alpha, const half* x, int incx, half* y, int incy)
+inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const half* alpha, const half* x, int incx, half* y, int incy)
 {
     float tmp_alpha = *alpha;
-    return cublasAxpyEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, CUDA_R_32F);
+    return HIPBLAS_STATUS_NOT_SUPPORTED;//hipblasAxpyEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, CUDA_R_32F); TODO:PRAS_2.4
 }
 
 // transpose using geam
-inline cublasStatus_t cublasTransposeHelper(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, float *alpha, float *A, int lda, float *beta, float *B, int ldb, float *C, int ldc)
+inline hipblasStatus_t hipblasTransposeHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, float *alpha, float *A, int lda, float *beta, float *B, int ldb, float *C, int ldc)
 {
-    return cublasSgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
+    return hipblasSgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
 }
-inline cublasStatus_t cublasTransposeHelper(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, double *alpha, double *A, int lda, double *beta, double *B, int ldb, double *C, int ldc)
+inline hipblasStatus_t hipblasTransposeHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, double *alpha, double *A, int lda, double *beta, double *B, int ldb, double *C, int ldc)
 {
-    return cublasDgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
+    return hipblasDgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
 }
-inline cublasStatus_t cublasTransposeHelper(cublasHandle_t, cublasOperation_t, cublasOperation_t, int m, int n, half *, half *A, int, half *, half *, int, half *C, int)
+inline hipblasStatus_t hipblasTransposeHelper(hipblasHandle_t, hipblasOperation_t, hipblasOperation_t, int m, int n, half *, half *A, int, half *, half *, int, half *C, int)
 {
     if(C != A)
     {
         dim3 dimGrid((n+TRANS_TILE_DIM-1)/TRANS_TILE_DIM, (m+TRANS_TILE_DIM-1)/TRANS_TILE_DIM, 1);
         dim3 dimBlock(TRANS_TILE_DIM, BLOCK_ROWS, 1);
 
-        transposeNoOverlap<<<dimGrid, dimBlock>>>(C, A, n, m);
+        hipLaunchKernelGGL((transposeNoOverlap), dim3(dimGrid), dim3(dimBlock), 0, 0, C, A, n, m);
     }
     else
-        RuntimeError("In place transpose(half) not supported."); // cublas do not support this either. There might be bug if this actually get called.
-    return (cublasStatus_t) 0;
+        RuntimeError("In place transpose(half) not supported."); // hipblas do not support this either. There might be bug if this actually get called.
+    return (hipblasStatus_t) 0;
 }
 
 // asum
-inline cublasStatus_t cublasasumHelper(cublasHandle_t handle, int n, const float *x, int incx, float *result)
+inline hipblasStatus_t hipblasasumHelper(hipblasHandle_t handle, int n, const float *x, int incx, float *result)
 {
-    return cublasSasum(handle, n, x, incx, result);
+    return hipblasSasum(handle, n, x, incx, result);
 }
-inline cublasStatus_t cublasasumHelper(cublasHandle_t handle, int n, const double *x, int incx, double *result)
+inline hipblasStatus_t hipblasasumHelper(hipblasHandle_t handle, int n, const double *x, int incx, double *result)
 {
-    return cublasDasum(handle, n, x, incx, result);
+    return hipblasDasum(handle, n, x, incx, result);
 }
-inline cublasStatus_t cublasasumHelper(cublasHandle_t, int n, const half *x, int incx, half *result)
+inline hipblasStatus_t hipblasasumHelper(hipblasHandle_t, int n, const half *x, int incx, half *result)
 {
-    // pass in cudnn handle/descriptor to remove overhead?
-    cudnnHandle_t cudnnHandle;
-    cudnnTensorDescriptor_t srcTensorDesc, dstTensorDesc;
-    cudnnReduceTensorDescriptor_t reduceTensorDesc;
+    // pass in hipdnn handle/descriptor to remove overhead?
+    hipdnnHandle_t hipdnnHandle;
+    hipdnnTensorDescriptor_t srcTensorDesc, dstTensorDesc;
+    hipdnnReduceTensorDescriptor_t reduceTensorDesc;
 
-    cudnnCreate(&cudnnHandle);
-    cudnnCreateTensorDescriptor(&srcTensorDesc);
-    cudnnCreateTensorDescriptor(&dstTensorDesc);
-    cudnnCreateReduceTensorDescriptor(&reduceTensorDesc);
+    hipdnnCreate(&hipdnnHandle);
+    hipdnnCreateTensorDescriptor(&srcTensorDesc);
+    hipdnnCreateTensorDescriptor(&dstTensorDesc);
+    hipdnnCreateReduceTensorDescriptor(&reduceTensorDesc);
 
-    cudnnSetTensor4dDescriptorEx(srcTensorDesc, CUDNN_DATA_HALF, 1, 1, 1, n, 1, 1, 1, incx);
-    cudnnSetTensor4dDescriptorEx(dstTensorDesc, CUDNN_DATA_HALF, 1, 1, 1, 1, 1, 1, 1, 1);
-    cudnnSetReduceTensorDescriptor(reduceTensorDesc,
-                                   CUDNN_REDUCE_TENSOR_NORM1,
-                                   CUDNN_DATA_FLOAT,
-                                   CUDNN_NOT_PROPAGATE_NAN,
-                                   CUDNN_REDUCE_TENSOR_NO_INDICES,
-                                   CUDNN_32BIT_INDICES);
+    hipdnnSetTensor4dDescriptorEx(srcTensorDesc, HIPDNN_DATA_HALF, 1, 1, 1, n, 1, 1, 1, incx);
+    hipdnnSetTensor4dDescriptorEx(dstTensorDesc, HIPDNN_DATA_HALF, 1, 1, 1, 1, 1, 1, 1, 1);
+    hipdnnSetReduceTensorDescriptor(reduceTensorDesc,
+                                   HIPDNN_REDUCE_TENSOR_NORM1,
+                                   HIPDNN_DATA_FLOAT,
+                                   HIPDNN_NOT_PROPAGATE_NAN,
+                                   HIPDNN_REDUCE_TENSOR_NO_INDICES,
+                                   HIPDNN_32BIT_INDICES);
 
     void *workspace = NULL;
     size_t workspaceSizeInBytes = 0;
-    cudnnGetReductionWorkspaceSize(cudnnHandle, reduceTensorDesc, srcTensorDesc, dstTensorDesc, &workspaceSizeInBytes);
-    if(workspaceSizeInBytes > 0) cudaMalloc(&workspace, workspaceSizeInBytes);
+    hipdnnGetReductionWorkspaceSize(hipdnnHandle, reduceTensorDesc, srcTensorDesc, dstTensorDesc, &workspaceSizeInBytes);
+    if(workspaceSizeInBytes > 0) hipMalloc(&workspace, workspaceSizeInBytes);
 
     float alpha = 1.0f;
     float beta = 0.0f;
 
     void *d_res;
-    cudaMalloc(&d_res, sizeof(half));
+    hipMalloc(&d_res, sizeof(half));
 
-    cudnnReduceTensor(cudnnHandle,
+    hipdnnReduceTensor(hipdnnHandle,
                       reduceTensorDesc,
                       NULL,
                       0,
@@ -261,62 +266,62 @@ inline cublasStatus_t cublasasumHelper(cublasHandle_t, int n, const half *x, int
                       dstTensorDesc,
                       d_res);
 
-    cudaMemcpy((void *)result, d_res, sizeof(half), cudaMemcpyDeviceToHost);
+    hipMemcpy((void *)result, d_res, sizeof(half), hipMemcpyDeviceToHost);
 
-    cudnnDestroyReduceTensorDescriptor(reduceTensorDesc);
-    cudnnDestroyTensorDescriptor(srcTensorDesc);
-    cudnnDestroyTensorDescriptor(dstTensorDesc);
-    cudnnDestroy(cudnnHandle);
-    cudaFree(d_res);
-    cudaFree(workspace);
+    hipdnnDestroyReduceTensorDescriptor(reduceTensorDesc);
+    hipdnnDestroyTensorDescriptor(srcTensorDesc);
+    hipdnnDestroyTensorDescriptor(dstTensorDesc);
+    hipdnnDestroy(hipdnnHandle);
+    hipFree(d_res);
+    hipFree(workspace);
 
-    return (cublasStatus_t) 0;
+    return (hipblasStatus_t) 0;
 }
 
 // amax
-inline cublasStatus_t cublasamaxHelper(cublasHandle_t handle, int n, const float *x, int incx, int *result)
+inline hipblasStatus_t hipblasamaxHelper(hipblasHandle_t handle, int n, const float *x, int incx, int *result)
 {
-    return cublasIsamax(handle, n, x, incx, result);
+    return hipblasIsamax(handle, n, x, incx, result);
 }
-inline cublasStatus_t cublasamaxHelper(cublasHandle_t handle, int n, const double *x, int incx, int *result)
+inline hipblasStatus_t hipblasamaxHelper(hipblasHandle_t handle, int n, const double *x, int incx, int *result)
 {
-    return cublasIdamax(handle, n, x, incx, result);
+    return hipblasIdamax(handle, n, x, incx, result);
 }
-inline cublasStatus_t cublasamaxHelper(cublasHandle_t, int n, const half *x, int incx, int *result)
+inline hipblasStatus_t hipblasamaxHelper(hipblasHandle_t, int n, const half *x, int incx, int *result)
 {
     unsigned int h_result_uint = 0;
-    // pass in cudnn handle/descriptor to remove overhead?
-    cudnnHandle_t cudnnHandle;
-    cudnnTensorDescriptor_t srcTensorDesc, dstTensorDesc;
-    cudnnReduceTensorDescriptor_t reduceTensorDesc;
+    // pass in hipdnn handle/descriptor to remove overhead?
+    hipdnnHandle_t hipdnnHandle;
+    hipdnnTensorDescriptor_t srcTensorDesc, dstTensorDesc;
+    hipdnnReduceTensorDescriptor_t reduceTensorDesc;
 
-    cudnnCreate(&cudnnHandle);
-    cudnnCreateTensorDescriptor(&srcTensorDesc);
-    cudnnCreateTensorDescriptor(&dstTensorDesc);
-    cudnnCreateReduceTensorDescriptor(&reduceTensorDesc);
+    hipdnnCreate(&hipdnnHandle);
+    hipdnnCreateTensorDescriptor(&srcTensorDesc);
+    hipdnnCreateTensorDescriptor(&dstTensorDesc);
+    hipdnnCreateReduceTensorDescriptor(&reduceTensorDesc);
 
-    cudnnSetTensor4dDescriptorEx(srcTensorDesc, CUDNN_DATA_HALF, 1, 1, 1, n, 1, 1, 1, incx);
-    cudnnSetTensor4dDescriptorEx(dstTensorDesc, CUDNN_DATA_HALF, 1, 1, 1, 1, 1, 1, 1, 1);
-    cudnnSetReduceTensorDescriptor(reduceTensorDesc,
-                                   CUDNN_REDUCE_TENSOR_AMAX,
-                                   CUDNN_DATA_FLOAT,
-                                   CUDNN_NOT_PROPAGATE_NAN,
-                                   CUDNN_REDUCE_TENSOR_FLATTENED_INDICES,
-                                   CUDNN_32BIT_INDICES);
+    hipdnnSetTensor4dDescriptorEx(srcTensorDesc, HIPDNN_DATA_HALF, 1, 1, 1, n, 1, 1, 1, incx);
+    hipdnnSetTensor4dDescriptorEx(dstTensorDesc, HIPDNN_DATA_HALF, 1, 1, 1, 1, 1, 1, 1, 1);
+    hipdnnSetReduceTensorDescriptor(reduceTensorDesc,
+                                   HIPDNN_REDUCE_TENSOR_AMAX,
+                                   HIPDNN_DATA_FLOAT,
+                                   HIPDNN_NOT_PROPAGATE_NAN,
+                                   HIPDNN_REDUCE_TENSOR_FLATTENED_INDICES,
+                                   HIPDNN_32BIT_INDICES);
 
     void *workspace = NULL;
     size_t workspaceSizeInBytes = 0;
-    cudnnGetReductionWorkspaceSize(cudnnHandle, reduceTensorDesc, srcTensorDesc, dstTensorDesc, &workspaceSizeInBytes);
-    if(workspaceSizeInBytes > 0) cudaMalloc(&workspace, workspaceSizeInBytes);
+    hipdnnGetReductionWorkspaceSize(hipdnnHandle, reduceTensorDesc, srcTensorDesc, dstTensorDesc, &workspaceSizeInBytes);
+    if(workspaceSizeInBytes > 0) hipMalloc(&workspace, workspaceSizeInBytes);
 
     float alpha = 1.0f;
     float beta = 0.0f;
     void *d_max;
-    cudaMalloc(&d_max, sizeof(half));
+    hipMalloc(&d_max, sizeof(half));
     void *d_result_uint;
-    cudaMalloc(&d_result_uint, sizeof(unsigned int));
+    hipMalloc(&d_result_uint, sizeof(unsigned int));
 
-    cudnnReduceTensor(cudnnHandle,
+    hipdnnReduceTensor(hipdnnHandle,
                       reduceTensorDesc,
                       d_result_uint,
                       sizeof(unsigned int),
@@ -329,283 +334,285 @@ inline cublasStatus_t cublasamaxHelper(cublasHandle_t, int n, const half *x, int
                       dstTensorDesc,
                       d_max);
 
-    cudaMemcpy(&h_result_uint, d_result_uint, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+    hipMemcpy(&h_result_uint, d_result_uint, sizeof(unsigned int), hipMemcpyDeviceToHost);
 
-    cudnnDestroyReduceTensorDescriptor(reduceTensorDesc);
-    cudnnDestroyTensorDescriptor(srcTensorDesc);
-    cudnnDestroyTensorDescriptor(dstTensorDesc);
-    cudnnDestroy(cudnnHandle);
-    cudaFree(workspace);
-    cudaFree(d_max);
-    cudaFree(d_result_uint);
+    hipdnnDestroyReduceTensorDescriptor(reduceTensorDesc);
+    hipdnnDestroyTensorDescriptor(srcTensorDesc);
+    hipdnnDestroyTensorDescriptor(dstTensorDesc);
+    hipdnnDestroy(hipdnnHandle);
+    hipFree(workspace);
+    hipFree(d_max);
+    hipFree(d_result_uint);
 
     *result = (int) h_result_uint;
-    return (cublasStatus_t) 0;
+    return (hipblasStatus_t) 0;
 }
 
 // scal
-inline cublasStatus_t cublasscalHelper(cublasHandle_t handle, int n, const float *alpha, float *x, int incx)
+inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t handle, int n, const float *alpha, float *x, int incx)
 {
-    return cublasSscal(handle, n, alpha, x, incx);
+    return hipblasSscal(handle, n, alpha, x, incx);
 }
-inline cublasStatus_t cublasscalHelper(cublasHandle_t handle, int n, const double *alpha, double *x, int incx)
+inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t handle, int n, const double *alpha, double *x, int incx)
 {
-    return cublasDscal(handle, n, alpha, x, incx);
+    return hipblasDscal(handle, n, alpha, x, incx);
 }
-inline cublasStatus_t cublasscalHelper(cublasHandle_t handle, int n, const half *alpha, half *x, int incx)
+inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t handle, int n, const half *alpha, half *x, int incx)
 {
     float tmp_alpha = *alpha;
-    return cublasScalEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, CUDA_R_32F);
+    return HIPBLAS_STATUS_NOT_SUPPORTED;//hipblasScalEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, CUDA_R_32F); TODO:PRAS_2.4
 }
-inline cublasStatus_t cublasscalHelper(cublasHandle_t,int,const char *,char *, int)
+inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t,int,const char *,char *, int)
 {
-    RuntimeError("Unsupported template argument(char) in cublas_scal");
+    RuntimeError("Unsupported template argument(char) in hipblas_scal");
 }
-inline cublasStatus_t cublasscalHelper(cublasHandle_t,int,const short *,short *, int)
+inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t,int,const short *,short *, int)
 {
-    RuntimeError("Unsupported template argument(short) in cublas_scal");
+    RuntimeError("Unsupported template argument(short) in hipblas_scal");
 }
 
 // dot
-inline cublasStatus_t cublasdotHelper(cublasHandle_t handle, int n, const float *x, int incx, const float *y, int incy, float *result)
+inline hipblasStatus_t hipblasdotHelper(hipblasHandle_t handle, int n, const float *x, int incx, const float *y, int incy, float *result)
 {
-    return cublasSdot(handle, n, x, incx, y, incy, result);
+    return hipblasSdot(handle, n, x, incx, y, incy, result);
 }
-inline cublasStatus_t cublasdotHelper(cublasHandle_t handle, int n, const double *x, int incx, const double *y, int incy, double *result)
+inline hipblasStatus_t hipblasdotHelper(hipblasHandle_t handle, int n, const double *x, int incx, const double *y, int incy, double *result)
 {
-    return cublasDdot(handle, n, x, incx, y, incy, result);
+    return hipblasDdot(handle, n, x, incx, y, incy, result);
 }
-inline cublasStatus_t cublasdotHelper(cublasHandle_t handle, int n, const half *x, int incx, const half *y, int incy, half *result)
+inline hipblasStatus_t hipblasdotHelper(hipblasHandle_t handle, int n, const half *x, int incx, const half *y, int incy, half *result)
 {
-    return cublasDotEx(handle, n, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, (void*)result, CUDA_R_16F, CUDA_R_32F);
+    return HIPBLAS_STATUS_NOT_SUPPORTED;//hipblasDotEx(handle, n, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, (void*)result, CUDA_R_16F, CUDA_R_32F); TODO:PRAS_2.4
 }
 
-// curand
-inline curandStatus_t curandGenerateUniformHelper(curandGenerator_t generator, float *outputPtr, size_t num)
+// hiprand
+inline hiprandStatus_t hiprandGenerateUniformHelper(hiprandGenerator_t generator, float *outputPtr, size_t num)
 {
-    return curandGenerateUniform(generator, outputPtr, num);
+    return hiprandGenerateUniform(generator, outputPtr, num);
 }
-inline curandStatus_t curandGenerateUniformHelper(curandGenerator_t generator, double *outputPtr, size_t num)
+inline hiprandStatus_t hiprandGenerateUniformHelper(hiprandGenerator_t generator, double *outputPtr, size_t num)
 {
-    return curandGenerateUniformDouble(generator, outputPtr, num);
+    return hiprandGenerateUniformDouble(generator, outputPtr, num);
 }
-inline curandStatus_t curandGenerateUniformHelper(curandGenerator_t, half *outputPtr, size_t num)
+inline hiprandStatus_t hiprandGenerateUniformHelper(hiprandGenerator_t, half *outputPtr, size_t num)
 {
-    curandState *devStates;
-    cudaMalloc((void **)&devStates, sizeof(curandState));
-    setup_state<<<1,1>>>(devStates, time(NULL)); // What does curandGenerateUniform actually doing? should also pass in state here
+    hiprandState *devStates;
+    hipMalloc((void **)&devStates, sizeof(hiprandState));
+    hipLaunchKernelGGL((setup_state), dim3(1), dim3(1), 0, 0, devStates, time(NULL)); // What does hiprandGenerateUniform actually doing? should also pass in state here
 
     dim3 dimGrid((unsigned int)(num+COPY_BLOCK_DIM-1)/COPY_BLOCK_DIM, 1, 1);
     dim3 dimBlock(COPY_BLOCK_DIM, 1, 1);
-    GenerateUniformHalf<<<dimGrid, dimBlock>>>(devStates, outputPtr, (int)num);
+    hipLaunchKernelGGL((GenerateUniformHalf), dim3(dimGrid), dim3(dimBlock), 0, 0, devStates, outputPtr, (int)num);
 
-    return (curandStatus_t) 0;
+    return (hiprandStatus_t) 0;
 }
 
-inline curandStatus_t curandGenerateNormalHelper(curandGenerator_t generator, float *outputPtr, size_t n, float mean, float stddev)
+inline hiprandStatus_t hiprandGenerateNormalHelper(hiprandGenerator_t generator, float *outputPtr, size_t n, float mean, float stddev)
 {
-    return curandGenerateNormal(generator, outputPtr, n, mean, stddev);
+    return hiprandGenerateNormal(generator, outputPtr, n, mean, stddev);
 }
-inline curandStatus_t curandGenerateNormalHelper(curandGenerator_t generator, double *outputPtr, size_t n, double mean, double stddev)
+inline hiprandStatus_t hiprandGenerateNormalHelper(hiprandGenerator_t generator, double *outputPtr, size_t n, double mean, double stddev)
 {
-    return curandGenerateNormalDouble(generator, outputPtr, n, mean, stddev);
+    return hiprandGenerateNormalDouble(generator, outputPtr, n, mean, stddev);
 }
-inline curandStatus_t curandGenerateNormalHelper(curandGenerator_t, half *outputPtr, size_t n, half mean, half stddev)
+inline hiprandStatus_t hiprandGenerateNormalHelper(hiprandGenerator_t, half *outputPtr, size_t n, half mean, half stddev)
 {
-    curandState *devStates;
-    cudaMalloc((void **)&devStates, sizeof(curandState));
-    setup_state<<<1,1>>>(devStates, time(NULL)); // What does curandGenerateUniform actually doing? should also pass in state here
+    hiprandState *devStates;
+    hipMalloc((void **)&devStates, sizeof(hiprandState));
+    hipLaunchKernelGGL((setup_state), dim3(1), dim3(1), 0, 0, devStates, time(NULL)); // What does hiprandGenerateUniform actually doing? should also pass in state here
 
     dim3 dimGrid((unsigned int)(n+COPY_BLOCK_DIM-1)/COPY_BLOCK_DIM, 1, 1);
     dim3 dimBlock(COPY_BLOCK_DIM, 1, 1);
-    GenerateNormalHalf<<<dimGrid, dimBlock>>>(devStates, outputPtr, (int)n, mean, stddev);
+    hipLaunchKernelGGL((GenerateNormalHalf), dim3(dimGrid), dim3(dimBlock), 0, 0, devStates, outputPtr, (int)n, mean, stddev);
 
-    return (curandStatus_t) 0;
+    return (hiprandStatus_t) 0;
 }
 
 
-// cusparse
-inline cusparseStatus_t cusparsecsr2denseHelper(cusparseHandle_t handle, int m, int n, const cusparseMatDescr_t descrA, const float *csrValA, const int *csrRowPtrA, const int *csrColIndA, float *A, int lda)
+// hipsparse
+inline hipsparseStatus_t hipsparsecsr2denseHelper(hipsparseHandle_t handle, int m, int n, const hipsparseMatDescr_t descrA, const float *csrValA, const int *csrRowPtrA, const int *csrColIndA, float *A, int lda)
 {
-    return cusparseScsr2dense(handle, m, n, descrA, csrValA, csrRowPtrA, csrColIndA, A, lda);
+    return hipsparseScsr2dense(handle, m, n, descrA, csrValA, csrRowPtrA, csrColIndA, A, lda);
 }
-inline cusparseStatus_t cusparsecsr2denseHelper(cusparseHandle_t handle, int m, int n, const cusparseMatDescr_t descrA, const double *csrValA, const int *csrRowPtrA, const int *csrColIndA, double *A, int lda)
+inline hipsparseStatus_t hipsparsecsr2denseHelper(hipsparseHandle_t handle, int m, int n, const hipsparseMatDescr_t descrA, const double *csrValA, const int *csrRowPtrA, const int *csrColIndA, double *A, int lda)
 {
-    return cusparseDcsr2dense(handle, m, n, descrA, csrValA, csrRowPtrA, csrColIndA, A, lda);
+    return hipsparseDcsr2dense(handle, m, n, descrA, csrValA, csrRowPtrA, csrColIndA, A, lda);
 }
-inline cusparseStatus_t cusparsecsr2denseHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const half *, const int *, const int *, half *, int)
+inline hipsparseStatus_t hipsparsecsr2denseHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const half *, const int *, const int *, half *, int)
 {
     RuntimeError("Unsupported template argument(half) in GPUSparseMatrix");
 }
-inline cusparseStatus_t cusparsecsr2denseHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const short *, const int *, const int *, short *, int)
+inline hipsparseStatus_t hipsparsecsr2denseHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const short *, const int *, const int *, short *, int)
 {
     RuntimeError("Unsupported template argument(short) in GPUSparseMatrix");
 }
-inline cusparseStatus_t cusparsecsr2denseHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const char *, const int *, const int *, char *, int)
+inline hipsparseStatus_t hipsparsecsr2denseHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const char *, const int *, const int *, char *, int)
 {
     RuntimeError("Unsupported template argument(char) in GPUSparseMatrix");
 }
 
-inline cusparseStatus_t cusparsecsc2denseHelper(cusparseHandle_t handle, int m, int n, const cusparseMatDescr_t descrA, const float *cscValA, const int *cscRowIndA, const int *cscColPtrA, float *A, int lda)
+inline hipsparseStatus_t hipsparsecsc2denseHelper(hipsparseHandle_t handle, int m, int n, const hipsparseMatDescr_t descrA, const float *cscValA, const int *cscRowIndA, const int *cscColPtrA, float *A, int lda)
 {
-    return cusparseScsc2dense(handle, m, n, descrA, cscValA, cscRowIndA, cscColPtrA, A, lda);
+    return hipsparseScsc2dense(handle, m, n, descrA, cscValA, cscRowIndA, cscColPtrA, A, lda);
 }
-inline cusparseStatus_t cusparsecsc2denseHelper(cusparseHandle_t handle, int m, int n, const cusparseMatDescr_t descrA, const double *cscValA, const int *cscRowIndA, const int *cscColPtrA, double *A, int lda)
+inline hipsparseStatus_t hipsparsecsc2denseHelper(hipsparseHandle_t handle, int m, int n, const hipsparseMatDescr_t descrA, const double *cscValA, const int *cscRowIndA, const int *cscColPtrA, double *A, int lda)
 {
-    return cusparseDcsc2dense(handle, m, n, descrA, cscValA, cscRowIndA, cscColPtrA, A, lda);
+    return hipsparseDcsc2dense(handle, m, n, descrA, cscValA, cscRowIndA, cscColPtrA, A, lda);
 }
-inline cusparseStatus_t cusparsecsc2denseHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const half *, const int *, const int *, half *, int)
+inline hipsparseStatus_t hipsparsecsc2denseHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const half *, const int *, const int *, half *, int)
 {
     RuntimeError("Unsupported template argument(half) in GPUSparseMatrix");
 }
-inline cusparseStatus_t cusparsecsc2denseHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const short *, const int *, const int *, short *, int)
+inline hipsparseStatus_t hipsparsecsc2denseHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const short *, const int *, const int *, short *, int)
 {
     RuntimeError("Unsupported template argument(short) in GPUSparseMatrix");
 }
-inline cusparseStatus_t cusparsecsc2denseHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const char *, const int *, const int *, char *, int)
+inline hipsparseStatus_t hipsparsecsc2denseHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const char *, const int *, const int *, char *, int)
 {
     RuntimeError("Unsupported template argument(char) in GPUSparseMatrix");
 }
 
-inline cusparseStatus_t cusparsecsr2cscHelper(cusparseHandle_t handle, int m, int n, int nnz, const float *csrVal, const int *csrRowPtr, const int *csrColInd, float *cscVal, int *cscRowInd, int *cscColPtr, cusparseAction_t copyValues, cusparseIndexBase_t idxBase)
+inline hipsparseStatus_t hipsparsecsr2cscHelper(hipsparseHandle_t handle, int m, int n, int nnz, const float *csrVal, const int *csrRowPtr, const int *csrColInd, float *cscVal, int *cscRowInd, int *cscColPtr, hipsparseAction_t copyValues, hipsparseIndexBase_t idxBase)
 {
-    return cusparseScsr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd, cscVal, cscRowInd, cscColPtr, copyValues, idxBase);
+    return hipsparseScsr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd, cscVal, cscRowInd, cscColPtr, copyValues, idxBase);
 }
-inline cusparseStatus_t cusparsecsr2cscHelper(cusparseHandle_t handle, int m, int n, int nnz, const double *csrVal, const int *csrRowPtr, const int *csrColInd, double *cscVal, int *cscRowInd, int *cscColPtr, cusparseAction_t copyValues, cusparseIndexBase_t idxBase)
+inline hipsparseStatus_t hipsparsecsr2cscHelper(hipsparseHandle_t handle, int m, int n, int nnz, const double *csrVal, const int *csrRowPtr, const int *csrColInd, double *cscVal, int *cscRowInd, int *cscColPtr, hipsparseAction_t copyValues, hipsparseIndexBase_t idxBase)
 {
-    return cusparseDcsr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd, cscVal, cscRowInd, cscColPtr, copyValues, idxBase);
+    return hipsparseDcsr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd, cscVal, cscRowInd, cscColPtr, copyValues, idxBase);
 }
-inline cusparseStatus_t cusparsecsr2cscHelper(cusparseHandle_t, int, int, int, const half *, const int *, const int *, half *, int *, int *, cusparseAction_t, cusparseIndexBase_t)
+inline hipsparseStatus_t hipsparsecsr2cscHelper(hipsparseHandle_t, int, int, int, const half *, const int *, const int *, half *, int *, int *, hipsparseAction_t, hipsparseIndexBase_t)
 {
-    RuntimeError("Unsupported template argument(half) in cusparsecsr2cscHelper");
+    RuntimeError("Unsupported template argument(half) in hipsparsecsr2cscHelper");
 }
 
-inline cusparseStatus_t cusparsennzHelper(cusparseHandle_t handle, cusparseDirection_t dirA, int m, int n, const cusparseMatDescr_t descrA, const float *A, int lda, int *nnzPerRowColumn, int *nnzTotalDevHostPtr)
+inline hipsparseStatus_t hipsparsennzHelper(hipsparseHandle_t handle, hipsparseDirection_t dirA, int m, int n, const hipsparseMatDescr_t descrA, const float *A, int lda, int *nnzPerRowColumn, int *nnzTotalDevHostPtr)
 {
-    return cusparseSnnz(handle, dirA, m, n, descrA, A, lda, nnzPerRowColumn, nnzTotalDevHostPtr);
+    return hipsparseSnnz(handle, dirA, m, n, descrA, A, lda, nnzPerRowColumn, nnzTotalDevHostPtr);
 }
-inline cusparseStatus_t cusparsennzHelper(cusparseHandle_t handle, cusparseDirection_t dirA, int m, int n, const cusparseMatDescr_t descrA, const double *A, int lda, int *nnzPerRowColumn, int *nnzTotalDevHostPtr)
+inline hipsparseStatus_t hipsparsennzHelper(hipsparseHandle_t handle, hipsparseDirection_t dirA, int m, int n, const hipsparseMatDescr_t descrA, const double *A, int lda, int *nnzPerRowColumn, int *nnzTotalDevHostPtr)
 {
-    return cusparseDnnz(handle, dirA, m, n, descrA, A, lda, nnzPerRowColumn, nnzTotalDevHostPtr);
+    return hipsparseDnnz(handle, dirA, m, n, descrA, A, lda, nnzPerRowColumn, nnzTotalDevHostPtr);
 }
-inline cusparseStatus_t cusparsennzHelper(cusparseHandle_t,cusparseDirection_t,int,int , const cusparseMatDescr_t, const half *, int, int *, int *)
+inline hipsparseStatus_t hipsparsennzHelper(hipsparseHandle_t,hipsparseDirection_t,int,int , const hipsparseMatDescr_t, const half *, int, int *, int *)
 {
     RuntimeError("Unsupported template argument(half) in GPUSparseMatrix");
 }
-inline cusparseStatus_t cusparsennzHelper(cusparseHandle_t,cusparseDirection_t,int,int , const cusparseMatDescr_t, const short *, int, int *, int *)
+inline hipsparseStatus_t hipsparsennzHelper(hipsparseHandle_t,hipsparseDirection_t,int,int , const hipsparseMatDescr_t, const short *, int, int *, int *)
 {
     RuntimeError("Unsupported template argument(short) in GPUSparseMatrix");
 }
-inline cusparseStatus_t cusparsennzHelper(cusparseHandle_t,cusparseDirection_t,int,int , const cusparseMatDescr_t, const char *, int, int *, int *)
+inline hipsparseStatus_t hipsparsennzHelper(hipsparseHandle_t,hipsparseDirection_t,int,int , const hipsparseMatDescr_t, const char *, int, int *, int *)
 {
     RuntimeError("Unsupported template argument(char) in GPUSparseMatrix");
 }
 
-inline cusparseStatus_t cusparsedense2csrHelper(cusparseHandle_t handle, int m, int n, const cusparseMatDescr_t descrA, const float *A, int lda, const int *nnzPerRow, float *csrValA, int *csrRowPtrA, int *csrColIndA)
+inline hipsparseStatus_t hipsparsedense2csrHelper(hipsparseHandle_t handle, int m, int n, const hipsparseMatDescr_t descrA, const float *A, int lda, const int *nnzPerRow, float *csrValA, int *csrRowPtrA, int *csrColIndA)
 {
-    return cusparseSdense2csr(handle, m, n, descrA, A, lda, nnzPerRow, csrValA, csrRowPtrA, csrColIndA);
+    return hipsparseSdense2csr(handle, m, n, descrA, A, lda, nnzPerRow, csrValA, csrRowPtrA, csrColIndA);
 }
-inline cusparseStatus_t cusparsedense2csrHelper(cusparseHandle_t handle, int m, int n, const cusparseMatDescr_t descrA, const double *A, int lda, const int *nnzPerRow, double *csrValA, int *csrRowPtrA, int *csrColIndA)
+inline hipsparseStatus_t hipsparsedense2csrHelper(hipsparseHandle_t handle, int m, int n, const hipsparseMatDescr_t descrA, const double *A, int lda, const int *nnzPerRow, double *csrValA, int *csrRowPtrA, int *csrColIndA)
 {
-    return cusparseDdense2csr(handle, m, n, descrA, A, lda, nnzPerRow, csrValA, csrRowPtrA, csrColIndA);
+    return hipsparseDdense2csr(handle, m, n, descrA, A, lda, nnzPerRow, csrValA, csrRowPtrA, csrColIndA);
 }
-inline cusparseStatus_t cusparsedense2csrHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const half *, int, const int *, half *, int *, int *)
+inline hipsparseStatus_t hipsparsedense2csrHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const half *, int, const int *, half *, int *, int *)
 {
     RuntimeError("Unsupported template argument(half) in GPUSparseMatrix");
 }
-inline cusparseStatus_t cusparsedense2csrHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const short *, int, const int *, short *, int *, int *)
+inline hipsparseStatus_t hipsparsedense2csrHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const short *, int, const int *, short *, int *, int *)
 {
     RuntimeError("Unsupported template argument(short) in GPUSparseMatrix");
 }
-inline cusparseStatus_t cusparsedense2csrHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const char *, int, const int *, char *, int *, int *)
+inline hipsparseStatus_t hipsparsedense2csrHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const char *, int, const int *, char *, int *, int *)
 {
     RuntimeError("Unsupported template argument(char) in GPUSparseMatrix");
 }
 
-inline cusparseStatus_t cusparsedense2cscHelper(cusparseHandle_t handle, int m, int n, const cusparseMatDescr_t descrA, const float *A, int lda, const int *nnzPerCol, float *cscValA, int *cscRowIndA, int *cscColPtrA)
+inline hipsparseStatus_t hipsparsedense2cscHelper(hipsparseHandle_t handle, int m, int n, const hipsparseMatDescr_t descrA, const float *A, int lda, const int *nnzPerCol, float *cscValA, int *cscRowIndA, int *cscColPtrA)
 {
-    return cusparseSdense2csc(handle, m, n, descrA, A, lda, nnzPerCol, cscValA, cscRowIndA, cscColPtrA);
+    return hipsparseSdense2csc(handle, m, n, descrA, A, lda, nnzPerCol, cscValA, cscRowIndA, cscColPtrA);
 }
-inline cusparseStatus_t cusparsedense2cscHelper(cusparseHandle_t handle, int m, int n, const cusparseMatDescr_t descrA, const double *A, int lda, const int *nnzPerCol, double *cscValA, int *cscRowIndA, int *cscColPtrA)
+inline hipsparseStatus_t hipsparsedense2cscHelper(hipsparseHandle_t handle, int m, int n, const hipsparseMatDescr_t descrA, const double *A, int lda, const int *nnzPerCol, double *cscValA, int *cscRowIndA, int *cscColPtrA)
 {
-    return cusparseDdense2csc(handle, m, n, descrA, A, lda, nnzPerCol, cscValA, cscRowIndA, cscColPtrA);
+    return hipsparseDdense2csc(handle, m, n, descrA, A, lda, nnzPerCol, cscValA, cscRowIndA, cscColPtrA);
 }
-inline cusparseStatus_t cusparsedense2cscHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const half *, int, const int *, half *, int *, int *)
+inline hipsparseStatus_t hipsparsedense2cscHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const half *, int, const int *, half *, int *, int *)
 {
     RuntimeError("Unsupported template argument(half) in GPUSparseMatrix");
 }
-inline cusparseStatus_t cusparsedense2cscHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const short *, int, const int *, short *, int *, int *)
+inline hipsparseStatus_t hipsparsedense2cscHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const short *, int, const int *, short *, int *, int *)
 {
     RuntimeError("Unsupported template argument(short) in GPUSparseMatrix");
 }
-inline cusparseStatus_t cusparsedense2cscHelper(cusparseHandle_t,int,int,const cusparseMatDescr_t, const char *, int, const int *, char *, int *, int *)
+inline hipsparseStatus_t hipsparsedense2cscHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const char *, int, const int *, char *, int *, int *)
 {
     RuntimeError("Unsupported template argument(char) in GPUSparseMatrix");
 }
 
-inline cusparseStatus_t cusparsecsrmmHelper(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int k, int nnz, const float *alpha, const cusparseMatDescr_t descrA, const float *csrValA, const int *csrRowPtrA, const int *csrColIndA, const float *B, int ldb, const float *beta, float *C, int ldc)
+inline hipsparseStatus_t hipsparsecsrmmHelper(hipsparseHandle_t handle, hipsparseOperation_t transA, int m, int n, int k, int nnz, const float *alpha, const hipsparseMatDescr_t descrA, const float *csrValA, const int *csrRowPtrA, const int *csrColIndA, const float *B, int ldb, const float *beta, float *C, int ldc)
 {
-    return cusparseScsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
+    return hipsparseScsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
 }
-inline cusparseStatus_t cusparsecsrmmHelper(cusparseHandle_t handle, cusparseOperation_t transA, int m, int n, int k, int nnz, const double *alpha, const cusparseMatDescr_t descrA, const double *csrValA, const int *csrRowPtrA, const int *csrColIndA, const double *B, int ldb, const double *beta, double *C, int ldc)
+inline hipsparseStatus_t hipsparsecsrmmHelper(hipsparseHandle_t handle, hipsparseOperation_t transA, int m, int n, int k, int nnz, const double *alpha, const hipsparseMatDescr_t descrA, const double *csrValA, const int *csrRowPtrA, const int *csrColIndA, const double *B, int ldb, const double *beta, double *C, int ldc)
 {
-    return cusparseDcsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
+    return hipsparseDcsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
 }
-inline cusparseStatus_t cusparsecsrmmHelper(cusparseHandle_t, cusparseOperation_t, int, int, int, int, const half *, const cusparseMatDescr_t, const half *, const int *, const int *, const half *, int, const half *, half *, int)
+inline hipsparseStatus_t hipsparsecsrmmHelper(hipsparseHandle_t, hipsparseOperation_t, int, int, int, int, const half *, const hipsparseMatDescr_t, const half *, const int *, const int *, const half *, int, const half *, half *, int)
 {
-    RuntimeError("Unsupported template argument(half) in cusparsecsrmmHelper");
-}
-
-inline cusparseStatus_t cusparsecsrgemmHelper(cusparseHandle_t handle, cusparseOperation_t transA, cusparseOperation_t transB, int m, int n, int k, const cusparseMatDescr_t descrA, const int nnzA, const float *csrValA, const int *csrRowPtrA, const int *csrColIndA, const cusparseMatDescr_t descrB, const int nnzB, const float *csrValB, const int *csrRowPtrB, const int *csrColIndB, const cusparseMatDescr_t descrC, float *csrValC, const int *csrRowPtrC, int *csrColIndC)
-{
-    return cusparseScsrgemm(handle, transA, transB, m, n, k, descrA, nnzA, csrValA, csrRowPtrA, csrColIndA, descrB, nnzB, csrValB, csrRowPtrB, csrColIndB, descrC, csrValC, csrRowPtrC, csrColIndC);
-}
-inline cusparseStatus_t cusparsecsrgemmHelper(cusparseHandle_t handle, cusparseOperation_t transA, cusparseOperation_t transB, int m, int n, int k, const cusparseMatDescr_t descrA, const int nnzA, const double *csrValA, const int *csrRowPtrA, const int *csrColIndA, const cusparseMatDescr_t descrB, const int nnzB, const double *csrValB, const int *csrRowPtrB, const int *csrColIndB, const cusparseMatDescr_t descrC, double *csrValC, const int *csrRowPtrC, int *csrColIndC)
-{
-    return cusparseDcsrgemm(handle, transA, transB, m, n, k, descrA, nnzA, csrValA, csrRowPtrA, csrColIndA, descrB, nnzB, csrValB, csrRowPtrB, csrColIndB, descrC, csrValC, csrRowPtrC, csrColIndC);
-}
-inline cusparseStatus_t cusparsecsrgemmHelper(cusparseHandle_t, cusparseOperation_t, cusparseOperation_t, int, int, int, const cusparseMatDescr_t, const int, const half *, const int *, const int *, const cusparseMatDescr_t, const int, const half *, const int *, const int *, const cusparseMatDescr_t, half *, const int *, int *)
-{
-    RuntimeError("Unsupported template argument(half) in cusparsecsrgemmHelper");
+    RuntimeError("Unsupported template argument(half) in hipsparsecsrmmHelper");
 }
 
-inline cusparseStatus_t cusparsecsrgeamHelper(cusparseHandle_t handle, int m, int n, const float *alpha, const cusparseMatDescr_t descrA, int nnzA, const float *csrValA, const int *csrRowPtrA, const int *csrColIndA, const float *beta, const cusparseMatDescr_t descrB, int nnzB, const float *csrValB, const int *csrRowPtrB, const int *csrColIndB, const cusparseMatDescr_t descrC, float *csrValC, int *csrRowPtrC, int *csrColIndC)
+inline hipsparseStatus_t hipsparsecsrgemmHelper(hipsparseHandle_t handle, hipsparseOperation_t transA, hipsparseOperation_t transB, int m, int n, int k, const hipsparseMatDescr_t descrA, const int nnzA, const float *csrValA, const int *csrRowPtrA, const int *csrColIndA, const hipsparseMatDescr_t descrB, const int nnzB, const float *csrValB, const int *csrRowPtrB, const int *csrColIndB, const hipsparseMatDescr_t descrC, float *csrValC, const int *csrRowPtrC, int *csrColIndC)
 {
-    return cusparseScsrgeam(handle, m, n, alpha, descrA, nnzA, csrValA, csrRowPtrA, csrColIndA, beta, descrB, nnzB, csrValB, csrRowPtrB, csrColIndB, descrC, csrValC, csrRowPtrC, csrColIndC);
+    return hipsparseScsrgemm(handle, transA, transB, m, n, k, descrA, nnzA, csrValA, csrRowPtrA, csrColIndA, descrB, nnzB, csrValB, csrRowPtrB, csrColIndB, descrC, csrValC, csrRowPtrC, csrColIndC);
 }
-inline cusparseStatus_t cusparsecsrgeamHelper(cusparseHandle_t handle, int m, int n, const double *alpha, const cusparseMatDescr_t descrA, int nnzA, const double *csrValA, const int *csrRowPtrA, const int *csrColIndA, const double *beta, const cusparseMatDescr_t descrB, int nnzB, const double *csrValB, const int *csrRowPtrB, const int *csrColIndB, const cusparseMatDescr_t descrC, double *csrValC, int *csrRowPtrC, int *csrColIndC)
+inline hipsparseStatus_t hipsparsecsrgemmHelper(hipsparseHandle_t handle, hipsparseOperation_t transA, hipsparseOperation_t transB, int m, int n, int k, const hipsparseMatDescr_t descrA, const int nnzA, const double *csrValA, const int *csrRowPtrA, const int *csrColIndA, const hipsparseMatDescr_t descrB, const int nnzB, const double *csrValB, const int *csrRowPtrB, const int *csrColIndB, const hipsparseMatDescr_t descrC, double *csrValC, const int *csrRowPtrC, int *csrColIndC)
 {
-    return cusparseDcsrgeam(handle, m, n, alpha, descrA, nnzA, csrValA, csrRowPtrA, csrColIndA, beta, descrB, nnzB, csrValB, csrRowPtrB, csrColIndB, descrC, csrValC, csrRowPtrC, csrColIndC);
+    return hipsparseDcsrgemm(handle, transA, transB, m, n, k, descrA, nnzA, csrValA, csrRowPtrA, csrColIndA, descrB, nnzB, csrValB, csrRowPtrB, csrColIndB, descrC, csrValC, csrRowPtrC, csrColIndC);
 }
-inline cusparseStatus_t cusparsecsrgeamHelper(cusparseHandle_t, int, int, const half *, const cusparseMatDescr_t, int, const half *, const int *, const int *, const half *, const cusparseMatDescr_t, int, const half *, const int *, const int *, const cusparseMatDescr_t, half *, int *, int *)
+inline hipsparseStatus_t hipsparsecsrgemmHelper(hipsparseHandle_t, hipsparseOperation_t, hipsparseOperation_t, int, int, int, const hipsparseMatDescr_t, const int, const half *, const int *, const int *, const hipsparseMatDescr_t, const int, const half *, const int *, const int *, const hipsparseMatDescr_t, half *, const int *, int *)
 {
-    RuntimeError("Unsupported template argument(half) in cusparsecsrgeamHelper");
+    RuntimeError("Unsupported template argument(half) in hipsparsecsrgemmHelper");
 }
 
-inline cusparseStatus_t cusparsedotiHelper(cusparseHandle_t handle, int nnz, const float *xVal, const int *xInd, const float *y, float *resultDevHostPtr, cusparseIndexBase_t idxBase)
+inline hipsparseStatus_t hipsparsecsrgeamHelper(hipsparseHandle_t handle, int m, int n, const float *alpha, const hipsparseMatDescr_t descrA, int nnzA, const float *csrValA, const int *csrRowPtrA, const int *csrColIndA, const float *beta, const hipsparseMatDescr_t descrB, int nnzB, const float *csrValB, const int *csrRowPtrB, const int *csrColIndB, const hipsparseMatDescr_t descrC, float *csrValC, int *csrRowPtrC, int *csrColIndC)
 {
-    return cusparseSdoti(handle, nnz, xVal, xInd, y, resultDevHostPtr, idxBase);
+    return hipsparseScsrgeam(handle, m, n, alpha, descrA, nnzA, csrValA, csrRowPtrA, csrColIndA, beta, descrB, nnzB, csrValB, csrRowPtrB, csrColIndB, descrC, csrValC, csrRowPtrC, csrColIndC);
 }
-inline cusparseStatus_t cusparsedotiHelper(cusparseHandle_t handle, int nnz, const double *xVal, const int *xInd, const double *y, double *resultDevHostPtr, cusparseIndexBase_t idxBase)
+inline hipsparseStatus_t hipsparsecsrgeamHelper(hipsparseHandle_t handle, int m, int n, const double *alpha, const hipsparseMatDescr_t descrA, int nnzA, const double *csrValA, const int *csrRowPtrA, const int *csrColIndA, const double *beta, const hipsparseMatDescr_t descrB, int nnzB, const double *csrValB, const int *csrRowPtrB, const int *csrColIndB, const hipsparseMatDescr_t descrC, double *csrValC, int *csrRowPtrC, int *csrColIndC)
 {
-    return cusparseDdoti(handle, nnz, xVal, xInd, y, resultDevHostPtr, idxBase);
+    return hipsparseDcsrgeam(handle, m, n, alpha, descrA, nnzA, csrValA, csrRowPtrA, csrColIndA, beta, descrB, nnzB, csrValB, csrRowPtrB, csrColIndB, descrC, csrValC, csrRowPtrC, csrColIndC);
 }
-inline cusparseStatus_t cusparsedotiHelper(cusparseHandle_t, int, const half *, const int *, const half *, half *, cusparseIndexBase_t)
+inline hipsparseStatus_t hipsparsecsrgeamHelper(hipsparseHandle_t, int, int, const half *, const hipsparseMatDescr_t, int, const half *, const int *, const int *, const half *, const hipsparseMatDescr_t, int, const half *, const int *, const int *, const hipsparseMatDescr_t, half *, int *, int *)
 {
-    RuntimeError("Unsupported template argument(half) in cusparsedotiHelper");
+    RuntimeError("Unsupported template argument(half) in hipsparsecsrgeamHelper");
+}
+
+inline hipsparseStatus_t hipsparsedotiHelper(hipsparseHandle_t handle, int nnz, const float *xVal, const int *xInd, const float *y, float *resultDevHostPtr, hipsparseIndexBase_t idxBase)
+{
+    return hipsparseSdoti(handle, nnz, xVal, xInd, y, resultDevHostPtr, idxBase);
+}
+inline hipsparseStatus_t hipsparsedotiHelper(hipsparseHandle_t handle, int nnz, const double *xVal, const int *xInd, const double *y, double *resultDevHostPtr, hipsparseIndexBase_t idxBase)
+{
+    return hipsparseDdoti(handle, nnz, xVal, xInd, y, resultDevHostPtr, idxBase);
+}
+inline hipsparseStatus_t hipsparsedotiHelper(hipsparseHandle_t, int, const half *, const int *, const half *, half *, hipsparseIndexBase_t)
+{
+    RuntimeError("Unsupported template argument(half) in hipsparsedotiHelper");
 }
 
 
 // Generalize cub calls
-inline cudaError_t SortPairsDescending(void *d_temp_storage, size_t &temp_storage_bytes, const float *d_keys_in, float *d_keys_out, const uint64_t *d_values_in, uint64_t *d_values_out, int num_items, int begin_bit, int end_bit, cudaStream_t stream)
+inline hipError_t SortPairsDescending(void *d_temp_storage, size_t &temp_storage_bytes, const float *d_keys_in, float *d_keys_out, const uint64_t *d_values_in, uint64_t *d_values_out, int num_items, int begin_bit, int end_bit, hipStream_t stream)
 {
-    return cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream);
+    return hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream));
+    //return cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream); //TODO: PRAS_2.4
 }
-inline cudaError_t SortPairsDescending(void *d_temp_storage, size_t &temp_storage_bytes, const double *d_keys_in, double *d_keys_out, const uint64_t *d_values_in, uint64_t *d_values_out, int num_items, int begin_bit, int end_bit, cudaStream_t stream)
+inline hipError_t SortPairsDescending(void *d_temp_storage, size_t &temp_storage_bytes, const double *d_keys_in, double *d_keys_out, const uint64_t *d_values_in, uint64_t *d_values_out, int num_items, int begin_bit, int end_bit, hipStream_t stream)
 {
-    return cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream);
+    return hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream));
+    //return cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream); //TODO: PRAS_2.4
 }
-inline cudaError_t SortPairsDescending(void *, size_t, const half *, half *, const uint64_t *, uint64_t *, int, int, int, cudaStream_t)
+inline hipError_t SortPairsDescending(void *, size_t, const half *, half *, const uint64_t *, uint64_t *, int, int, int, hipStream_t)
 {
     RuntimeError("Unsupported template argument(half) in SortPairsDescending");
 }

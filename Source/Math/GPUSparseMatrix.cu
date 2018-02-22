@@ -121,26 +121,20 @@ void GPUSparseMatrix<ElemType>::DeepCast(const GPUSparseMatrix<ElemType2>& deepC
     RequireSizeAndAllocate(deepCopy.GetNumRows(), deepCopy.GetNumCols(), deepCopy.GetNumNZElements(), deepCopy.GetFormat(), true, false);
     m_sliceViewOffset = 0; // reset to zero as we only start copying the indices starting from the offset in the source matrix
 
-<<<<<<< HEAD
     if (std::is_same<ElemType, ElemType2>::value)
     {
-        CUDA_CALL(cudaMemcpy(Data(), deepCopy.NzValues(), deepCopy.NzSize(), cudaMemcpyDeviceToDevice));
+        CUDA_CALL(hipMemcpy(Data(), deepCopy.NzValues(), deepCopy.NzSize(), hipMemcpyDeviceToDevice));
     }
     else
     {
         CUDA_LONG N = (CUDA_LONG)deepCopy.NzSize();
         int blocksPerGrid = (int)ceil(1.0 * N / GridDim::maxThreadsPerBlock);
         SyncGuard syncGuard;
-        _castValue<ElemType, ElemType2><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(deepCopy.NzValues(), Data(), N);
+        hipLaunchKernelGGL((_castValue<ElemType, ElemType2>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, deepCopy.NzValues(), Data(), N);
     }
 
-    CUDA_CALL(cudaMemcpy(MajorIndexLocation(), deepCopy.MajorIndexLocationWithSliceViewOffset(), deepCopy.MajorIndexSize(), cudaMemcpyDeviceToDevice));
-    CUDA_CALL(cudaMemcpy(SecondaryIndexLocation(), deepCopy.SecondaryIndexLocation(), deepCopy.SecondaryIndexSize(), cudaMemcpyDeviceToDevice));
-=======
-    CUDA_CALL(hipMemcpy(Data(), deepCopy.NzValues(), deepCopy.NzSize(), hipMemcpyDeviceToDevice));
     CUDA_CALL(hipMemcpy(MajorIndexLocation(), deepCopy.MajorIndexLocationWithSliceViewOffset(), deepCopy.MajorIndexSize(), hipMemcpyDeviceToDevice));
     CUDA_CALL(hipMemcpy(SecondaryIndexLocation(), deepCopy.SecondaryIndexLocation(), deepCopy.SecondaryIndexSize(), hipMemcpyDeviceToDevice));
->>>>>>> d007c39... HIP codes for CNTK
 
     if (deepCopy.m_sliceViewOffset > 0)
     {
@@ -300,33 +294,11 @@ void GPUSparseMatrix<ElemType>::CopyToDenseMatrix(GPUMatrix<ElemType>& denseMatr
     HIPSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
     if (GetFormat() == MatrixFormat::matrixFormatSparseCSR)
     {
-<<<<<<< HEAD
-        CUSPARSE_CALL(cusparsecsr2denseHelper(cusparseHandle, int(GetNumRows()), int(GetNumCols()), descr, Buffer(), RowLocation(), ColLocation(), denseMatrix.Data(), int(GetNumRows())));
+        HIPSPARSE_CALL(hipsparsecsr2denseHelper(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, Buffer(), RowLocation(), ColLocation(), denseMatrix.Data(), int(GetNumRows())));
     }
     else if (GetFormat() == MatrixFormat::matrixFormatSparseCSC)
     {
-        CUSPARSE_CALL(cusparsecsc2denseHelper(cusparseHandle, int(GetNumRows()), int(GetNumCols()), descr, Buffer(), RowLocation(), ColLocation(), denseMatrix.Data(), int(GetNumRows())));
-=======
-        if (sizeof(ElemType) == sizeof(float))
-        {
-            HIPSPARSE_CALL(hipsparseScsr2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (float*) Buffer(), RowLocation(), ColLocation(), (float*) denseMatrix.Data(), int(GetNumRows())));
-        }
-        else
-        {
-            HIPSPARSE_CALL(hipsparseDcsr2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (double*) Buffer(), RowLocation(), ColLocation(), (double*) denseMatrix.Data(), int(GetNumRows())));
-        }
-    }
-    else if (GetFormat() == MatrixFormat::matrixFormatSparseCSC)
-    {
-        if (sizeof(ElemType) == sizeof(float))
-        {
-            HIPSPARSE_CALL(hipsparseScsc2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (float*) Buffer(), RowLocation(), ColLocation(), (float*) denseMatrix.Data(), int(GetNumRows())));
-        }
-        else
-        {
-            HIPSPARSE_CALL(hipsparseDcsc2dense(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, (double*) Buffer(), RowLocation(), ColLocation(), (double*) denseMatrix.Data(), int(GetNumRows())));
-        }
->>>>>>> d007c39... HIP codes for CNTK
+        HIPSPARSE_CALL(hipsparsecsc2denseHelper(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), descr, Buffer(), RowLocation(), ColLocation(), denseMatrix.Data(), int(GetNumRows())));
     }
     else if (GetFormat() == MatrixFormat::matrixFormatSparseBlockCol || GetFormat() == MatrixFormat::matrixFormatSparseBlockRow)
     {
@@ -371,24 +343,9 @@ void GPUSparseMatrix<ElemType>::ConvertToSparseFormat(MatrixFormat newFormat, GP
 
     if ((oldFormat == matrixFormatSparseCSR && newFormat == matrixFormatSparseCSC) || (oldFormat == matrixFormatSparseCSC && newFormat == matrixFormatSparseCSR))
     {
-<<<<<<< HEAD
-        CUSPARSE_CALL(cusparsecsr2cscHelper(cusparseHandle, int(GetNumRows()), int(GetNumCols()), int(GetSizeAllocated()),
+        HIPSPARSE_CALL(hipsparsecsr2cscHelper(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), int(GetSizeAllocated()),
                                             Data(), RowLocation(), ColLocation(), outMatrix.Data(),
-                                            outMatrix.RowLocation(), outMatrix.ColLocation(), CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ZERO));
-=======
-        if (sizeof(ElemType) == sizeof(float))
-        {
-            HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), int(GetSizeAllocated()),
-                                           (float*) Data(), RowLocation(), ColLocation(), (float*) outMatrix.Data(),
-                                           outMatrix.RowLocation(), outMatrix.ColLocation(), HIPSPARSE_ACTION_NUMERIC, HIPSPARSE_INDEX_BASE_ZERO));
-        }
-        else
-        {
-            HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, int(GetNumRows()), int(GetNumCols()), int(GetSizeAllocated()),
-                                           (double*) Data(), RowLocation(), ColLocation(), (double*) outMatrix.Data(),
-                                           outMatrix.RowLocation(), outMatrix.ColLocation(), HIPSPARSE_ACTION_NUMERIC, HIPSPARSE_INDEX_BASE_ZERO));
-        }
->>>>>>> d007c39... HIP codes for CNTK
+                                            outMatrix.RowLocation(), outMatrix.ColLocation(), HIPSPARSE_ACTION_NUMERIC, HIPSPARSE_INDEX_BASE_ZERO));
     }
     else
     {
@@ -445,7 +402,7 @@ void GPUSparseMatrix<ElemType>::ChangeDeviceTo(DEVICEID_TYPE to_id)
 
 #ifdef WIN32
         // IOMMU DMAR needs to be disabled for CUDA P2P, otherwise it will silently hang.
-        // Unfortunately, cudaDeviceCanAccessPeer returns true irrespective of the IOMMU settings.
+        // Unfortunately, hipDeviceCanAccessPeer returns true irrespective of the IOMMU settings.
         // More details: https://bugzilla.kernel.org/show_bug.cgi?id=188271
         // http://docs.nvidia.com/cuda/gpudirect-rdma/#supported-systems
         // TODO: enable UVA p2p access once this is fixed.
@@ -453,15 +410,15 @@ void GPUSparseMatrix<ElemType>::ChangeDeviceTo(DEVICEID_TYPE to_id)
 
         // first try peer access
 	int canAccessPeer = false;
-        CUDA_CALL(cudaDeviceCanAccessPeer(&canAccessPeer, to_id, GetComputeDeviceId()));
+        CUDA_CALL(hipDeviceCanAccessPeer(&canAccessPeer, to_id, GetComputeDeviceId()));
         if (canAccessPeer)
         {
-            cudaError_t cudaStatus = cudaDeviceEnablePeerAccess(GetComputeDeviceId(), 0);
-            if (cudaStatus != cudaErrorPeerAccessAlreadyEnabled)
+            hipError_t cudaStatus = hipDeviceEnablePeerAccess(GetComputeDeviceId(), 0);
+            if (cudaStatus != hipErrorPeerAccessAlreadyEnabled)
             {
                 CUDA_CALL(cudaStatus);
             }
-            CUDA_CALL(cudaMemcpyPeer(d_dst, to_id, Buffer(), GetComputeDeviceId(), BufferSizeAllocated()));
+            CUDA_CALL(hipMemcpyPeer(d_dst, to_id, Buffer(), GetComputeDeviceId(), BufferSizeAllocated()));
         }
 	else
 #endif
@@ -526,21 +483,8 @@ void GPUSparseMatrix<ElemType>::SetValue(const GPUMatrix<ElemType>& denseMatrix,
 
     {
         SyncGuard syncGuard;
-<<<<<<< HEAD
-        CUSPARSE_CALL(cusparsennzHelper(cusparseHandle, (matrixFormat & matrixFormatRowMajor) ? CUSPARSE_DIRECTION_ROW : CUSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
+        HIPSPARSE_CALL(hipsparsennzHelper(hipsparseHandle, (matrixFormat & matrixFormatRowMajor) ? HIPSPARSE_DIRECTION_ROW : HIPSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
                                         denseMatrix.Data(), (int) numRows, nnzPerRowOrCol, &nnzTotalDevHostPtr));
-=======
-        if (sizeof(ElemType) == sizeof(float))
-        {
-            HIPSPARSE_CALL(hipsparseSnnz(hipsparseHandle, (matrixFormat & matrixFormatRowMajor) ? HIPSPARSE_DIRECTION_ROW : HIPSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
-                                       reinterpret_cast<float*>(denseMatrix.Data()), (int) numRows, nnzPerRowOrCol, &nnzTotalDevHostPtr));
-        }
-        else
-        {
-            HIPSPARSE_CALL(hipsparseDnnz(hipsparseHandle, (matrixFormat & matrixFormatRowMajor) ? HIPSPARSE_DIRECTION_ROW : HIPSPARSE_DIRECTION_COLUMN, (int) numRows, (int) numCols, descr,
-                                       reinterpret_cast<double*>(denseMatrix.Data()), (int) numRows, nnzPerRowOrCol, &nnzTotalDevHostPtr));
-        }
->>>>>>> d007c39... HIP codes for CNTK
         // ~SyncGuard
     }
 
@@ -549,39 +493,13 @@ void GPUSparseMatrix<ElemType>::SetValue(const GPUMatrix<ElemType>& denseMatrix,
     SyncGuard syncGuard;
     if (GetFormat() == MatrixFormat::matrixFormatSparseCSR)
     {
-<<<<<<< HEAD
-        CUSPARSE_CALL(cusparsedense2csrHelper(cusparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, denseMatrix.Data(),
+        HIPSPARSE_CALL(hipsparsedense2csrHelper(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, denseMatrix.Data(),
                                               (int) GetNumRows(), nnzPerRowOrCol, Data(), RowLocation(), ColLocation()));
     }
     else if (GetFormat() == MatrixFormat::matrixFormatSparseCSC)
     {
-        CUSPARSE_CALL(cusparsedense2cscHelper(cusparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, denseMatrix.Data(),
+        HIPSPARSE_CALL(hipsparsedense2cscHelper(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, denseMatrix.Data(),
                                               (int) GetNumRows(), nnzPerRowOrCol, Data(), RowLocation(), ColLocation()));
-=======
-        if (sizeof(ElemType) == sizeof(float))
-        {
-            HIPSPARSE_CALL(hipsparseSdense2csr(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<float*>(denseMatrix.Data()),
-                                             (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<float*>(Data()), RowLocation(), ColLocation()));
-        }
-        else
-        {
-            HIPSPARSE_CALL(hipsparseDdense2csr(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<double*>(denseMatrix.Data()),
-                                             (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<double*>(Data()), RowLocation(), ColLocation()));
-        }
-    }
-    else if (GetFormat() == MatrixFormat::matrixFormatSparseCSC)
-    {
-        if (sizeof(ElemType) == sizeof(float))
-        {
-            HIPSPARSE_CALL(hipsparseSdense2csc(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<float*>(denseMatrix.Data()),
-                                             (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<float*>(Data()), RowLocation(), ColLocation()));
-        }
-        else
-        {
-            HIPSPARSE_CALL(hipsparseDdense2csc(hipsparseHandle, (int) GetNumRows(), (int) GetNumCols(), descr, reinterpret_cast<double*>(denseMatrix.Data()),
-                                             (int) GetNumRows(), nnzPerRowOrCol, reinterpret_cast<double*>(Data()), RowLocation(), ColLocation()));
-        }
->>>>>>> d007c39... HIP codes for CNTK
     }
 }
 
@@ -804,11 +722,7 @@ void GPUSparseMatrix<ElemType>::Allocate(const size_t numRows, const size_t numC
         ElemType* pArray = (ElemType*)(buf);
 
         // Note this is required due to m_nz
-<<<<<<< HEAD
-        CUDA_CALL(cudaMemset(pArray, 0, bufferSizeNeeded));
-=======
         CUDA_CALL(hipMemset(pArray, 0, bufferSizeNeeded));
->>>>>>> d007c39... HIP codes for CNTK
         if (Buffer() != nullptr)
         {
             if (keepExistingValues)
@@ -1655,26 +1569,10 @@ ElemType GPUSparseMatrix<ElemType>::Adagrad(GPUMatrix<ElemType>& c, const bool n
         return 1;
 
     let nz = NzCount();
-<<<<<<< HEAD
-    cublasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
-    ElemType aveMultiplier = 0;
-    CUBLAS_CALL(cublasasumHelper(cuHandle, (LONG64) nz, multipliers, 1, &aveMultiplier));
-    return (ElemType) aveMultiplier / nz;
-=======
     hipblasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
-    if (sizeof(ElemType) == sizeof(float))
-    {
-        float aveMultiplier = 0;
-        HIPBLAS_CALL(hipblasSasum(cuHandle, (LONG64) nz, reinterpret_cast<float*>(multipliers), 1, &aveMultiplier));
-        return (ElemType) aveMultiplier / nz;
-    }
-    else
-    {
-        double aveMultiplier = 0;
-        HIPBLAS_CALL(hipblasDasum(cuHandle, (LONG64) nz, reinterpret_cast<double*>(multipliers), 1, &aveMultiplier));
-        return (ElemType) aveMultiplier / nz;
-    }
->>>>>>> d007c39... HIP codes for CNTK
+    ElemType aveMultiplier = 0;
+    HIPBLAS_CALL(hipblasasumHelper(cuHandle, (LONG64) nz, multipliers, 1, &aveMultiplier));
+    return (ElemType) aveMultiplier / nz;
 }
 
 template <class ElemType>
@@ -1786,18 +1684,12 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         ElemType* steps = c.Data() + 2 * n; // current step size
                                             // Data()+3*n is temp memory used to store multipliers, no need to initialize
 
-<<<<<<< HEAD
-        _rmsprop_init4BlockSparseCol<ElemType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
-            avars, signs, steps,
-            Data(), ColOrRow2BlockId(), GetNumRows(),
-=======
 	auto fc_data = Data(); //TODO: __add__ remove
 	auto fc_cor2bi = ColOrRow2BlockId();
 	auto fc_gnr = GetNumRows();
         hipLaunchKernelGGL((_rmsprop_init4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
             avars, signs, steps, 
             fc_data, fc_cor2bi, fc_gnr,
->>>>>>> d007c39... HIP codes for CNTK
             n);
     }
     assert(c.GetNumRows() == GetNumRows() && c.GetNumCols() == numColsNeeded);
@@ -1841,26 +1733,10 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
     if (!needAveMultiplier)
         return 1;
 
-<<<<<<< HEAD
-    cublasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
-    ElemType aveMultiplier = 0;
-    CUBLAS_CALL(cublasasumHelper(cuHandle, (CUDA_LONG)n, multipliers, 1, &aveMultiplier));
-    return (ElemType)aveMultiplier / n;
-=======
     hipblasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
-    if (sizeof(ElemType) == sizeof(float))
-    {
-        float aveMultiplier = 0;
-        HIPBLAS_CALL(hipblasSasum(cuHandle, (CUDA_LONG)n, reinterpret_cast<float*>(multipliers), 1, &aveMultiplier));
-        return aveMultiplier / n;
-    }
-    else
-    {
-        double aveMultiplier = 0;
-        HIPBLAS_CALL(hipblasDasum(cuHandle, (CUDA_LONG)n, reinterpret_cast<double*>(multipliers), 1, &aveMultiplier));
-        return (ElemType)aveMultiplier / n;
-    }
->>>>>>> d007c39... HIP codes for CNTK
+    ElemType aveMultiplier = 0;
+    HIPBLAS_CALL(hipblasasumHelper(cuHandle, (CUDA_LONG)n, multipliers, 1, &aveMultiplier));
+    return (ElemType)aveMultiplier / n;
 }
 
 __global__ void _updateTimestamps(CUDA_LONG N, const GPUSPARSE_INDEX_TYPE* blockId2ColOrRow, int* timestamps, int currentTimestamp)
@@ -1893,19 +1769,13 @@ void GPUSparseMatrix<ElemType>::AdaDelta(GPUMatrix<AccumType>&c, GPUMatrix<Accum
 
     size_t n = GetBlockSize() * GetNumRows();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-<<<<<<< HEAD
-    _adadelta4BlockSparseCol<ElemType, AccumType> << <blocksPerGrid, GridDim::maxThreadsPerBlock >> >(
-        n, Data(), BlockId2ColOrRow(), GetNumRows(),
-        c.Data(), c.Data() + GetNumElements(), functionValues.Data(),
-=======
     auto fc_data = Data(); //TODO: __add__ remove
     auto fc_bi2cor = BlockId2ColOrRow();
     auto fc_gnr = GetNumRows();
     auto fc_gne = GetNumElements();
-    hipLaunchKernelGGL((_adadelta4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
+    hipLaunchKernelGGL((_adadelta4BlockSparseCol<ElemType, AccumType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
         n, fc_data, fc_bi2cor, fc_gnr,
         c.Data(), c.Data() + fc_gne, functionValues.Data(),
->>>>>>> d007c39... HIP codes for CNTK
         learningRate, rho, epsilon, timestamps, currentTimestamp);
     n = GetBlockSize();
     blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
@@ -1947,26 +1817,10 @@ void GPUSparseMatrix<ElemType>::MultiplyAndWeightedAdd(ElemType alpha, const GPU
     const auto& aColLocation = reinterpretAsCSR ? a.RowLocation() : a.ColLocation();
 
     SyncGuard syncGuard;
-<<<<<<< HEAD
-    CUSPARSE_CALL(cusparsecsrmmHelper(cusparseHandle, oper, m, n, k, (int) a.GetNumNZElements(), &alpha, descr, a.Buffer(),
+    HIPSPARSE_CALL(hipsparsecsrmmHelper(hipsparseHandle, oper, m, n, k, (int) a.GetNumNZElements(), &alpha, descr, a.Buffer(),
                                      aRowLocation, aColLocation, b.Data(),
                                      (int) b.GetNumRows(), &beta, c.Data(), (int) c.GetNumRows()));
-    CUSPARSE_CALL(cusparseDestroy(cusparseHandle));
-=======
-    if (sizeof(ElemType) == sizeof(float))
-    {
-        HIPSPARSE_CALL(hipsparseScsrmm(hipsparseHandle, oper, m, n, k, (int) a.GetNumNZElements(), reinterpret_cast<float*>(&alpha), descr, reinterpret_cast<const float*>(a.Buffer()),
-                                     aRowLocation, aColLocation, reinterpret_cast<float*>(b.Data()),
-                                     (int) b.GetNumRows(), reinterpret_cast<float*>(&beta), reinterpret_cast<float*>(c.Data()), (int) c.GetNumRows()));
-    }
-    else
-    {
-        HIPSPARSE_CALL(hipsparseDcsrmm(hipsparseHandle, oper, m, n, k, (int) a.GetNumNZElements(), reinterpret_cast<double*>(&alpha), descr, reinterpret_cast<const double*>(a.Buffer()),
-                                     aRowLocation, aColLocation, reinterpret_cast<double*>(b.Data()),
-                                     (int) b.GetNumRows(), reinterpret_cast<double*>(&beta), reinterpret_cast<double*>(c.Data()), (int) c.GetNumRows()));
-    }
     HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
->>>>>>> d007c39... HIP codes for CNTK
 }
 
 template <class ElemType>
@@ -2120,26 +1974,10 @@ void GPUSparseMatrix<ElemType>::Multiply(const GPUSparseMatrix<ElemType>& S1, bo
                         return nnzTotal;
                     });
     // Step 2
-<<<<<<< HEAD
-    CUSPARSE_CALL(cusparsecsrgemmHelper(cusparseHandle, operA, operB, m, n, k, descrA, nnzA, S1.Buffer(), S1.RowLocation(), S1.ColLocation(),
+    HIPSPARSE_CALL(hipsparsecsrgemmHelper(hipsparseHandle, operA, operB, m, n, k, descrA, nnzA, S1.Buffer(), S1.RowLocation(), S1.ColLocation(),
                                         descrB, nnzB, S2.Buffer(), S2.RowLocation(), S2.ColLocation(),
                                         descrC, c.Data(), c.RowLocation(), c.ColLocation()));
-    cusparseDestroy(cusparseHandle);
-=======
-    if (sizeof(float) == sizeof(ElemType))
-    {
-        HIPSPARSE_CALL(hipsparseScsrgemm(hipsparseHandle, operA, operB, m, n, k, descrA, nnzA, (const float*) S1.Buffer(), S1.RowLocation(), S1.ColLocation(),
-                                       descrB, nnzB, (const float*) S2.Buffer(), S2.RowLocation(), S2.ColLocation(),
-                                       descrC, (float*) c.Data(), c.RowLocation(), c.ColLocation()));
-    }
-    else
-    {
-        HIPSPARSE_CALL(hipsparseDcsrgemm(hipsparseHandle, operA, operB, m, n, k, descrA, nnzA, (const double*) S1.Buffer(), S1.RowLocation(), S1.ColLocation(),
-                                       descrB, nnzB, (const double*) S2.Buffer(), S2.RowLocation(), S2.ColLocation(),
-                                       descrC, (double*) c.Data(), c.RowLocation(), c.ColLocation()));
-    }
     hipsparseDestroy(hipsparseHandle);
->>>>>>> d007c39... HIP codes for CNTK
 }
 
 template <class ElemType>
@@ -2196,23 +2034,9 @@ void GPUSparseMatrix<ElemType>::ScaleAndAdd(ElemType alpha, const GPUSparseMatri
                         return nnzTotal;
                     });
     // Step 2
-<<<<<<< HEAD
-    CUSPARSE_CALL(cusparsecsrgeamHelper(cusparseHandle, m, n, &alpha, descrA, nnzA, a.Data(), a.RowLocation(), a.ColLocation(),
+    HIPSPARSE_CALL(hipsparsecsrgeamHelper(hipsparseHandle, m, n, &alpha, descrA, nnzA, a.Data(), a.RowLocation(), a.ColLocation(),
                                         &beta, descrB, nnzB, b.Data(), b.RowLocation(), b.ColLocation(), descrC, c.Data(), c.RowLocation(), c.ColLocation()));
-    cusparseDestroy(cusparseHandle);
-=======
-    if (sizeof(ElemType) == sizeof(float))
-    {
-        HIPSPARSE_CALL(hipsparseScsrgeam(hipsparseHandle, m, n, reinterpret_cast<const float*>(&alpha), descrA, nnzA, reinterpret_cast<const float*>(a.Data()), a.RowLocation(), a.ColLocation(),
-                                       reinterpret_cast<const float*>(&beta), descrB, nnzB, reinterpret_cast<const float*>(b.Data()), b.RowLocation(), b.ColLocation(), descrC, reinterpret_cast<float*>(c.Data()), c.RowLocation(), c.ColLocation()));
-    }
-    else
-    {
-        HIPSPARSE_CALL(hipsparseDcsrgeam(hipsparseHandle, m, n, reinterpret_cast<const double*>(&alpha), descrA, nnzA, reinterpret_cast<const double*>(a.Data()), a.RowLocation(), a.ColLocation(),
-                                       reinterpret_cast<const double*>(&beta), descrB, nnzB, reinterpret_cast<const double*>(b.Data()), b.RowLocation(), b.ColLocation(), descrC, reinterpret_cast<double*>(c.Data()), c.RowLocation(), c.ColLocation()));
-    }
     hipsparseDestroy(hipsparseHandle);
->>>>>>> d007c39... HIP codes for CNTK
 }
 
 template <class ElemType>
@@ -2314,18 +2138,7 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
         cscColPtrA = TracingGPUMemoryAllocator::Allocate<GPUSPARSE_INDEX_TYPE>(a.GetComputeDeviceId(), (n + 1));
 
         SyncGuard syncGuard;
-<<<<<<< HEAD
-        CUSPARSE_CALL(cusparsecsr2cscHelper(cusparseHandle, m, n, nnz, a.Data(), a.RowLocation(), a.ColLocation(), cscValA, cscRowIndA, cscColPtrA, cpVals, idxBase));
-=======
-        if (sizeof(ElemType) == sizeof(float))
-        {
-            HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const float*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<float*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
-        }
-        else
-        {
-            HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const double*>(a.Data()), a.RowLocation(), a.ColLocation(), reinterpret_cast<double*>(cscValA), cscRowIndA, cscColPtrA, cpVals, idxBase));
-        }
->>>>>>> d007c39... HIP codes for CNTK
+        HIPSPARSE_CALL(hipsparsecsr2cscHelper(hipsparseHandle, m, n, nnz, a.Data(), a.RowLocation(), a.ColLocation(), cscValA, cscRowIndA, cscColPtrA, cpVals, idxBase));
     }
     else if (a.GetFormat() == matrixFormatSparseCSC)
     {
@@ -2355,22 +2168,7 @@ ElemType GPUSparseMatrix<ElemType>::InnerProductOfMatrices(const GPUSparseMatrix
 
     // Actual dot product
     ElemType res = 0;
-<<<<<<< HEAD
-    CUSPARSE_CALL(cusparsedotiHelper(cusparseHandle, (int) a_nz, cscValA, vectArray, b.Data(), &res, idxBase));
-=======
-    if (sizeof(ElemType) == sizeof(float))
-    {
-        HIPSPARSE_CALL(hipsparseSdoti(hipsparseHandle, (int) a_nz, reinterpret_cast<float*>(cscValA), vectArray,
-                                    reinterpret_cast<float*>(b.Data()),
-                                    reinterpret_cast<float*>(&res), idxBase));
-    }
-    else
-    {
-        HIPSPARSE_CALL(hipsparseDdoti(hipsparseHandle, (int) a_nz, reinterpret_cast<double*>(cscValA), vectArray,
-                                    reinterpret_cast<double*>(b.Data()),
-                                    reinterpret_cast<double*>(&res), idxBase));
-    }
->>>>>>> d007c39... HIP codes for CNTK
+    HIPSPARSE_CALL(hipsparsedotiHelper(hipsparseHandle, (int) a_nz, cscValA, vectArray, b.Data(), &res, idxBase));
     TracingGPUMemoryAllocator::Free<GPUSPARSE_INDEX_TYPE>(a.GetComputeDeviceId(), vectArray);
     if (allocTemp)
     {
@@ -2492,17 +2290,10 @@ template <class ElemType>
     CUDA_CALL(hipMemcpy(d_res, res, sizeof(long) * 3, hipMemcpyHostToDevice));
 
     int blocksPerGrid = (int) ceil(1.0 * a.GetNumNZElements() / GridDim::maxThreadsPerBlock);
-<<<<<<< HEAD
-    _areEqual<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(a.NzValues(), b.NzValues(), (CUDA_LONG) a.GetNumNZElements(), threshold, d_res);
-    _areEqual<int><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(a.MajorIndexLocation(), b.MajorIndexLocation(), (CUDA_LONG) a.MajorIndexCount(), (int)(comp_t) threshold, d_res + 1);
-    blocksPerGrid = (int) ceil((1.0 * a.SecondaryIndexCount()) / GridDim::maxThreadsPerBlock);
-    _areEqual<int><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(a.SecondaryIndexLocation(), b.SecondaryIndexLocation(), (CUDA_LONG) a.SecondaryIndexCount(), (int)(comp_t) threshold, d_res + 2);
-=======
     hipLaunchKernelGGL((_areEqual<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, a.NzValues(), b.NzValues(), (CUDA_LONG) a.GetNumNZElements(), threshold, d_res);
-    hipLaunchKernelGGL((_areEqual<int>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, a.MajorIndexLocation(), b.MajorIndexLocation(), (CUDA_LONG) a.MajorIndexCount(), (int) threshold, d_res + 1);
+    hipLaunchKernelGGL((_areEqual<int>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, a.MajorIndexLocation(), b.MajorIndexLocation(), (CUDA_LONG) a.MajorIndexCount(), (int)(comp_t) threshold, d_res + 1);
     blocksPerGrid = (int) ceil((1.0 * a.SecondaryIndexCount()) / GridDim::maxThreadsPerBlock);
-    hipLaunchKernelGGL((_areEqual<int>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, a.SecondaryIndexLocation(), b.SecondaryIndexLocation(), (CUDA_LONG) a.SecondaryIndexCount(), (int) threshold, d_res + 2);
->>>>>>> d007c39... HIP codes for CNTK
+    hipLaunchKernelGGL((_areEqual<int>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, a.SecondaryIndexLocation(), b.SecondaryIndexLocation(), (CUDA_LONG) a.SecondaryIndexCount(), (int)(comp_t) threshold, d_res + 2);
 
     CUDA_CALL(hipMemcpy(res, d_res, sizeof(long) * 3, hipMemcpyDeviceToHost));
     if (res[0] * res[1] * res[2] == 1)
@@ -2657,21 +2448,8 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
     {
         if (nnz > 0)
         {
-<<<<<<< HEAD
-            CUSPARSE_CALL(cusparsecsr2cscHelper(cusparseHandle, m, n, nnz, Data(), RowLocation(), ColLocation(),
+            HIPSPARSE_CALL(hipsparsecsr2cscHelper(hipsparseHandle, m, n, nnz, Data(), RowLocation(), ColLocation(),
                                                 c.Data(), c.ColLocation(), c.RowLocation(), cpVals, idxBase));
-=======
-            if (sizeof(ElemType) == sizeof(float))
-            {
-                HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const float*>(Data()), RowLocation(), ColLocation(),
-                                               reinterpret_cast<float*>(c.Data()), c.ColLocation(), c.RowLocation(), cpVals, idxBase));
-            }
-            else
-            {
-                HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, m, n, nnz, reinterpret_cast<const double*>(Data()), RowLocation(), ColLocation(),
-                                               reinterpret_cast<double*>(c.Data()), c.ColLocation(), c.RowLocation(), cpVals, idxBase));
-            }
->>>>>>> d007c39... HIP codes for CNTK
         }
         else
         {
@@ -2682,21 +2460,8 @@ GPUSparseMatrix<ElemType> GPUSparseMatrix<ElemType>::Transpose() const
     {
         if (nnz > 0)
         {
-<<<<<<< HEAD
-            CUSPARSE_CALL(cusparsecsr2cscHelper(cusparseHandle, n, m, nnz, this->Data(), this->ColLocation(), this->RowLocation(),
+            HIPSPARSE_CALL(hipsparsecsr2cscHelper(hipsparseHandle, n, m, nnz, this->Data(), this->ColLocation(), this->RowLocation(),
                                                 c.Data(), c.RowLocation(), c.ColLocation(), cpVals, idxBase));
-=======
-            if (sizeof(ElemType) == sizeof(float))
-            {
-                HIPSPARSE_CALL(hipsparseScsr2csc(hipsparseHandle, n, m, nnz, reinterpret_cast<const float*>(this->Data()), this->ColLocation(), this->RowLocation(),
-                                               reinterpret_cast<float*>(c.Data()), c.RowLocation(), c.ColLocation(), cpVals, idxBase));
-            }
-            else
-            {
-                HIPSPARSE_CALL(hipsparseDcsr2csc(hipsparseHandle, n, m, nnz, reinterpret_cast<const double*>(this->Data()), this->ColLocation(), this->RowLocation(),
-                                               reinterpret_cast<double*>(c.Data()), c.RowLocation(), c.ColLocation(), cpVals, idxBase));
-            }
->>>>>>> d007c39... HIP codes for CNTK
         }
         else
         {
@@ -2782,21 +2547,8 @@ void GPUSparseMatrix<ElemType>::AssignColumnSliceToDense(GPUMatrix<ElemType>& sl
     hipsparseSetMatIndexBase(descr, HIPSPARSE_INDEX_BASE_ZERO);
 
     SyncGuard syncGuard;
-<<<<<<< HEAD
-    CUSPARSE_CALL(cusparseSetStream(cusparseHandle, t_stream));
-    CUSPARSE_CALL(cusparsecsc2denseHelper(cusparseHandle, m, numCols, descr, Buffer(), RowLocation(), ColLocation() + startColumn, slice.Data(), m));
-    CUSPARSE_CALL(cusparseDestroy(cusparseHandle));
-=======
     HIPSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
-    if (sizeof(ElemType) == sizeof(float))
-    {
-        HIPSPARSE_CALL(hipsparseScsc2dense(hipsparseHandle, m, numCols, descr, (float*) Buffer(), RowLocation(), ColLocation() + startColumn, (float*) slice.Data(), m));
-    }
-    else
-    {
-        HIPSPARSE_CALL(hipsparseDcsc2dense(hipsparseHandle, m, numCols, descr, (double*) Buffer(), RowLocation(), ColLocation() + startColumn, (double*) slice.Data(), m));
-    }
-
+    HIPSPARSE_CALL(hipsparsecsc2denseHelper(hipsparseHandle, m, numCols, descr, Buffer(), RowLocation(), ColLocation() + startColumn, slice.Data(), m));
     HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
 
 }
@@ -2884,7 +2636,6 @@ void GPUSparseMatrix<short>::AssignColumnSliceToDense(GPUMatrix<short>& slice, s
 
     HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
 
->>>>>>> d007c39... HIP codes for CNTK
 }
 template <class ElemType>
 GPUMatrix<ElemType> GPUSparseMatrix<ElemType>::CopyColumnSliceToDense(size_t startColumn, size_t numCols) const
@@ -2922,28 +2673,10 @@ ElemType GPUSparseMatrix<ElemType>::SumOfAbsElements() const
     if (IsEmpty())
         return 0;
 
-<<<<<<< HEAD
-    cublasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
-    ElemType res = 0;
-    cublasasumHelper(cuHandle, (int) GetNumNZElements(), NzValues(), 1, &res);
-    return res;
-=======
     hipblasHandle_t cuHandle = GPUMatrix<ElemType>::GetCublasHandle(GetComputeDeviceId());
-    if (sizeof(ElemType) == sizeof(float))
-    {
-        float res = 0;
-        //TODO:hipblasSasum(cuHandle, (int) GetNumNZElements(), reinterpret_cast<const float*>(NzValues()), 1, &res);
-        hipblasSasum(cuHandle, (int) GetNumNZElements(), const_cast<float*>(reinterpret_cast<const float*>(NzValues())), 1, &res);
-        return res;
-    }
-    else
-    {
-        double res = 0;
-        //TODO:hipblasDasum(cuHandle, (int) GetNumNZElements(), reinterpret_cast<const double*>(NzValues()), 1, &res);
-        hipblasDasum(cuHandle, (int) GetNumNZElements(), const_cast<double*>(reinterpret_cast<const double*>(NzValues())), 1, &res);
-        return ElemType(res);
-    }
->>>>>>> d007c39... HIP codes for CNTK
+    ElemType res = 0;
+    hipblasasumHelper(cuHandle, (int) GetNumNZElements(), NzValues(), 1, &res);
+    return res;
 }
 
 template <class ElemType>
@@ -3271,11 +3004,7 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::AssignOneHot(const GPUMatr
     CUDA_LONG N = (CUDA_LONG)a.GetNumElements();
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
-<<<<<<< HEAD
-    _assignOneHotAsSparse<ElemType><<<blocksPerGrid, GridDim::maxThreadsPerBlock>>>(indices,
-=======
-    hipLaunchKernelGGL((_assignOneHotAsSparse<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, indices, 
->>>>>>> d007c39... HIP codes for CNTK
+    hipLaunchKernelGGL((_assignOneHotAsSparse<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, indices,
                                                                                     secondaryIndices,
                                                                                     majorIndices,
                                                                                     targetData,

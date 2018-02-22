@@ -113,7 +113,7 @@ public:
                                                    HIPDNN_CROSS_CORRELATION, dataType == HIPDNN_DATA_HALF ? HIPDNN_DATA_FLOAT : dataType));
         // allow tensor core for fp16 by default
         if(dataType == HIPDNN_DATA_HALF)
-            HIPDNN_CALL(cudnnSetConvolutionMathType(m_conv, HIPDNN_TENSOR_OP_MATH));
+            HIPDNN_CALL(hipdnnSetConvolutionMathType(m_conv, HIPDNN_TENSOR_OP_MATH));
     }
 
     ~CuDnnConv()
@@ -322,8 +322,8 @@ protected:
             return err;
         };
         FindBestAlgo(batchSize, m_fwdAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
-        if(m_dataType == CUDNN_DATA_HALF) CUDNN_CALL(cudnnSetConvolutionMathType(*m_conv, m_fwdAlgo.AlgoMathType));
-        else CUDNN_CALL(cudnnSetConvolutionMathType(*m_conv, CUDNN_DEFAULT_MATH));
+        if(m_dataType == HIPDNN_DATA_HALF) HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, m_fwdAlgo.AlgoMathType));
+        else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
         // Perform forward convolution operation.
         HIPDNN_CALL(hipdnnConvolutionForward(*m_cudnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
     }
@@ -472,7 +472,7 @@ protected:
         // Compute gradients with respect to the output tensor (data).
         if(m_dataType == HIPDNN_DATA_HALF) HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, m_backFiltAlgo.AlgoMathType));
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
-        CUDNN_CALL(hipdnnConvolutionBackwardFilter(*m_cudnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
+        HIPDNN_CALL(hipdnnConvolutionBackwardFilter(*m_cudnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
     }
 
     void EnsurePoolingInitialized() override
@@ -528,6 +528,11 @@ private:
         hipdnnStatus_t status_hipdnn;
         status_hipdnn = cudnnTohipConvolutionBwdFilterAlgo(in, out);
     }
+    void convert_type(cudnnMathType_t in, hipdnnMathType_t *out)
+    {
+	hipdnnStatus_t status_hipdnn;
+	status_hipdnn = cudnnTohipMathType(in, out);
+    }
 #elif defined  __HIP_PLATFORM_HCC__
     void convert_type(miopenConvFwdAlgorithm_t in, hipdnnConvolutionFwdAlgo_t* out)
     {
@@ -544,6 +549,7 @@ private:
         hipdnnStatus_t status_hipdnn;
         status_hipdnn = miopenTohipConvolutionBwdFilterAlgo(in, out);
     }
+
 
 
     void algomatch(miopenConvFwdAlgorithm_t* newalgo, hipdnnConvolutionFwdAlgoPerf_t* algotype)
@@ -661,7 +667,9 @@ private:
 #endif
                 convert_type(newAlgo, &sel_algo);
                 algo.RecordAlgoBatchSizeWorkspaceSize(true, sel_algo, batchSize, (*res).memory);
-                algo.AlgoMathType = (*res).mathType;
+		        hipdnnMathType_t hipMT;
+		        convert_type((*res).mathType, &hipMT);
+                algo.AlgoMathType = hipMT;
                 algo.autotuningState = AutotuningState::Running;
                 if (algo.MaxAlgoWorkspaceSize < curSize)   // need to shrink the workspace
                     workspace.Resize((curSize + sizeof(ElemType) - 1) / sizeof(ElemType), 1, 0, false);
@@ -687,7 +695,9 @@ private:
 #endif
                     convert_type(newAlgo, &sel_algo);
                     algo.RecordAlgoBatchSizeWorkspaceSize(true, sel_algo, batchSize, (*res).memory);
-                    algo.AlgoMathType = (*res).mathType;
+		            hipdnnMathType_t hipMT;
+                    convert_type((*res).mathType, &hipMT);
+                    algo.AlgoMathType = hipMT;
                     algo.autotuningState = AutotuningState::Running;
                 }
                 catch (...)
@@ -730,7 +740,7 @@ private:
         typedef L typeL;
         typedef M typeM;
         ConvAlgoInfo()
-            : LastBatchAlgoMBSize(0), MaxAlgoMBSize(0), maxMBSizeSeen(0), autotuningState(AutotuningState::Init), MaxAlgoWorkspaceSize(0), LastBatchAlgoWorkspaceSize(0), AlgoMathType(CUDNN_TENSOR_OP_MATH)
+            : LastBatchAlgoMBSize(0), MaxAlgoMBSize(0), maxMBSizeSeen(0), autotuningState(AutotuningState::Init), MaxAlgoWorkspaceSize(0), LastBatchAlgoWorkspaceSize(0), AlgoMathType(HIPDNN_TENSOR_OP_MATH)
         {
         }
         // Variables to stores states
@@ -748,7 +758,7 @@ private:
         L selectedAlgo;     // currently selected algorithm
         L maxAlgo;          // algorithm that was selected when the current workspace is allocated
 
-        cudnnMathType_t AlgoMathType;
+        hipdnnMathType_t AlgoMathType;
 
         bool NeedAutotuning(size_t batchSize, size_t workspaceSize)
         {
