@@ -20,7 +20,7 @@ protected:
 };
 #endif
 
-#if defined(__CUDACC__)
+#if defined(__HIPCC__)
 #define __CUDA_HOSTDEVICE__ __host__ __device__
 #define __INLINE__ __forceinline__
 #else
@@ -46,7 +46,7 @@ public:
 
     // construction from build-in types
     __FP16_DECL__ half(float f) {
-#ifndef __CUDA_ARCH__
+#ifndef __HIP_DEVICE_COMPILE__
         CNTK::floatToFloat16(&f, &__x);
 #else
         *this = half(__float2half(f));
@@ -60,7 +60,7 @@ public:
     __FP16_DECL__ half(size_t u) : half((float)u) {}
 
     __FP16_DECL__ half& operator=(float f) {
-#ifndef __CUDA_ARCH__
+#ifndef __HIP_DEVICE_COMPILE__
         CNTK::floatToFloat16(&f, &__x); return *this;
 #else
         *this = half(__float2half(f)); return *this;
@@ -84,7 +84,7 @@ public:
 
     // cast to build-in types
     __FP16_DECL__ operator float() const {
-#ifndef __CUDA_ARCH__
+#ifndef __HIP_DEVICE_COMPILE__
         float f;
         CNTK::float16ToFloat(&__x, &f);
         return f;

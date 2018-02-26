@@ -40,8 +40,13 @@ using namespace std;
 #define __float_as_int(in) (*(int *) &in)
 #define __int_as_float(in) (*(float *) &in)
 #else // TODO: remove this once we got this figured out
+#ifdef __HIP_PLATFORM_NVCC__
 #include "math_constants.h"
-#if __CUDA_ARCH__ < 200
+#elif defined __HIP_PLATFORM_HCC__
+#include "hip/hip_runtime_api.h"
+#define CUDART_MIN_DENORM_F __int_as_float(0x00000001)                                               
+#endif
+#if !defined(__HIP_ARCH_HAS_THREAD_FENCE_SYSTEM__) && !defined(__HIP_ARCH_HAS_SYNC_THREAD_EXT__) //TODO: __hip__
 //#warning Sequence training not supported on 1.x CUDA machines.
 #define force_crash() (*((int *) -1) = 0)         // TODO: this does not in fact seem to crash it...
 #define xatomicAdd(a, v) (force_crash(), *(a) = v) // force a crash if used with 1.x devices

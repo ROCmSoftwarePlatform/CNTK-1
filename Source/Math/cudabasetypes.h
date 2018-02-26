@@ -4,7 +4,7 @@
 
 #pragma once
 
-#ifdef __CUDA_ARCH__ // we are compiling under CUDA
+#ifdef __HIP_DEVICE_COMPILE__ // we are compiling under CUDA
 #define ON_CUDA 1
 #ifdef __device__
 #define cudacode __device__
@@ -58,6 +58,9 @@ public:
     {
         return cuda_ptr(p - index);
     }
+#ifdef __HIP_PLATFORM_HCC__ //TODO:
+    cudasharedcode
+#endif
     cuda_ptr(T* pp)
         : p(pp)
     {
@@ -127,6 +130,9 @@ protected:
     }
 
 public:
+#ifdef __HIP_PLATFORM_HCC__ //TODO:
+    cudasharedcode
+#endif
     matrixref(T* p, size_t numRows, size_t numCols, size_t colStride)
         : p(p), numrows(numRows), numcols(numCols), colstride(colStride)
     {

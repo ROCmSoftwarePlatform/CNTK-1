@@ -5,8 +5,10 @@
 #include "ColumnQuantizer.h"
 #include "GPUMatrix.h"
 #ifndef CPUONLY
-#include <cuda_runtime_api.h>
+#include <hip/hip_runtime_api.h>
+#ifdef __HIP_PLATFORM_NVCC__
 #include <cuda.h>
+#endif
 #endif // !CPUONLY
 #include <vector>
 #include <memory>
@@ -35,7 +37,7 @@ private:
 
 #ifndef CPUONLY
     // Record a event to flag the completion of quantization/unquantization kernel on the compute stream
-    void RecordQuantizeCompleteEvent(cudaStream_t computestream) const;
+    void RecordQuantizeCompleteEvent(hipStream_t computestream) const;
 
     // Synchronize the fetch stream to the quantization completion event and record an event on the fetch
     // stream to flag the completion of fetching the quantization results from the GPU
@@ -43,7 +45,7 @@ private:
 
     // Synchronize the compute stream to the assign completion event to ensure that subsequent compute stream operations
     // wait for the assign stream operations, scheduled so far, to finish
-    void SyncAssignCompleteEvent(cudaStream_t computestream) const;
+    void SyncAssignCompleteEvent(hipStream_t computestream) const;
 
     // for concurrent computation and memcpy
     //  - assign to GPU : CPU-to-GPU,started by CPU when data read; flags assigncomplete
@@ -52,25 +54,25 @@ private:
     //  - CPU-side access of buffer --read: waits for fetchcomplete, write: waits for assigncomplete
 
 public:
-    static cudaStream_t GetComputeStream(); // get the compute stream
-    static cudaStream_t GetFetchStream();   // and the copy streams
-    static cudaStream_t GetAssignStream();
+    static hipStream_t GetComputeStream(); // get the compute stream
+    static hipStream_t GetFetchStream();   // and the copy streams
+    static hipStream_t GetAssignStream();
 
 private:
     // helper functions for gpus
     static void Sync();
-    static void SyncStream(cudaStream_t stream);
-    static void SyncEvent(cudaEvent_t ev);
+    static void SyncStream(hipStream_t stream);
+    static void SyncEvent(hipEvent_t ev);
 
 private:
-    static cudaStream_t m_computeStream;
-    static cudaStream_t m_fetchStream;
-    static cudaStream_t m_assignStream;
+    static hipStream_t m_computeStream;
+    static hipStream_t m_fetchStream;
+    static hipStream_t m_assignStream;
 
-    mutable cudaEvent_t m_tempMatrixZeroingCompleteEvent;
-    mutable cudaEvent_t m_quantizeCompleteEvent;
-    mutable cudaEvent_t m_fetchCompleteEvent;
-    mutable cudaEvent_t m_assignCompleteEvent;
+    mutable hipEvent_t m_tempMatrixZeroingCompleteEvent;
+    mutable hipEvent_t m_quantizeCompleteEvent;
+    mutable hipEvent_t m_fetchCompleteEvent;
+    mutable hipEvent_t m_assignCompleteEvent;
 #endif // !CPUONLY
 
 private:
@@ -99,7 +101,7 @@ public:
 
 private:
 #ifndef CPUONLY
-    cudaEvent_t m_mainGPUComputeStreamCUDAEvent;
+    hipEvent_t m_mainGPUComputeStreamCUDAEvent;
 #endif
 };
 } } }

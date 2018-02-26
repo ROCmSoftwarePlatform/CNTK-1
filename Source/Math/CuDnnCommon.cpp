@@ -12,7 +12,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 #ifndef CPUONLY
 MATH_API std::size_t GetCUDNNVersion()
 {
-    return cudnnGetVersion();
+    return hipdnnGetVersion();
 }
 #endif
 template <>
@@ -33,7 +33,7 @@ CuDnnTensor::CuDnnTensor()
 {
 }
 
-CuDnnTensor::CuDnnTensor(const TensorShape& src, cudnnDataType_t dataType)
+CuDnnTensor::CuDnnTensor(const TensorShape& src, hipdnnDataType_t dataType)
     : m_tensor(nullptr)
 {
     Set(src, dataType);
@@ -43,14 +43,14 @@ CuDnnTensor::~CuDnnTensor()
 {
     if (m_tensor != nullptr)
     {
-        cudnnDestroyTensorDescriptor(m_tensor);
+        hipdnnDestroyTensorDescriptor(m_tensor);
         m_tensor = nullptr;
     }
 }
 
-void CuDnnTensor::Set(const TensorShape& src, cudnnDataType_t dataType)
+void CuDnnTensor::Set(const TensorShape& src, hipdnnDataType_t dataType)
 {
-    CUDNN_CALL(cudnnCreateTensorDescriptor(&m_tensor));
+    HIPDNN_CALL(hipdnnCreateTensorDescriptor(&m_tensor));
     // Set cuDNN tensor dimensions. cuDNN uses row-major format while TensorShape - column-major
     // so conversion is required. N dimension will be set to 1.
     const auto& stridesSrc = src.GetStrides();
@@ -65,7 +65,7 @@ void CuDnnTensor::Set(const TensorShape& src, cudnnDataType_t dataType)
     // Set "minibatch"(aka N) dimension.
     dims[0] = 1;
     strides[0] = strides[1] * dims[1];
-    CUDNN_CALL(cudnnSetTensorNdDescriptor(m_tensor, dataType, (int)dims.size(), dims.data(), strides.data()));
+    HIPDNN_CALL(hipdnnSetTensorNdDescriptor(m_tensor, dataType, (int)dims.size(), dims.data(), strides.data()));
 }
 
 void CuDnnTensor::UpdateBatchSize(size_t batchSize)
@@ -75,51 +75,51 @@ void CuDnnTensor::UpdateBatchSize(size_t batchSize)
     int dims[MaxDims];
     int strides[MaxDims];
     int nbDims = 0;
-    cudnnDataType_t dataType;
+    hipdnnDataType_t dataType;
     // According to NVIDIA, Get/Set functions are very fast so it's safe to call them in a loop.
-    CUDNN_CALL(cudnnGetTensorNdDescriptor(m_tensor, MaxDims, &dataType, &nbDims, dims, strides));
+    HIPDNN_CALL(hipdnnGetTensorNdDescriptor(m_tensor, MaxDims, &dataType, &nbDims, dims, strides));
     assert(nbDims <= MaxDims);
     dims[0] = (int)batchSize;
-    CUDNN_CALL(cudnnSetTensorNdDescriptor(m_tensor, dataType, nbDims, dims, strides));
+    HIPDNN_CALL(hipdnnSetTensorNdDescriptor(m_tensor, dataType, nbDims, dims, strides));
 }
 
 template <typename ElemType>
-cudnnDataType_t CuDnnTensor::GetDataType()
+hipdnnDataType_t CuDnnTensor::GetDataType()
 {
     if (typeid(ElemType) == typeid(float))
-        return CUDNN_DATA_FLOAT;
+        return HIPDNN_DATA_FLOAT;
     else if (typeid(ElemType) == typeid(double))
-        return CUDNN_DATA_DOUBLE;
+        return HIPDNN_DATA_DOUBLE;
     else if (typeid(ElemType) == typeid(half))
-        return CUDNN_DATA_HALF;
+        return HIPDNN_DATA_HALF;
     else
-        InvalidArgument("cuDNN engine currently supports only single and double precision data types.");
+        InvalidArgument("hipDNN engine currently supports only single and double precision data types.");
 }
 
-template cudnnDataType_t CuDnnTensor::GetDataType<float>();
-template cudnnDataType_t CuDnnTensor::GetDataType<double>();
-template cudnnDataType_t CuDnnTensor::GetDataType<half>();
+template hipdnnDataType_t CuDnnTensor::GetDataType<float>();
+template hipdnnDataType_t CuDnnTensor::GetDataType<double>();
+template hipdnnDataType_t CuDnnTensor::GetDataType<half>();
 
 CuDnn::ptr_t CuDnn::Instance()
 {
     auto createNew = []()
     {
         int deviceId;
-        CUDA_CALL(cudaGetDevice(&deviceId));
-        cudaDeviceProp props = {0};
-        if (cudaGetDeviceProperties(&props, deviceId) != cudaSuccess || props.major < 3)
+        CUDA_CALL(hipGetDevice(&deviceId));
+        hipDeviceProp_t props = {0};
+        if (hipGetDeviceProperties(&props, deviceId) != hipSuccess || props.major < 3)
             RuntimeError("cuDNN requires device with compute capability 3.0 or higher.");
-        cudnnHandle_t* cudnn = new cudnnHandle_t;
-        CUDNN_CALL(cudnnCreate(cudnn));
-        CUDNN_CALL(cudnnSetStream(*cudnn, GetStream()));
-        return cudnn;
+        hipdnnHandle_t* hipdnn = new hipdnnHandle_t;
+        HIPDNN_CALL(hipdnnCreate(hipdnn));
+        HIPDNN_CALL(hipdnnSetStream(*hipdnn, GetStream()));
+        return hipdnn;
     };
 
-    static std::shared_ptr<cudnnHandle_t> m_instance = std::shared_ptr<cudnnHandle_t>(createNew(), [](cudnnHandle_t* src)
+    static std::shared_ptr<hipdnnHandle_t> m_instance = std::shared_ptr<hipdnnHandle_t>(createNew(), [](hipdnnHandle_t* src)
     {
         assert(*src != nullptr);
-        auto err = cudnnDestroy(*src);
-        assert(err == CUDNN_STATUS_SUCCESS);
+        auto err = hipdnnDestroy(*src);
+        assert(err == HIPDNN_STATUS_SUCCESS);
 #ifdef NDEBUG
         UNUSED(err);
 #endif
