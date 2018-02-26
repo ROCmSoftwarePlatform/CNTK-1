@@ -23,7 +23,6 @@
 #include <hiprand.h>
 #include <hiprand_kernel.h>
 #include <time.h>
-#include "GPUMatrixCUDAKernels.cuh"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -250,7 +249,7 @@ inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const ha
     return status;
     //return hipblasAxpyEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, CUDA_R_32F); TODO:PRAS_2.4
 }
-inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const half* alpha, const half* x, int incx, half* y, int incy, int num_x, int num_y)
+inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const half* alpha, const half* x, int incx, half* y, int incy, int num_x, int num_y) //TODO:PRAS_2.4
 {
     float tmp_alpha = *alpha;
 

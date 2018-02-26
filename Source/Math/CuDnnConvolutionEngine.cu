@@ -513,41 +513,34 @@ private:
     static const int MaxAlgoCount = 10;
 
 #ifdef __HIP_PLATFORM_NVCC__
-    void convert_type(cudnnConvolutionFwdAlgo_t in, hipdnnConvolutionFwdAlgo_t* out)
+    hipdnnStatus_t convert_type(cudnnConvolutionFwdAlgo_t in, hipdnnConvolutionFwdAlgo_t* out)
     {
-        hipdnnStatus_t status_hipdnn;
-        status_hipdnn = cudnnTohipConvolutionFwdAlgo(in, out);
+        return cudnnTohipConvolutionFwdAlgo(in, out);
     }
-    void convert_type(cudnnConvolutionBwdDataAlgo_t in, hipdnnConvolutionBwdDataAlgo_t* out)
+    hipdnnStatus_t convert_type(cudnnConvolutionBwdDataAlgo_t in, hipdnnConvolutionBwdDataAlgo_t* out)
     {
-        hipdnnStatus_t status_hipdnn;
-        status_hipdnn = cudnnTohipConvolutionBwdDataAlgo(in, out);
+        return cudnnTohipConvolutionBwdDataAlgo(in, out);
     }
-    void convert_type(cudnnConvolutionBwdFilterAlgo_t in, hipdnnConvolutionBwdFilterAlgo_t* out)
+    hipdnnStatus_t convert_type(cudnnConvolutionBwdFilterAlgo_t in, hipdnnConvolutionBwdFilterAlgo_t* out)
     {
-        hipdnnStatus_t status_hipdnn;
-        status_hipdnn = cudnnTohipConvolutionBwdFilterAlgo(in, out);
+        return cudnnTohipConvolutionBwdFilterAlgo(in, out);
     }
-    void convert_type(cudnnMathType_t in, hipdnnMathType_t *out)
+    hipdnnStatus_t convert_type(cudnnMathType_t in, hipdnnMathType_t *out)
     {
-	hipdnnStatus_t status_hipdnn;
-	status_hipdnn = cudnnTohipMathType(in, out);
+	    return cudnnTohipMathType(in, out);
     }
 #elif defined  __HIP_PLATFORM_HCC__
-    void convert_type(miopenConvFwdAlgorithm_t in, hipdnnConvolutionFwdAlgo_t* out)
+    hipdnnStatus_t convert_type(miopenConvFwdAlgorithm_t in, hipdnnConvolutionFwdAlgo_t* out)
     {
-        hipdnnStatus_t status_hipdnn;
-        status_hipdnn = miopenTohipConvolutionFwdAlgo(in, out);
+        return miopenTohipConvolutionFwdAlgo(in, out);
     }
-    void convert_type(miopenConvBwdDataAlgorithm_t in, hipdnnConvolutionBwdDataAlgo_t* out)
+    hipdnnStatus_t convert_type(miopenConvBwdDataAlgorithm_t in, hipdnnConvolutionBwdDataAlgo_t* out)
     {
-        hipdnnStatus_t status_hipdnn;
-        status_hipdnn = miopenTohipConvolutionBwdDataAlgo(in, out);
+        return miopenTohipConvolutionBwdDataAlgo(in, out);
     }
-    void convert_type(miopenConvBwdWeightsAlgorithm_t in, hipdnnConvolutionBwdFilterAlgo_t* out)
+    hipdnnStatus_t convert_type(miopenConvBwdWeightsAlgorithm_t in, hipdnnConvolutionBwdFilterAlgo_t* out)
     {
-        hipdnnStatus_t status_hipdnn;
-        status_hipdnn = miopenTohipConvolutionBwdFilterAlgo(in, out);
+        return miopenTohipConvolutionBwdFilterAlgo(in, out);
     }
 
 
@@ -612,7 +605,7 @@ private:
 #elif defined  __HIP_PLATFORM_HCC__
     	        algomatch(&newAlgo, algoPerf);
 #endif
-                convert_type(newAlgo, &sel_algo);
+                HIPDNN_CALL(convert_type(newAlgo, &sel_algo));
                 algo.RecordAlgoBatchSizeWorkspaceSize(true, sel_algo, batchSize, (*algoPerf).memory);
                 algo.autotuningState = AutotuningState::Running;    // no further need for tuning since this is deterministic, directly enter running state
             }
@@ -665,10 +658,10 @@ private:
 #elif defined __HIP_PLATFORM_HCC__
                 algomatch(&newAlgo, res);
 #endif
-                convert_type(newAlgo, &sel_algo);
+                HIPDNN_CALL(convert_type(newAlgo, &sel_algo));
                 algo.RecordAlgoBatchSizeWorkspaceSize(true, sel_algo, batchSize, (*res).memory);
 		        hipdnnMathType_t hipMT;
-		        convert_type((*res).mathType, &hipMT);
+		        HIPDNN_CALL(convert_type((*res).mathType, &hipMT));
                 algo.AlgoMathType = hipMT;
                 algo.autotuningState = AutotuningState::Running;
                 if (algo.MaxAlgoWorkspaceSize < curSize)   // need to shrink the workspace
@@ -693,10 +686,10 @@ private:
 #elif defined __HIP_PLATFORM_HCC__
                     algomatch(&newAlgo, res);
 #endif
-                    convert_type(newAlgo, &sel_algo);
+                    HIPDNN_CALL(convert_type(newAlgo, &sel_algo));
                     algo.RecordAlgoBatchSizeWorkspaceSize(true, sel_algo, batchSize, (*res).memory);
 		            hipdnnMathType_t hipMT;
-                    convert_type((*res).mathType, &hipMT);
+                    HIPDNN_CALL(convert_type((*res).mathType, &hipMT));
                     algo.AlgoMathType = hipMT;
                     algo.autotuningState = AutotuningState::Running;
                 }
