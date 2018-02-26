@@ -23,6 +23,7 @@
 #include <hiprand.h>
 #include <hiprand_kernel.h>
 #include <time.h>
+#include "GPUMatrixCUDAKernels.cuh"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -136,6 +137,22 @@ __global__ void copyFloat2Half(half *odata, const float *idata, const int n)
 }
 */
 
+__global__ void helperCopyHalf2Float(float *f, const half *h, const int n)
+{
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    if (id >= n)
+        return;
+    f[id] = (float)h[id];
+}
+
+__global__ void helperCopyFloat2Half(half *h, const float *f, const int n)
+{
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    if (id >= n)
+        return;
+    h[id] = (half)f[id];
+}
+
 }
 
 // Generalize library calls to be use in template functions
@@ -157,7 +174,27 @@ inline hipblasStatus_t hipblasgemmHelper(hipblasHandle_t handle, hipblasOperatio
     float h_a = *alpha;
     float h_b = *beta;
     //hipblasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH); //TODO:PRAS_2.4
-    return HIPBLAS_STATUS_NOT_SUPPORTED;//hipblasGemmEx(handle, transa, transb, m, n, k, &h_a, A, CUDA_R_16F, lda, B, CUDA_R_16F, ldb, &h_b, C, CUDA_R_16F, ldc, CUDA_R_32F, CUBLAS_GEMM_DFALT); //TODO:PRAS_2.4
+    //return hipblasGemmEx(handle, transa, transb, m, n, k, &h_a, A, CUDA_R_16F, lda, B, CUDA_R_16F, ldb, &h_b, C, CUDA_R_16F, ldc, CUDA_R_32F, CUBLAS_GEMM_DFALT); //TODO:PRAS_2.4
+    return hipblasHgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+    
+    /*float *fA, *fB, *fC;
+    hipMalloc(&fA, (lda * k) * sizeof(float));
+    hipMalloc(&fB, (ldb * n) * sizeof(float));
+    hipMalloc(&fC, (ldc * n) * sizeof(float));
+
+    int max = (lda * k );
+    ( max < (ldb * n)) && ( max = (ldb * n));
+    ( max < (ldc * n)) && ( max = (ldc * n));
+
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(max), dim3(256), 0, 0, fA, A, (lda * k));
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(max), dim3(256), 0, 0, fB, B, (ldb * n));
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(max), dim3(256), 0, 0, fC, C, (ldc * n));
+
+    hipblasStatus_t status;
+    status = hipblasSgemm(handle, transa, transb, m, n, k, &h_a, (const float*)fA, lda, (const float*)fB, ldb, &h_b, fC, ldc);
+
+    hipLaunchKernelGGL((helperCopyFloat2Half), dim3(max), dim3(256), 0, 0, C, fC, (ldc * n));
+    return status;*/
 }
 
 // batched gemm
@@ -183,10 +220,56 @@ inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const do
 {
     return hipblasDaxpy(handle, n, alpha, x, incx, y, incy);
 }
+inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const float* alpha, const float* x, int incx, float* y, int incy, int a, int b)
+{
+    return hipblasSaxpy(handle, n, alpha, x, incx, y, incy);
+}
+inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const double* alpha, const double* x, int incx, double* y, int incy, int a, int b)
+{
+    return hipblasDaxpy(handle, n, alpha, x, incx, y, incy);
+}
 inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const half* alpha, const half* x, int incx, half* y, int incy)
 {
     float tmp_alpha = *alpha;
-    return HIPBLAS_STATUS_NOT_SUPPORTED;//hipblasAxpyEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, CUDA_R_32F); TODO:PRAS_2.4
+
+    float *df_x, *df_y;
+    hipMalloc(&df_x, n * sizeof(float));
+    hipMalloc(&df_y, n * sizeof(float));
+
+    int blocks = ((n-1)/256)+1;
+    
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, df_x, x, n);
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, df_y, y, n);
+
+    hipblasStatus_t status;
+    status = hipblasSaxpy(handle, n, (const float*)&tmp_alpha, (const float*)df_x, incx, df_y, incy);
+
+    if(status == HIPBLAS_STATUS_SUCCESS)
+        hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, y, df_y, n);
+
+    return status;
+    //return hipblasAxpyEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, CUDA_R_32F); TODO:PRAS_2.4
+}
+inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const half* alpha, const half* x, int incx, half* y, int incy, int num_x, int num_y)
+{
+    float tmp_alpha = *alpha;
+
+    float *df_x, *df_y;
+    hipMalloc(&df_x, num_x * sizeof(float));
+    hipMalloc(&df_y, num_y * sizeof(float));
+
+    int blocks = ((n-1)/256)+1;
+
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, df_x, x, num_x);
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, df_y, y, num_y);
+
+    hipblasStatus_t status;
+    status = hipblasSaxpy(handle, n, (const float*)&tmp_alpha, (const float*)df_x, incx, df_y, incy);
+
+    if(status == HIPBLAS_STATUS_SUCCESS)
+        hipLaunchKernelGGL((helperCopyFloat2Half), dim3(1024), dim3(256), 0, 0, y, df_y, num_y);
+
+    return status;
 }
 
 // transpose using geam
@@ -357,10 +440,23 @@ inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t handle, int n, const do
 {
     return hipblasDscal(handle, n, alpha, x, incx);
 }
+
 inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t handle, int n, const half *alpha, half *x, int incx)
 {
     float tmp_alpha = *alpha;
-    return HIPBLAS_STATUS_NOT_SUPPORTED;//hipblasScalEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, CUDA_R_32F); TODO:PRAS_2.4
+    float *float_x;
+    hipMalloc(&float_x, n * sizeof(float));
+
+    int blocks = ((n-1)/256) + 1;
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, float_x, x, n);
+
+    hipblasStatus_t status;
+    status = hipblasSscal(handle, n, (const float*)&tmp_alpha, float_x, incx);
+    hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, x, float_x, n);
+
+    return status;
+
+    //return hipblasScalEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, CUDA_R_32F); TODO:PRAS_2.4
 }
 inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t,int,const char *,char *, int)
 {
@@ -382,7 +478,24 @@ inline hipblasStatus_t hipblasdotHelper(hipblasHandle_t handle, int n, const dou
 }
 inline hipblasStatus_t hipblasdotHelper(hipblasHandle_t handle, int n, const half *x, int incx, const half *y, int incy, half *result)
 {
-    return HIPBLAS_STATUS_NOT_SUPPORTED;//hipblasDotEx(handle, n, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, (void*)result, CUDA_R_16F, CUDA_R_32F); TODO:PRAS_2.4
+    float *float_x, *float_y, *float_result;
+    hipMalloc(&float_x, n * sizeof(float));
+    hipMalloc(&float_y, n * sizeof(float));
+    hipMalloc(&float_result, n * sizeof(float));
+
+    int blocks = ((n-1)/256) + 1;
+
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, float_x, x, n);
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, float_y, y, n);
+
+    hipblasStatus_t status;
+    status = hipblasSdot(handle, n, float_x, incx, float_y, incy, float_result);
+    if(status == HIPBLAS_STATUS_SUCCESS)
+        hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, result, float_result, n);
+
+    return status;
+
+    //return hipblasDotEx(handle, n, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, (void*)result, CUDA_R_16F, CUDA_R_32F); TODO:PRAS_2.4
 }
 
 // hiprand

@@ -3824,10 +3824,12 @@ template <class ElemType>
             assert(n == (int) a.GetNumCols());
             if (n != (int) a.GetNumCols())
                 InvalidArgument("To add row vector, cols should match.");
+            int num_x = a.GetNumElements(); //TODO: PRAS_2.4
+            int num_y = c.GetNumElements();
 
             foreach_row (i, c)
             {
-                HIPBLAS_CALL(hipblasaxpyHelper(cuHandle, n, &alpha, a.Data(), 1, c.Data()+ i, m));
+                HIPBLAS_CALL(hipblasaxpyHelper(cuHandle, n, &alpha, a.Data(), 1, c.Data()+ i, m, num_x, num_y - i));
             }
         }
         else
