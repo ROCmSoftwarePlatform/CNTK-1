@@ -12,10 +12,10 @@ cur_dir=$(pwd)
 mkdir lib64 -p
 
 #List of repos to be cloned and installed
-repoList=(hcBLAS rocRAND HcSPARSE hipDNN)
+repoList=(hipBLAS rocRAND HcSPARSE hipDNN)
 
 #Installation directories
-installDir=("hcblas" " " "hcsparse" "hipdnn")
+installDir=("hipblas" " " "hcsparse" "hipdnn")
 
 #git command
 clone="git clone https://github.com/ROCmSoftwarePlatform"
