@@ -451,7 +451,9 @@ inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t handle, int n, const ha
 
     hipblasStatus_t status;
     status = hipblasSscal(handle, n, (const float*)&tmp_alpha, float_x, incx);
-    hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, x, float_x, n);
+
+    if(status == HIPBLAS_STATUS_SUCCESS)
+        hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, x, float_x, n);
 
     return status;
 
