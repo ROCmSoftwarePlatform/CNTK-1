@@ -105,7 +105,7 @@ do
             mkdir $build_dir -p && cd $build_dir
             $cmake_it/${installDir[$i]} ${build_test[$i]} .. && make && make install
         else
-            make INSTALL_DIR=../hipdnn
+            make INSTALL_DIR=../hipdnn HIP_PATH=$rootDir/$externalDir/hip
         fi
         cd $rootDir/$externalDir
     fi
