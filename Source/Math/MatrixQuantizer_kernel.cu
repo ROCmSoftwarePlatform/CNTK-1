@@ -142,7 +142,7 @@ __global__ void _ComputeQuantiStatParj(const ElemType* us, const ElemType* inRes
 #ifdef __HIP_PLATFORM_NVCC__
     Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int,REDUCTION_BLOCK_SIZE>);
 #endif
-   //TODO: __revert__ solve this and revert on AMD Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int,REDUCTION_BLOCK_SIZE>);
+   //TODO: __hip__ solve this and revert on AMD Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int,REDUCTION_BLOCK_SIZE>);
 }
 
 //caller: griddim and blockdim should be both 1d
@@ -179,7 +179,7 @@ __global__ void _QuantizeStripjOneQWord(
 #ifdef __HIP_PLATFORM_NVCC__
     qCol.bits[iQWord] = q.QuantizeOneQWord<ZeroThresholdFor1Bit>(us, curResidual, M, iQWord, M, numQWordsPerCol, j, newResidual);
 #endif
-    //TODO: __revert__ solver this and revert on AMD qCol.bits[iQWord] = q.QuantizeOneQWord<ZeroThresholdFor1Bit>(us, curResidual, M, iQWord, M, numQWordsPerCol, j, newResidual);
+    //TODO: __hip__ solver this and revert on AMD qCol.bits[iQWord] = q.QuantizeOneQWord<ZeroThresholdFor1Bit>(us, curResidual, M, iQWord, M, numQWordsPerCol, j, newResidual);
 }
 
 template <class ElemType>
