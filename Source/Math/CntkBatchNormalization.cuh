@@ -112,10 +112,9 @@ __device__ __forceinline__ void StoreValues<4, float, float>(const float src[4],
 template <typename T>
 __device__ __forceinline__ T Shuffle(T input, int srcLane, unsigned int mask)
 {
-//#if defined(__CUDA_ARCH__) //&& defined(__HIP_PLATFORM_NVCC__)
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
     // shfl is supported only on Kepler+
-    static_assert(__CUDA_ARCH__ >= 300, "CNTK only supports only Kepler GPU architecture or newer.");
+    static_assert( __HIP_ARCH_HAS_WARP_SHUFFLE__, "CNTK only supports only Kepler GPU architecture or newer.");
 #if CUDA_VERSION >= 9000
     return cub::ShuffleIndex(input, srcLane, CUB_PTX_WARP_THREADS, mask); // Need cub > 1.7.0
 #else
@@ -147,7 +146,7 @@ namespace Operations
 
     __device__ half RSqrt(half a)
     {
-#if __CUDA_ARCH__ >= 600
+#if __CUDA_ARCH__ >= 600 //TODO: __hip__
         return hrsqrt(a);
 #else
         return __float2half(rsqrtf(__half2float(a)));

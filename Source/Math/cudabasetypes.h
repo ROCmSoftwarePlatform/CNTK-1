@@ -4,7 +4,7 @@
 
 #pragma once
 
-#ifdef __CUDA_ARCH__ // we are compiling under CUDA
+#ifdef __HIP_DEVICE_COMPILE__ // we are compiling under CUDA
 #define ON_CUDA 1
 #ifdef __device__
 #define cudacode __device__

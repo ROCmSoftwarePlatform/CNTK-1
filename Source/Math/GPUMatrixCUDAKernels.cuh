@@ -39,7 +39,7 @@
 
 #ifdef __HIP_PLATFORM_NVCC__
 // On older GPUs, CUDA atomicAdd() only exists for 'float'. This is the 'double' version.
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600 //TODO: __mcw_cuda__ find perfect match and replace
+#if defined(__HIP_DEVICE_COMPILE__) && __CUDA_ARCH__ < 600 //TODO: __mcw_cuda__ find perfect match and replace
 static __inline__ __device__ double atomicAdd(double* address, double val)
 {
     unsigned long long int* address_as_ull = (unsigned long long int*) address;
