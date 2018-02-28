@@ -101,6 +101,9 @@ do
         echo -e "\n--------------------- CLONING ${repoList[$i]} ---------------------\n"
         $clone/${repoList[$i]}.git
         cd ${repoList[$i]}
+        if [ "${repoList[$i]}" == "rocRAND" ]; then
+            git checkout rocm_1_7_1
+        fi
         if [ "${repoList[$i]}" != "hipDNN" ]; then
             mkdir $build_dir -p && cd $build_dir
             $cmake_it/${installDir[$i]} ${build_test[$i]} .. && make && make install
