@@ -121,8 +121,7 @@ if [ -d $cubRepo ]; then
 else
     git clone https://github.com/ROCmSoftwarePlatform/cub-hip.git
     cd cub-hip
-    git checkout developer-cub-hip
-    git checkout 3effedd23f4e80ccec5d0808d8349f7d570e488e
+    git checkout hip_port_1.7.4
     cd $rootDir/$externalDir
 fi
 
