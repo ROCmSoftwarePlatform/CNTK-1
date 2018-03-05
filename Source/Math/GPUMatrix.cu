@@ -441,7 +441,7 @@ void GPUMatrix<ElemType>::CastAssignValuesOf(const GPUMatrix<ElemType2>* other)
     CUDA_LONG N = (CUDA_LONG)GetNumElements();
     int blocksPerGrid = (int)ceil(1.0 * N / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
-    _castValue<ElemType, ElemType2><<<blocksPerGrid, GridDim::maxThreadsPerBlock, 0, t_stream>>>(other->Data(), Data(), N);
+    hipLaunchKernelGGL((_castValue<ElemType, ElemType2>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, other->Data(), Data(), N);
 }
 
 template <class ElemType>
