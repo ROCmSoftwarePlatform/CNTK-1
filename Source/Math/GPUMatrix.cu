@@ -2990,8 +2990,8 @@ void GPUMatrix<ElemType>::VectorMax(GPUMatrix<ElemType>& maxIndexes, GPUMatrix<E
     CUDA_CALL(SortPairsDescending(nullptr, cbtemp, inVal, outVal1, inIdx, outIdx, celt, 0, sizeof(ElemType) * 8, t_stream));
     size_t ctemp1 = (cbtemp + sizeof(ElemType) - 1) / sizeof(ElemType);
     cbtemp = 0;
-    CUDA_CALL(hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairs(nullptr, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream)));
-    //CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
+    //CUDA_CALL(hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairs(nullptr, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream)));
+    CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
     size_t ctemp2 = (cbtemp + sizeof(ElemType) - 1) / sizeof(ElemType);
     size_t ctemp = std::max(ctemp1, ctemp2);
     cbtemp = ctemp * sizeof(ElemType);
@@ -3019,8 +3019,8 @@ void GPUMatrix<ElemType>::VectorMax(GPUMatrix<ElemType>& maxIndexes, GPUMatrix<E
     // Sort by values.
     CUDA_CALL(SortPairsDescending(ptmp, cbtemp, inVal, outVal1, inIdx, outIdx, celt, 0, sizeof(ElemType) * 8, t_stream));
     // Sort by column indices. outIdx contains indices after the first pass so it's used as an input.
-    CUDA_CALL(hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairs(ptmp, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream)));
-    //CUDA_CALL(cub::DeviceRadixSort::SortPairs(ptmp, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
+    //CUDA_CALL(hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairs(ptmp, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream)));
+    CUDA_CALL(cub::DeviceRadixSort::SortPairs(ptmp, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
     // Copy results.
     cblock = (topK * n + ThreadsPerBlock - 1) / ThreadsPerBlock;
     hipLaunchKernelGGL((_copyTopKResults), dim3(cblock), dim3(ThreadsPerBlock), 0, t_stream, inIdx, outVal2, maxIndexes.Data(), maxValues.Data(), m, n, topK);
