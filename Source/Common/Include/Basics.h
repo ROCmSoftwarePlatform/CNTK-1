@@ -82,7 +82,7 @@ __declspec_noreturn static inline void ThrowFormattedVA(const char* format, va_l
 
 #ifndef _MSC_VER // TODO: what is the correct trigger for gcc?
 template <class E>
-__declspec_noreturn void ThrowFormatted(const char* format, ...) __attribute__((format(printf, 1, 2)));
+__declspec_noreturn static void ThrowFormatted(const char* format, ...) __attribute__((format(printf, 1, 2)));
 #endif
 
 
