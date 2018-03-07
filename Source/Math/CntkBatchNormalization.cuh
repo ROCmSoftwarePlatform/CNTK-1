@@ -153,7 +153,8 @@ namespace Operations
 #if __CUDA_ARCH__ >= 600 //TODO: __hip__
         return hrsqrt(a);
 #else
-        return __float2half(rsqrtf(__half2float(a)));
+        //return __float2half(rsqrtf(__half2float(a))); //TODO: PRAS_AMD
+        return (half)(rsqrtf((float)(a)));
 #endif
     }
 }

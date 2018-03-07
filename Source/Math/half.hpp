@@ -50,7 +50,8 @@ public:
 #ifndef __HIP_DEVICE_COMPILE__
         CNTK::floatToFloat16(&f, &__x);
 #else
-        *this = half(__float2half(f));
+        //*this = half(__float2half(f)); //TODO: PRAS_AMD
+        *this = half((__half)(f));
 #endif
     }
 
@@ -64,7 +65,8 @@ public:
 #ifndef __HIP_DEVICE_COMPILE__
         CNTK::floatToFloat16(&f, &__x); return *this;
 #else
-        *this = half(__float2half(f)); return *this;
+        //*this = half(__float2half(f)); return *this; //TODO: PRAS_AMD
+        *this = half((__half)(f)); return *this;
 #endif
     }
 
@@ -90,7 +92,8 @@ public:
         CNTK::float16ToFloat(&__x, &f);
         return f;
 #else
-        return __half2float(*this);
+        //return __half2float(*this); //TODO: PRAS_AMD
+        return (float)(*this);
 #endif
     }
 
