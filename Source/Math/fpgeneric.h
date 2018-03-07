@@ -173,7 +173,11 @@ inline hipblasStatus_t hipblasgemmHelper(hipblasHandle_t handle, hipblasOperatio
     float h_b = *beta;
     //hipblasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH); //TODO:PRAS_2.4
     //return hipblasGemmEx(handle, transa, transb, m, n, k, &h_a, A, CUDA_R_16F, lda, B, CUDA_R_16F, ldb, &h_b, C, CUDA_R_16F, ldc, CUDA_R_32F, CUBLAS_GEMM_DFALT); //TODO:PRAS_2.4
+#ifdef __HIP_PLATFORM_NVCC
     return hipblasHgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+#elif defined __HIP_PLATFORM_HCC__
+    return HIPBLAS_STATUS_NOT_SUPPORTED;
+#endif
     
     /*float *fA, *fB, *fC;
     hipMalloc(&fA, (lda * k) * sizeof(float));
