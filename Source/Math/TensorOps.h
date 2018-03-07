@@ -167,7 +167,7 @@ DECL half min(half a, half b) {
 }
 
 // overload for CUDA only functions
-#if defined(__CUDACC__)
+#if defined(__HIPCC__)
 
 DECL half rsqrt_(half v) {
 #if __CUDA_ARCH__ >= 700 || __CUDA_ARCH__ == 600
