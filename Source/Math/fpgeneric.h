@@ -44,9 +44,8 @@
 #define COPY_TILE_DIM 1024
 #define COPY_BLOCK_DIM 256
 
-#ifdef __HIP_PLATFORM_NVCC__
 typedef hiprandState_t hiprandState;
-#endif
+
 // kernel(s) for half functions with no library support
 namespace {
 __global__ void transposeNoOverlap(half *odata, const half *idata, const int m, const int n)
