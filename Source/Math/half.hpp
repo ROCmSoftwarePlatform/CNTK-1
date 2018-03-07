@@ -9,6 +9,7 @@
 #pragma once
 
 #include "../CNTKv2LibraryDll/API/HalfConverter.hpp"
+#include "hip/hip_runtime.h"
 
 #if !defined(CPUONLY) && __has_include("cuda_fp16.h")
 #include <cuda_fp16.h> // ASSUME CUDA9
