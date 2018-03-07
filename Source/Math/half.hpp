@@ -105,6 +105,7 @@ public:
     __FP16_DECL__ operator size_t() const { return (size_t)(float)(*this); }
     __FP16_DECL__ operator long() const { return (long)(float)(*this); }
     __FP16_DECL__ operator long long() const { return (long long)(float)(*this); }
+    __FP16_DECL__ operator unsigned long long() const { return (unsigned long long)(float)(*this); }
 #endif
 
 //    __CUDA_HOSTDEVICE__ operator bool() const { return (__x & 0x7FFF) != 0; }
