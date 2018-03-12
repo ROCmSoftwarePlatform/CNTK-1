@@ -178,7 +178,8 @@ endif
 
 ifeq ($(HIP_PLATFORM), hcc)
   LIBS_LIST += hipblas hip_hcc hiprand hipsparse MIOpen
-  INCLUDEPATH += /home/prasandh/CNTK-1/external/HIP/miopen/include/
+  ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+  INCLUDEPATH += ${ROOT_DIR}/external/HIP/miopen/include/
 endif
 
   ifndef CUB_PATH
@@ -188,7 +189,7 @@ endif
 
   DEVICE = gpu
 
-  INCLUDEPATH+=$(CUB_PATH) /home/prasandh/CNTK-1/external/HIP/cub-hip/external/Thrust
+  INCLUDEPATH+=$(CUB_PATH) ${ROOT_DIR}/external/HIP/cub-hip/external/Thrust
 
 # Set up CUDA includes and libraries
   ifdef HIPDNN_PATH
