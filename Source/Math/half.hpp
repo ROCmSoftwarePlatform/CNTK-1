@@ -23,17 +23,17 @@ protected:
 
 #if defined(__HIPCC__)
 #define __CUDA_HOSTDEVICE__ __host__ __device__
-#define __INLINE__ __forceinline__
+#define __INLINE__ __forceinline__ inline 
 #else
 #define __CUDA_HOSTDEVICE__
 #define __INLINE__ inline
 #endif
 
-#define __FP16_DECL__ __INLINE__ __CUDA_HOSTDEVICE__
+#define __FP16_DECL__  __INLINE__ __CUDA_HOSTDEVICE__
 
 class alignas(2) half : public __half {
 public:
-    half() = default;
+    __FP16_DECL__ half() = default;
     __FP16_DECL__ half(const half& other) { __x = other.__x; }
     __FP16_DECL__ half& operator=(const half& other) { __x = other.__x; return *this; }
     __FP16_DECL__ half(half&& other) { *this = std::move(other); }
