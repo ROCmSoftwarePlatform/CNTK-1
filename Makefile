@@ -178,8 +178,7 @@ endif
 
 ifeq ($(HIP_PLATFORM), hcc)
   LIBS_LIST += hipblas hip_hcc hiprand hipsparse MIOpen
-  ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-  INCLUDEPATH += ${ROOT_DIR}/external/HIP/miopen/include/
+  INCLUDEPATH += ${EXTERNAL_DIR}/miopen/include/
 endif
 
   ifndef CUB_PATH
@@ -189,7 +188,7 @@ endif
 
   DEVICE = gpu
 
-  INCLUDEPATH+=$(CUB_PATH) ${ROOT_DIR}/external/HIP/cub-hip/external/Thrust
+  INCLUDEPATH+=$(CUB_PATH) ${EXTERNAL_DIR}/cub-hip/external/Thrust
 
 # Set up CUDA includes and libraries
   ifdef HIPDNN_PATH
@@ -306,7 +305,7 @@ ifeq ("$(BUILDTYPE)","release")
     endif
   endif
 
-  CXXFLAGS += -g -O4
+  CXXFLAGS += -g -O3
   LDFLAGS += -rdynamic
   COMMON_FLAGS += -DNDEBUG -DNO_SYNC
   CUFLAGS += -O3 -g $(GENCODE_FLAGS)
@@ -478,8 +477,7 @@ $(CNTKMATH_LIB): $(MATH_OBJ) | $(PERF_PROFILER_LIB)
 	@echo $(SEPARATOR)
 	@echo creating $@ for $(ARCH) with build type $(BUILDTYPE)
 	@mkdir -p $(dir $@)
-	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ $(LIBS) -fopenmp -l$(PERF_PROFILER)
-
+	$(HIPCC) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) -o $@ $^ $(LIBS) -fopenmp=libiomp5 -l$(PERF_PROFILER)
 
 # Any executable using Common or ReaderLib needs to link these libraries.
 READER_LIBS := $(CNTKMATH_LIB) $(PERF_PROFILER_LIB)
@@ -1368,7 +1366,7 @@ $(UNITTEST_NETWORK): $(UNITTEST_NETWORK_OBJ) | $(READER_LIBS) $(CNTKTEXTFORMATRE
 	@echo $(SEPARATOR)
 	@mkdir -p $(dir $@)
 	@echo building $@ for $(ARCH) with build type $(BUILDTYPE)
-	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(GDK_NVML_LIB_PATH) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH) $(BOOSTLIB_PATH)) -o $@ $^ $(BOOSTLIBS) $(LIBS) $(lMULTIVERSO) $(L_READER_LIBS) -ldl -fopenmp  $(PROTOBUF_PATH)/lib/libprotobuf.a  
+	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(GDK_NVML_LIB_PATH) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH) $(BOOSTLIB_PATH)) -o $@ $^ $(BOOSTLIBS) $(LIBS) $(lMULTIVERSO) $(L_READER_LIBS) -ldl -fopenmp  $(PROTOBUF_PATH)/lib/libprotobuf.a 
 
 UNITTEST_MATH_SRC = \
 	$(SOURCEDIR)/../Tests/UnitTests/MathTests/BatchNormalizationEngineTests.cpp \
@@ -1405,7 +1403,7 @@ $(UNITTEST_MATH): $(UNITTEST_MATH_OBJ) | $(READER_LIBS)
 	@echo $(SEPARATOR)
 	@mkdir -p $(dir $@)
 	@echo building $@ for $(ARCH) with build type $(BUILDTYPE)
-	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(GDK_NVML_LIB_PATH) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH) $(BOOSTLIB_PATH)) -o $@ $^ $(BOOSTLIBS) $(LIBS)  $(L_READER_LIBS) -ldl -fopenmp
+	$(HIPCC) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(GDK_NVML_LIB_PATH) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH) $(BOOSTLIB_PATH)) -g -o $@ $^ $(BOOSTLIBS) $(LIBS)  $(L_READER_LIBS) -ldl -fopenmp=libiomp5 -pthread -Wl,-rpath -Wl,/usr/local/mpi/lib -Wl,--enable-new-dtags -L/usr/local/mpi/lib -lmpi_cxx -lmpi
 
 UNITTEST_BRAINSCRIPT_SRC = \
 	$(SOURCEDIR)/CNTK/BrainScript/BrainScriptEvaluator.cpp \
