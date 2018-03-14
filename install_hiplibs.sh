@@ -15,10 +15,8 @@ mkdir lib64 -p
 repoList=(hipBLAS rocRAND HcSPARSE)
 
 #Installation directories
-installDir=("hipblas" " " "hcsparse")
+installDir=(" " " " "hcsparse")
 
-#repoList+=(hcBLAS)
-#installDir+=("hcblas")
 
 #git command
 clone="git clone https://github.com/ROCmSoftwarePlatform"
@@ -101,7 +99,7 @@ if [ "$platform" == "hcc" ]; then
 		$clone/rocBLAS.git
 		echo -e "\n--------------------- INSTALLING rocBLAS ---------------------\n"
                 cd rocBLAS && mkdir $build_dir -p && cd $build_dir
-                $cmake_it/rocblas .. && make && make install
+                $cmake_it/ .. && make && make install
                 cd $rootDir/$externalDir
 	fi
 	export rocblas_DIR=$rootDir/$externalDir/rocblas/lib/cmake/rocblas
