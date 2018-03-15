@@ -11,6 +11,39 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+
+// Manual Serialization strategy to bypass the serialization attempted by compiler
+#if defined(__HIP_PLATFORM_HCC__)
+  #include <hip/hip_hcc.h>
+
+  template<typename T>
+    class Magic_wrapper {
+        // TODO: this is temporary, and it has the unpleasant property of
+        //       leaking memory.
+        T* p_ = nullptr;
+    public:
+        Magic_wrapper() = default;
+        explicit
+        Magic_wrapper(const T& x)
+        {
+            hipHostMalloc(&p_, sizeof(T)); new (p_) T{x};
+        }
+
+        operator const T&() const [[hc]] { return p_[0]; }
+    };
+
+  template<typename T>
+  Magic_wrapper<T> make_magic_wrapper(const T& x)
+  {
+    return Magic_wrapper<T>{x};
+  }
+  #define reference_to_const(...) __VA_ARGS__ const&
+#else
+  #define make_magic_wrapper(x) x
+  #define reference_to_const(...) __VA_ARGS__
+#endif
+
+
 // GPUMatrix::TensorOp() interfaces with actual tensor code through these two functions, which are independent of the GPUMatrix class
 
 #define C_size_t CUDA_LONG
