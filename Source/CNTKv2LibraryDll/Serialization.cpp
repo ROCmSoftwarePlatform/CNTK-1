@@ -328,10 +328,10 @@ namespace CNTK
             {
                 CopyData<double>(src, dst->mutable_double_values()->mutable_value());
             }
-            else if (src.GetDataType() == DataType::Float16)
+            /*else if (src.GetDataType() == DataType::Float16)
             {
                 CopyData<float16, float>(src, dst->mutable_float_values()->mutable_value());
-            }
+            }*/
         }
     }
 
@@ -348,10 +348,10 @@ namespace CNTK
             {
                 WriteData<double>(src, output);
             }
-            else if (src.GetDataType() == DataType::Float16)
+            /*else if (src.GetDataType() == DataType::Float16)
             {
                 WriteData<float16>(src, output);
-            }
+            }*/
         }
     }
 
@@ -374,11 +374,11 @@ namespace CNTK
                 if (!ReadData<double>(wrapper, dst))
                     return false;                
             }
-            else if (dst.GetDataType() == DataType::Float16)
+            /*else if (dst.GetDataType() == DataType::Float16)
             {
                 if (!ReadData<float, float16>(wrapper, dst))
                     return false;
-            }
+            }*/
         }
         return true;
     }
@@ -475,13 +475,13 @@ namespace CNTK
             else
                 m_arrayViews.push_back({ dst, nullptr });
         }
-        else if(dataType == DataType::Float16)
+        /*else if(dataType == DataType::Float16)
         {
             if (src.float_values().value().size() == shape->TotalSize())
                 CopyData<float, float16>(src.float_values().value(), dst);
             else
                 m_arrayViews.push_back({ dst, nullptr });
-        }
+        }*/
         return dst;
     }
 

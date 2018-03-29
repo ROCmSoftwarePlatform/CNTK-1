@@ -176,9 +176,7 @@ struct FixedMatrix
             }
         }
     }
-#ifdef __HIP_PLATFORM_HCC__
-   __host__ __device__ FixedMatrix(T[N][K]); //TODO: __hip__ resolve constructor prob
-#endif
+
 };
 template <typename T, size_t N> // specialized version for 0 elements
 struct FixedMatrix<T, N, 0>
@@ -751,7 +749,7 @@ struct TensorArgOpElement<ElemType, N, M, K, /*k=*/-1>
 
 // launch tensor op with CUDA
 template <class ElemType, C_size_t N, C_int M, C_int K>
-__global__ void _launchTensorOp(ElemType beta, FixedArray<ElemType*, N> pointers, ElemType alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
+__global__ void _launchTensorOp(ElemType beta, reference_to_const(FixedArray<ElemType*, N>) pointers, ElemType alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
                                 reference_to_const(FixedArray<C_unsigned_int, K>) regularOpStrides, reference_to_const(FixedMatrix<C_int, N, K>) regularStrides, CUDA_LONG numElements,
                                 reference_to_const(FixedArray<C_unsigned_int, M>) reducingOpDims, reference_to_const(FixedMatrix<C_int, N, M>) reducingStrides,
                                 reference_to_const(FixedArray<fast_divmod, K>) regularOpStrideDivmod, reference_to_const(FixedArray<fast_divmod, M>) reducingOpDimDivmod)
@@ -763,7 +761,7 @@ __global__ void _launchTensorOp(ElemType beta, FixedArray<ElemType*, N> pointers
 }
 
 template <class ElemType, C_size_t N, C_int M, C_int K>
-__global__ void _launchTensorArgOp(FixedArray<ElemType*, N> pointers, ElementWiseOperator reductionOp,
+__global__ void _launchTensorArgOp(reference_to_const(FixedArray<ElemType*, N>) pointers, ElementWiseOperator reductionOp,
     reference_to_const(FixedArray<C_unsigned_int, K>) regularOpStrides, reference_to_const(FixedMatrix<C_int, N, K>) regularStrides, CUDA_LONG numElements,
     reference_to_const(FixedArray<C_unsigned_int, M>) reducingOpDims, reference_to_const(FixedMatrix<C_int, N, M>) reducingStrides,
     reference_to_const(FixedArray<fast_divmod, K>) regularOpStrideDivmod, reference_to_const(FixedArray<fast_divmod, M>) reducingOpDimDivmod)
@@ -809,17 +807,19 @@ static void LaunchTensorOp(ElemType beta, array<ElemType*, N> pointerVector, Ele
     if ((reductionOp == ElementWiseOperator::opArgmax) ||
         (reductionOp == ElementWiseOperator::opArgmin))
     {
-        hipLaunchKernelGGL((_launchTensorArgOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, pointers, reductionOp,
+        hipLaunchKernelGGL((_launchTensorArgOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream,  make_magic_wrapper(pointers), reductionOp,
                                                                                                                         make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides), grid.m_N,
                                                                                                                         make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides),
                                                                                                                         make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
     }
+#if 0
     else
     {
-        hipLaunchKernelGGL((_launchTensorOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, beta, pointers, alpha, op, (ElementWiseOperator)(-1) /* dummy reductionOp */, regularOpStrides, regularStrides,
+        hipLaunchKernelGGL((_launchTensorOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, beta,  make_magic_wrapper(pointers), alpha, op, (ElementWiseOperator)(-1) /* dummy reductionOp */, regularOpStrides, regularStrides,
                                                                                                                      grid.m_N, make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides),
                                                                                                                      make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
     }
+#endif
 }
 
 // -----------------------------------------------------------------------
@@ -827,7 +827,7 @@ static void LaunchTensorOp(ElemType beta, array<ElemType*, N> pointerVector, Ele
 // -----------------------------------------------------------------------
 
 template <class ElemType, C_size_t N, C_int M, C_int K>
-__global__ void _launchTensorOpWithReduction(ElemType beta, FixedArray<ElemType*, N> pointers, ElemType alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
+__global__ void _launchTensorOpWithReduction(ElemType beta, reference_to_const(FixedArray<ElemType*, N>) pointers, ElemType alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
                                              reference_to_const(FixedArray<C_unsigned_int, K>) regularOpStrides, reference_to_const(FixedMatrix<C_int, N, K>) regularStrides, CUDA_LONG numElements,
                                              reference_to_const(FixedArray<C_unsigned_int, M>) reducingOpDims, reference_to_const(FixedMatrix<C_int, N, M>) reducingStrides,
                                              CUDA_LONG reductionBegin, CUDA_LONG reductionChunkSize,
@@ -941,11 +941,12 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
         (reductionOp == ElementWiseOperator::opArgmin))
     {
         hipLaunchKernelGGL((_launchTensorArgOp<ElemType, N, M, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, 
-            pointers, reductionOp,
+            make_magic_wrapper(pointers), reductionOp,
             make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides), grid.m_N,
             make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides),
             make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
     }
+#if 0
     // === simple case: NN large, one thread per output element
     else if (reductionDim == 1 ||                                     // no reduction
              grid.m_blocksPerGrid >= props.multiProcessorCount ||     // enough output elements to fill all multiprocs
@@ -955,11 +956,12 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
     {
         // we got enough elements to generate: do one element per thread, and reduction inside
         hipLaunchKernelGGL((_launchTensorOp<ElemType, N, M, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, 
-            beta, pointers, alpha, op, reductionOp,
+            beta, make_magic_wrapper(pointers), alpha, op, reductionOp,
             make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides), grid.m_N,
             make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides),
             make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
     }
+#endif
     // === optimization: simple case would not use all multiprocs
     else
     {
@@ -1005,14 +1007,16 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
         int numThreadsX = std::min<int>(reductionChunkSize, GridDim::maxThreadsPerBlock); // any that's over will be done by looping inside the kernel
 
         // --- cases (a1) and (a2)
-        // This involves no reduction across blocks.
+        // This involves no reduction across blocks
         if (numReductionChunks == 1)
         {
+#if 0
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, 
-                beta, pointers, alpha, op, reductionOp,
+                beta, make_magic_wrapper(pointers), alpha, op, reductionOp,
                 make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides), NN,
                 make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides), /*reductionBegin*/ 0, reductionChunkSize,
                 make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
+#endif
         }
         // --- case (b)
         // Reduction across blocks. This is the difficult one.
@@ -1046,11 +1050,13 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
             FixedMatrix<C_int, N, K> regularStrides1(regularStrideVectors1);
             ElemType beta1  = 0;
             ElemType alpha1 = 1;
+#if 0
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, 
-                beta1, pointers1, alpha1, op, reductionOp,
+                beta1, make_magic_wrapper(pointers1), alpha1, op, reductionOp,
                 make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides1), NN,
                 make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides), /*reductionBegin*/0, reductionChunkSize,
                 make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
+#endif
 
 #if 1
             // now reduce and redistribute
@@ -1092,10 +1098,11 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
 #endif
         }
 #else
+#if 0
         else if (beta == 1)
         {
             // no need to pre-scale; just add (common for gradients)
-            hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, beta, pointers, alpha, op, reductionOp, make_magic_wrapper(regularOpStrides),
+            hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, beta, make_magic_wrapper(pointers), alpha, op, reductionOp, make_magic_wrapper(regularOpStrides),
                                                                    make_magic_wrapper(regularStrides), NN, make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides), 0, reductionChunkSize,
                                                                    make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
             return;
@@ -1104,12 +1111,13 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
         {
             // We need more than one chunk, we will use atomicAdd().
             // First reset/pre-multiply input; then do the remaining chunks using atomicAdd().
-            hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, 1)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, beta, pointers, alpha, op, reductionOp, make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides), NN, make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides), 0, reductionChunkSize,
+            hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, 1)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, beta, make_magic_wrapper(pointers), alpha, op, reductionOp, make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides), NN, make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides), 0, reductionChunkSize,
                                                                    make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
             // We will leave it like this for a while, but eventually need to revisit using temporary memory.
-            hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ - 1)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, /*beta=*/1, pointers, alpha, op, reductionOp, make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides), NN, make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides), reductionChunkSize, reductionChunkSize,
-                                                                   make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
+            hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ - 1)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, /*beta=*/1, make_magic_wrapper(pointers), alpha, op, reductionOp, make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides), NN, make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides), reductionChunkSize, reductionChunkSize,
+                                                                   make_magic_wrapper(regularOpStrideDivmod), make(reducingOpDimDivmod));
         }
+#endif
 #endif
     }
 }
@@ -1267,7 +1275,7 @@ template void TensorOpN<double, 4>(double beta, array<double*, 4> pointers, doub
                                    const array<size_t, 4>& offsets,
                                    const SmallVector<size_t>& regularOpDims, const array<SmallVector<ptrdiff_t>, 4>& regularStrides,
                                    const SmallVector<size_t>& reducingOpDims, const array<SmallVector<ptrdiff_t>, 4>& reducingStrides);
-template void TensorOpN<half, 2>(half beta, array<half*, 2> pointers, half alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
+/*template void TensorOpN<half, 2>(half beta, array<half*, 2> pointers, half alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
                                   const array<size_t, 2>& offsets,
                                   const SmallVector<size_t>& regularOpDims, const array<SmallVector<ptrdiff_t>, 2>& regularStrides,
                                   const SmallVector<size_t>& reducingOpDims, const array<SmallVector<ptrdiff_t>, 2>& reducingStrides);
@@ -1278,12 +1286,12 @@ template void TensorOpN<half, 3>(half beta, array<half*, 3> pointers, half alpha
 template void TensorOpN<half, 4>(half beta, array<half*, 4> pointers, half alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
                                   const array<size_t, 4>& offsets,
                                   const SmallVector<size_t>& regularOpDims, const array<SmallVector<ptrdiff_t>, 4>& regularStrides,
-                                  const SmallVector<size_t>& reducingOpDims, const array<SmallVector<ptrdiff_t>, 4>& reducingStrides);
+                                  const SmallVector<size_t>& reducingOpDims, const array<SmallVector<ptrdiff_t>, 4>& reducingStrides);*/
 
 
 template void LaunchUnaryTensorOp(float beta, const float* pa, float* pb, float alpha, ElementWiseOperator op, size_t regularOpDim);
 template void LaunchUnaryTensorOp(double beta, const double* pa, double* pb, double alpha, ElementWiseOperator op, size_t regularOpDim);
-template void LaunchUnaryTensorOp(half beta, const half* pa, half* pb, half alpha, ElementWiseOperator op, size_t regularOpDim);
+//template void LaunchUnaryTensorOp(half beta, const half* pa, half* pb, half alpha, ElementWiseOperator op, size_t regularOpDim);
 
 }}}
 

@@ -236,8 +236,8 @@ static bool DumpNode(ComputationNodeBasePtr nodep, bool dumpGradient)
     if (nodef) return TypedDumpNode<float>(nodef, dumpGradient);
     let noded = dynamic_pointer_cast<ComputationNode<double>>(nodep);
     if (noded) return TypedDumpNode<double>(noded, dumpGradient);
-    let nodeh = dynamic_pointer_cast<ComputationNode<half>>(nodep);
-    if (nodeh) return TypedDumpNode<half>(nodeh, dumpGradient);
+    /*let nodeh = dynamic_pointer_cast<ComputationNode<half>>(nodep);
+    if (nodeh) return TypedDumpNode<half>(nodeh, dumpGradient);*/
     return false;
 }
 

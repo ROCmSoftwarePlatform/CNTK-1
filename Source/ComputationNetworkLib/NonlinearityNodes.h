@@ -446,7 +446,7 @@ public:
 
 template class HardmaxNode<float>;
 template class HardmaxNode<double>;
-template class HardmaxNode<half>;
+//template class HardmaxNode<half>;
 
 
 
@@ -771,7 +771,7 @@ public:                                                                 \
                                                                         \
 template class ClassName<float>;                                        \
 template class ClassName<double>;                                       \
-template class ClassName<half>;
+//template class ClassName<half>;
 
 DefineComparisonNode(LessNode,         -1, 0)
 DefineComparisonNode(EqualNode,         0, 0)

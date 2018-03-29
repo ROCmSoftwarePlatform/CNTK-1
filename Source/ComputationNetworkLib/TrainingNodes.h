@@ -2394,7 +2394,8 @@ class BatchNormalizationNode : public ComputationNodeNonLooping<ElemType>, publi
     typedef ComputationNodeNonLooping<ElemType> Base; UsingComputationNodeMembersBoilerplate;
     static const std::wstring TypeName() { return L"BatchNormalization"; }
 
-    typedef typename std::conditional<std::is_same<ElemType, half>::value, float, ElemType>::type StatType;
+    //typedef typename std::conditional<std::is_same<ElemType, half>::value, float, ElemType>::type StatType;
+    typedef typename std::conditional<std::is_same<ElemType, float>::value, float, ElemType>::type StatType;
 
     // inputs
     // TODO: Change all of these throughout the codebase to 'class enum'. Also change all places where we still use integer constants.

@@ -704,6 +704,6 @@ File& operator<<(File& stream, const Matrix<ElemType>& M)
 
 typedef Matrix<float> SingleMatrix;
 typedef Matrix<double> DoubleMatrix;
-typedef Matrix<half> HalfMatrix;
+//typedef Matrix<half> HalfMatrix;
 
 }}}

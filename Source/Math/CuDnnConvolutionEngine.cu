@@ -877,6 +877,6 @@ bool CuDnnConvolutionEngineFactory<ElemType>::IsSupported(DEVICEID_TYPE deviceId
 
 template class CuDnnConvolutionEngineFactory<float>;
 template class CuDnnConvolutionEngineFactory<double>;
-template class CuDnnConvolutionEngineFactory<half>;
+//template class CuDnnConvolutionEngineFactory<half>;
 
 } } }

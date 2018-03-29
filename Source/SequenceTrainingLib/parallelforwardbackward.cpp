@@ -737,10 +737,12 @@ void lattice::parallelstate::setloglls(const Microsoft::MSR::CNTK::Matrix<double
     throw ::logic_error("Double precision not supported for sequence training");
 }
 
+#if 0
 void lattice::parallelstate::setloglls(const Microsoft::MSR::CNTK::Matrix<half>& /*loglls*/)
 {
     throw ::logic_error("Half precision not supported for sequence training");
 }
+#endif
 
 void lattice::parallelstate::getgamma(Microsoft::MSR::CNTK::Matrix<float>& loglls)
 {
@@ -753,10 +755,12 @@ void lattice::parallelstate::getgamma(Microsoft::MSR::CNTK::Matrix<double>& /*lo
     throw ::logic_error("Double precision not supported for sequence training");
 }
 
+#if 0
 void lattice::parallelstate::getgamma(Microsoft::MSR::CNTK::Matrix<half>& /*loglls*/)
 {
     throw ::logic_error("Double precision not supported for sequence training");
 }
+#endif
 
 // -----------------------------------------------------------------------
 // parallel implementations of key processing steps

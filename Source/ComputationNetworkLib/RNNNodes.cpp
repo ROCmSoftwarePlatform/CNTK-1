@@ -341,6 +341,6 @@ void OptimizedRNNStackNode<ElemType>::UnpackSequencesFromCuDNN(const Matrix<Elem
 
 template class OptimizedRNNStackNode<float>;
 template class OptimizedRNNStackNode<double>;
-template class OptimizedRNNStackNode<half>;
+//template class OptimizedRNNStackNode<half>;
 
 }}}

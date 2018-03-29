@@ -20,7 +20,7 @@
 #include "common.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK { namespace Test {
-
+#if 0
 using vec = std::vector<float>;
 using vecHalf = std::vector<half>;
 
@@ -38,7 +38,7 @@ void CopyVecFromHalfToFloat(vecHalf& from, vec& to)
     to.resize(from.size());
     for(int i=0; i<from.size(); i++) to[i] = (float)from[i];
 }
-
+#endif
 
 bool AreEqual(float a, float b, float maxRelError, float maxAbsError)
 {
@@ -58,14 +58,14 @@ bool AreEqual(double a, double b, double maxRelError, double maxAbsError)
     return diff < largest * maxRelError;
 }
 
-bool AreEqual(float a, half b, float maxRelError, float maxAbsError)
+/*bool AreEqual(float a, half b, float maxRelError, float maxAbsError)
 {
     float diff = std::abs(a - (float)b);
     if (diff <= maxAbsError)
         return true;
     float largest = std::max(std::abs(a), std::abs((float)b));
     return diff < largest * maxRelError;
-}
+}*/
 
 size_t CountNans(const SingleMatrix& src)
 {
@@ -77,7 +77,7 @@ size_t CountNans(const SingleMatrix& src)
     return n;
 }
 
-size_t CountNans(const HalfMatrix& src)
+/*size_t CountNans(const HalfMatrix& src)
 {
     size_t n = 0;
     foreach_coord (i, j, src)
@@ -85,7 +85,7 @@ size_t CountNans(const HalfMatrix& src)
         n += std::isnan((float)src(i, j)) ? 1 : 0;
     }
     return n;
-}
+}*/
 
 // Returns vector of engine config parameters: <kind, device, maxTempMemSizeInSamples>
 std::vector<std::tuple<ConvolutionEngineKind, DEVICEID_TYPE, size_t>> GetTestEngineConfigs()
@@ -212,7 +212,7 @@ std::vector<ConvolveGeometryPtr> GeneratePoolTestConfigs()
         TensorShape(0), TensorShape(0)));
     return res;
 }
-
+#if 0
 BOOST_AUTO_TEST_SUITE(ConvolutionSuite)
 
 BOOST_AUTO_TEST_CASE(ConvolutionForward)
@@ -644,6 +644,7 @@ BOOST_AUTO_TEST_CASE(MaxUnpooling)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+
 BOOST_AUTO_TEST_SUITE(Half_ConvolutionSuite)
 
 BOOST_AUTO_TEST_CASE(ConvolutionForward)
@@ -1074,4 +1075,5 @@ BOOST_AUTO_TEST_CASE(PoolingBackward)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+#endif
 } } } }

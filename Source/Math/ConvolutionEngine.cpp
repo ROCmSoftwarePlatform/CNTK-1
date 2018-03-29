@@ -1177,7 +1177,7 @@ std::unique_ptr<ConvolutionEngine<ElemType>> ConvolutionEngine<ElemType>::Create
 }
 
 // only GPU supports fp16 convolution
-template <>
+/*template <>
 std::unique_ptr<ConvolutionEngine<half>> ConvolutionEngine<half>::Create(ConvolveGeometryPtr geometry, DEVICEID_TYPE deviceId,
     ImageLayoutKind imageLayout, size_t maxTempMemSizeInSamples, PoolKind poolKind,
     ConvolutionEngineKind enabledEngines, std::wstring logPrefix,
@@ -1207,10 +1207,10 @@ std::unique_ptr<ConvolutionEngine<half>> ConvolutionEngine<half>::Create(Convolv
     RuntimeError("FP16 convolution is only supported via cuDNN.");
 
     return nullptr;
-}
+}*/
 
 template class ConvolutionEngine<float>;
 template class ConvolutionEngine<double>;
-template class ConvolutionEngine<half>;
+//template class ConvolutionEngine<half>;
 
 }}}

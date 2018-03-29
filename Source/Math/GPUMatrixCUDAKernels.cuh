@@ -66,11 +66,11 @@ static __inline__ __device__ double atomicAdd(double* address, double val)
 }
 #endif
 // overload atomicAdd for half
-static __inline__ __device__ half atomicAdd(half* address, half val)
+/*static __inline__ __device__ half atomicAdd(half* address, half val)
 {
     assert(false); // TODO: implement later
     return val;
-}
+}*/
 
 
 // TODO: replace this with TensorOps.h LogAdd(). It differs in using ElemType throughout, while this one seems to use 'double' versions of exp() and log().

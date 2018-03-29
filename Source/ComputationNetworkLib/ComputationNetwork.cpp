@@ -47,11 +47,11 @@ vector<MemRequestInfo<double>>& MatrixPool::GetMemRequestInfoVec<double>()
     return m_memRequestInfoDoubleVec;
 }
 
-template <>
+/*template <>
 vector<MemRequestInfo<half>>& MatrixPool::GetMemRequestInfoVec<half>()
 {
     return m_memRequestInfoHalfVec;
-}
+}*/
 
 // -----------------------------------------------------------------------
 // construction
@@ -147,8 +147,8 @@ void ComputationNetwork::SaveToFileImpl(const wstring& fileName, const FileOptio
             precision = ElemTypeName<float>();
         else if (nodePtr->Is<ComputationNode<double>>())
             precision = ElemTypeName<double>();
-        else if (nodePtr->Is<ComputationNode<half>>())
-            precision = ElemTypeName<half>();
+        /*else if (nodePtr->Is<ComputationNode<half>>())
+            precision = ElemTypeName<half>();*/
         else LogicError("Unexpected node type.");
         fstream << precision;
 #endif
@@ -261,8 +261,8 @@ void ComputationNetwork::ReadPersistableParameters(size_t modelVersion, File& fs
             node = ComputationNetworkBuilder<float>::NewNode(opName, m_deviceId, nodeName);
         else if (precision == L"double")
             node = ComputationNetworkBuilder<double>::NewNode(opName, m_deviceId, nodeName);
-        else if (precision == L"half")
-            node = ComputationNetworkBuilder<half>::NewNode(opName, m_deviceId, nodeName);
+        /*else if (precision == L"half")
+            node = ComputationNetworkBuilder<half>::NewNode(opName, m_deviceId, nodeName);*/
         else if (precision == L"") // old file format: default to <ElemType>
             node = ComputationNetworkBuilder<ElemType>::NewNode(opName, m_deviceId, nodeName);
         else
@@ -456,8 +456,8 @@ void ComputationNetwork::InitLearnableParameters(const ComputationNodeBasePtr& n
 {
     randomSeed += GetRandomSeedOffset();
     if (TryPostInitParameters<float> (node, initString, initValue, randomSeed, initOnCPUOnly) ||
-        TryPostInitParameters<double>(node, initString, initValue, randomSeed, initOnCPUOnly) ||
-        TryPostInitParameters<half>  (node, initString, initValue, randomSeed, initOnCPUOnly))
+        TryPostInitParameters<double>(node, initString, initValue, randomSeed, initOnCPUOnly)) //||
+        /*TryPostInitParameters<half>  (node, initString, initValue, randomSeed, initOnCPUOnly))*/
         return;
     LogicError("InitLearnableParameters: Input node is not a LearnableParameter<float or double or half>");
 }
@@ -689,9 +689,9 @@ void ComputationNetwork::SetSeqParam(ComputationNetworkPtr net,
             auto noded = dynamic_pointer_cast<ConvolutionNode<double>>(*nodeIter);
             if (noded)
                 noded->SetmMaxTempMemSizeInSamples(maxTempMemSizeInSamples);
-            auto nodeh = dynamic_pointer_cast<ConvolutionNode<half>>(*nodeIter);
+            /*auto nodeh = dynamic_pointer_cast<ConvolutionNode<half>>(*nodeIter);
             if (nodeh)
-                nodeh->SetmMaxTempMemSizeInSamples(maxTempMemSizeInSamples);
+                nodeh->SetmMaxTempMemSizeInSamples(maxTempMemSizeInSamples);*/
         }
     }
 }
@@ -1562,14 +1562,14 @@ template void ComputationNetwork::SetSeqParam<double>(ComputationNetworkPtr net,
                                                       const double& amf, const double& lmf, const double& wp, const double& bMMIfactor, const bool& sMBR);
 template void ComputationNetwork::SaveToDbnFile<double>(ComputationNetworkPtr net, const std::wstring& fileName) const;
 
-template void ComputationNetwork::InitLearnableParametersWithBilinearFill<half>(const ComputationNodeBasePtr& node, size_t kernelWidth, size_t kernelHeight);
+/*template void ComputationNetwork::InitLearnableParametersWithBilinearFill<half>(const ComputationNodeBasePtr& node, size_t kernelWidth, size_t kernelHeight);
 template void ComputationNetwork::Read<half>(const wstring& fileName);
 template void ComputationNetwork::ReadPersistableParameters<half>(size_t modelVersion, File& fstream, bool create);
-template void ComputationNetwork::PerformSVDecomposition<half>(const map<wstring, float>& SVDConfig, size_t alignedsize);
-template /*static*/ void ComputationNetwork::SetBatchNormalizationTimeConstants<half>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double normalizationTimeConstant, double& prevNormalizationTimeConstant, double blendTimeConstant, double& prevBlendTimeConstant);
-template void ComputationNetwork::SetSeqParam<half>(ComputationNetworkPtr net, const ComputationNodeBasePtr criterionNode, const double& hsmoothingWeight, const double& frameDropThresh, const bool& doreferencealign,
+template void ComputationNetwork::PerformSVDecomposition<half>(const map<wstring, float>& SVDConfig, size_t alignedsize);*/
+//template /*static*/ void ComputationNetwork::SetBatchNormalizationTimeConstants<half>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double normalizationTimeConstant, double& prevNormalizationTimeConstant, double blendTimeConstant, double& prevBlendTimeConstant);
+/*template void ComputationNetwork::SetSeqParam<half>(ComputationNetworkPtr net, const ComputationNodeBasePtr criterionNode, const double& hsmoothingWeight, const double& frameDropThresh, const bool& doreferencealign,
     const double& amf, const double& lmf, const double& wp, const double& bMMIfactor, const bool& sMBR);
-template void ComputationNetwork::SaveToDbnFile<half>(ComputationNetworkPtr net, const std::wstring& fileName) const;
+template void ComputationNetwork::SaveToDbnFile<half>(ComputationNetworkPtr net, const std::wstring& fileName) const;*/
 
 // register ComputationNetwork with the ScriptableObject system
 ScriptableObjects::ConfigurableRuntimeTypeRegister::Add<ComputationNetwork> registerComputationNetwork(L"ComputationNetwork");

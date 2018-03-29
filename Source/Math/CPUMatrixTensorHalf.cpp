@@ -3,7 +3,7 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-template
+/*template
 void CPUMatrixTensorOpImpl(half beta, const CPUMatrix<half>& a, CPUMatrix<half>& o, half alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
     const array<size_t, 2>& offsets,
     const SmallVector<size_t>& regularOpDims, const array<SmallVector<ptrdiff_t>, 2>& regularStrides,
@@ -25,6 +25,6 @@ template
 void CPUMatrixTensorArgOpImpl(const CPUMatrix<half>& a, CPUMatrix<half>& o, ElementWiseOperator reductionOp,
     const array<size_t, 2>& offsets,
     const SmallVector<size_t>& regularOpDims, const array<SmallVector<ptrdiff_t>, 2>& regularStrides,
-    const SmallVector<size_t>& reducingOpDims, const array<SmallVector<ptrdiff_t>, 2>& reducingStrides);
+    const SmallVector<size_t>& reducingOpDims, const array<SmallVector<ptrdiff_t>, 2>& reducingStrides);*/
 
 }}}

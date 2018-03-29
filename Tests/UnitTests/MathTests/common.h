@@ -20,7 +20,7 @@ struct Err
 
 bool AreEqual(float a, float b, float maxRelError, float maxAbsError);
 bool AreEqual(double a, double b, double maxRelError, double maxAbsError);
-bool AreEqual(float a, half b, float maxRelError, float maxAbsError);
+//bool AreEqual(float a, half b, float maxRelError, float maxAbsError);
 
 size_t CountNans(const SingleMatrix& src);
 
@@ -48,7 +48,7 @@ bool CheckEqual(const Matrix<T>& result, const Matrix<T>& reference, std::string
     return count == 0;
 }
 
-inline bool CheckEqual(const Matrix<float>& result, const Matrix<half>& reference, std::string& msg, float maxRelError, float maxAbsError)
+/*inline bool CheckEqual(const Matrix<float>& result, const Matrix<half>& reference, std::string& msg, float maxRelError, float maxAbsError)
 {
     std::unique_ptr<float[]> res(result.CopyToArray());
     std::unique_ptr<half[]> ref(reference.CopyToArray());
@@ -69,7 +69,7 @@ inline bool CheckEqual(const Matrix<float>& result, const Matrix<half>& referenc
         msg = ss.str();
     }
     return count == 0;
-}
+}*/
 
 
 } } } }

@@ -41,9 +41,9 @@ template void Microsoft::MSR::CNTK::UpdateRunningAverage<float>(ComputationNode<
 template void Microsoft::MSR::CNTK::UpdateRunningAverage<double>(ComputationNode<double>& newInput,
                                                                  TensorView<double>& runningAverage,
                                                                  size_t& runningCount);
-template void Microsoft::MSR::CNTK::UpdateRunningAverage<half>(ComputationNode<half>& newInput,
+/*template void Microsoft::MSR::CNTK::UpdateRunningAverage<half>(ComputationNode<half>& newInput,
                                                                  TensorView<half>& runningAverage,
-                                                                 size_t& runningCount);
+                                                                 size_t& runningCount);*/
 
 template <class ElemType>
 EpochAccumulatorNode<ElemType>::EpochAccumulatorNode(DEVICEID_TYPE deviceId, const wstring& name)
@@ -131,4 +131,4 @@ void EpochAccumulatorNode<ElemType>::Reset()
 
 template class EpochAccumulatorNode<float>;
 template class EpochAccumulatorNode<double>;
-template class EpochAccumulatorNode<half>;
+//template class EpochAccumulatorNode<half>;

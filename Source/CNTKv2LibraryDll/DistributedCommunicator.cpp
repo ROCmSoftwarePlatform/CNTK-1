@@ -64,8 +64,8 @@ namespace CNTK
             return viewPtr->WritableDataBuffer<float>();
         if (viewPtr->GetDataType() == DataType::Double)
             return viewPtr->WritableDataBuffer<double>();
-        if (viewPtr->GetDataType() == DataType::Float16)
-            return viewPtr->WritableDataBuffer<float16>();
+        /*if (viewPtr->GetDataType() == DataType::Float16)
+            return viewPtr->WritableDataBuffer<float16>();*/
 
         LogicError("Unknown DataType");
         return nullptr; // Make compiler happy.
@@ -399,11 +399,11 @@ namespace CNTK
                 AllReduceData(static_cast<double*>(inputData), static_cast<double*>(outputData), numElements,
                     &allReduceRequests, (inputValue->Device() == DeviceDescriptor::CPUDevice()));
             }
-            else if (dataType == DataType::Float16)
+            /*else if (dataType == DataType::Float16)
             {
                 AllReduceDataHalf(static_cast<half*>(inputData), static_cast<half*>(outputData), numElements,
                     &allReduceRequests, (inputValue->Device() == DeviceDescriptor::CPUDevice()));
-            }
+            }*/
             else
                 LogicError("MPICommunicator: Unknown DataType.");
         }
@@ -589,8 +589,8 @@ namespace CNTK
                 AllReduceData<float>((float*)nz, (float*)nz, requiredElements, nullptr, aggregateOnCPU, MPI_SUM, true);
             else if (sbc->GetDataType() == DataType::Double)
                 AllReduceData<double>((double*)nz, (double*)nz, requiredElements, nullptr, aggregateOnCPU, MPI_SUM, true);
-            else if (sbc->GetDataType() == DataType::Float16)
-                AllReduceDataHalf((half*)nz, (half*)nz, requiredElements, nullptr, aggregateOnCPU, MPI_SUM, true);
+            /*else if (sbc->GetDataType() == DataType::Float16)
+                AllReduceDataHalf((half*)nz, (half*)nz, requiredElements, nullptr, aggregateOnCPU, MPI_SUM, true);*/
 
             if (aggregateOnCPU)
             {
@@ -728,7 +728,7 @@ namespace CNTK
             m_mpi->AllReduceAsync(inputData, outputData, numElements, &(pAllReduceRequests->back()), op);
     }
 
-    void MPICommunicatorImpl::AllReduceDataHalf(half* inputData, half* outputData, size_t numElements, std::vector<MPI_Request>* pAllReduceRequests, bool dataOnCPU, MPI_Op op, bool forceSync)
+    /*void MPICommunicatorImpl::AllReduceDataHalf(half* inputData, half* outputData, size_t numElements, std::vector<MPI_Request>* pAllReduceRequests, bool dataOnCPU, MPI_Op op, bool forceSync)
     {
         if (m_nccl->IsSupported() && !dataOnCPU)
         {
@@ -739,5 +739,5 @@ namespace CNTK
 
         //half aggregation other than NCCL is not supported
         NOT_IMPLEMENTED;
-    }
+    }*/
 }

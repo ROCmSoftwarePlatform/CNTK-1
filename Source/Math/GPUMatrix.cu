@@ -4977,43 +4977,43 @@ void GPUMatrix<ElemType>::TensorArgOp(const GPUMatrix<ElemType>& a, ElementWiseO
 // =======================================================================
 template class GPUMatrix<float>;
 template class GPUMatrix<double>;
-template class GPUMatrix<half>;
+//template class GPUMatrix<half>;
 template class DeviceBoundNumber<float>;
 template class DeviceBoundNumber<double>;
-template class DeviceBoundNumber<half>;
+//template class DeviceBoundNumber<half>;
 
 // instantiation of cast methods
 template void GPUMatrix<char>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<char>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
-template void GPUMatrix<char>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
+//template void GPUMatrix<char>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
 template void GPUMatrix<short>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<short>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
-template void GPUMatrix<short>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
+//template void GPUMatrix<short>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
 template void GPUMatrix<int>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<int>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
-template void GPUMatrix<int>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
+//template void GPUMatrix<int>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
 template void GPUMatrix<float>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<float>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
-template void GPUMatrix<float>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
+//template void GPUMatrix<float>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
 template void GPUMatrix<double>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<double>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
-template void GPUMatrix<double>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
+/*template void GPUMatrix<double>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
 template void GPUMatrix<half>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<half>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
 template void GPUMatrix<half>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
-
+*/
 // instantiation of templated methods
 template void GPUMatrix<float>::AdaDelta<float>(GPUMatrix<float>& gradients, GPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon);
 template void GPUMatrix<double>::AdaDelta<double>(GPUMatrix<double>& gradients, GPUMatrix<double>& functionValues, double learningRate, double rho, double epsilon);
-template void GPUMatrix<float>::AdaDelta<half>(GPUMatrix<half>& gradients, GPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon);
+//template void GPUMatrix<float>::AdaDelta<half>(GPUMatrix<half>& gradients, GPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon);
 
 template void GPUMatrix<float>::BatchNormalizationForward(const GPUMatrix<float>& scale, const GPUMatrix<float>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, GPUMatrix<float>& runMean, GPUMatrix<float>& runVariance, GPUMatrix<float>& out, double epsilon, GPUMatrix<float>& saveMean, GPUMatrix<float>& saveInvStdDev) const;
 template void GPUMatrix<double>::BatchNormalizationForward(const GPUMatrix<double>& scale, const GPUMatrix<double>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, GPUMatrix<double>& runMean, GPUMatrix<double>& runVariance, GPUMatrix<double>& out, double epsilon, GPUMatrix<double>& saveMean, GPUMatrix<double>& saveInvStdDev) const;
-template void GPUMatrix<half>::BatchNormalizationForward(const GPUMatrix<float>& scale, const GPUMatrix<float>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, GPUMatrix<float>& runMean, GPUMatrix<float>& runVariance, GPUMatrix<half>& out, double epsilon, GPUMatrix<float>& saveMean, GPUMatrix<float>& saveInvStdDev) const;
+//template void GPUMatrix<half>::BatchNormalizationForward(const GPUMatrix<float>& scale, const GPUMatrix<float>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, GPUMatrix<float>& runMean, GPUMatrix<float>& runVariance, GPUMatrix<half>& out, double epsilon, GPUMatrix<float>& saveMean, GPUMatrix<float>& saveInvStdDev) const;
 
 template void GPUMatrix<float>::BatchNormalizationBackward(const GPUMatrix<float>& in, GPUMatrix<float>& grad, const GPUMatrix<float>& scale, double blendFactor, const GPUMatrix<float>& saveMean, const GPUMatrix<float>& saveInvStdDev, GPUMatrix<float>& scaleGrad, GPUMatrix<float>& biasGrad) const;
 template void GPUMatrix<double>::BatchNormalizationBackward(const GPUMatrix<double>& in, GPUMatrix<double>& grad, const GPUMatrix<double>& scale, double blendFactor, const GPUMatrix<double>& saveMean, const GPUMatrix<double>& saveInvStdDev, GPUMatrix<double>& scaleGrad, GPUMatrix<double>& biasGrad) const;
-template void GPUMatrix<half>::BatchNormalizationBackward(const GPUMatrix<half>& in, GPUMatrix<half>& grad, const GPUMatrix<float>& scale, double blendFactor, const GPUMatrix<float>& saveMean, const GPUMatrix<float>& saveInvStdDev, GPUMatrix<float>& scaleGrad, GPUMatrix<float>& biasGrad) const;
+//template void GPUMatrix<half>::BatchNormalizationBackward(const GPUMatrix<half>& in, GPUMatrix<half>& grad, const GPUMatrix<float>& scale, double blendFactor, const GPUMatrix<float>& saveMean, const GPUMatrix<float>& saveInvStdDev, GPUMatrix<float>& scaleGrad, GPUMatrix<float>& biasGrad) const;
 
 template <class ElemType>
 hipblasHandle_t GPUMatrix<ElemType>::s_cuHandle[GPUMatrix<ElemType>::MaxGpus] = {0};
@@ -5082,7 +5082,7 @@ template short* TracingGPUMemoryAllocator::Allocate<short>(int, size_t);
 template char* TracingGPUMemoryAllocator::Allocate<char>(int, size_t);
 template float* TracingGPUMemoryAllocator::Allocate<float>(int, size_t);
 template double* TracingGPUMemoryAllocator::Allocate<double>(int, size_t);
-template half* TracingGPUMemoryAllocator::Allocate<half>(int, size_t);
+//template half* TracingGPUMemoryAllocator::Allocate<half>(int, size_t);
 
 template void TracingGPUMemoryAllocator::Free<int>(int, int*, bool);
 template void TracingGPUMemoryAllocator::Free<size_t>(int, size_t*, bool);
@@ -5090,7 +5090,7 @@ template void TracingGPUMemoryAllocator::Free<short>(int, short*, bool);
 template void TracingGPUMemoryAllocator::Free<char>(int, char*, bool);
 template void TracingGPUMemoryAllocator::Free<float>(int, float*, bool);
 template void TracingGPUMemoryAllocator::Free<double>(int, double*, bool);
-template void TracingGPUMemoryAllocator::Free<half>(int, half*, bool);
+//template void TracingGPUMemoryAllocator::Free<half>(int, half*, bool);
 
 }}}
 
