@@ -33,7 +33,7 @@
 #pragma warning(disable : 4515) // 'namespace': namespace uses itself
 #pragma warning(disable : 4706) // assignment within conditional expression
 #endif
-#include <cub/cub.cuh>
+//#include <cub/cub.cuh>
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -720,12 +720,12 @@ inline hipsparseStatus_t hipsparsedotiHelper(hipsparseHandle_t handle, int nnz, 
 inline hipError_t SortPairsDescending(void *d_temp_storage, size_t &temp_storage_bytes, const float *d_keys_in, float *d_keys_out, const uint64_t *d_values_in, uint64_t *d_values_out, int num_items, int begin_bit, int end_bit, hipStream_t stream)
 {
     //return hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream));
-    return cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream); //TODO: PRAS_2.4
+    return hipErrorTbd;//cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream); //TODO: PRAS_2.4
 }
 inline hipError_t SortPairsDescending(void *d_temp_storage, size_t &temp_storage_bytes, const double *d_keys_in, double *d_keys_out, const uint64_t *d_values_in, uint64_t *d_values_out, int num_items, int begin_bit, int end_bit, hipStream_t stream)
 {
     //return hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream));
-    return cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream); //TODO: PRAS_2.4
+    return hipErrorTbd;//cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream); //TODO: PRAS_2.4
 }
 /*inline hipError_t SortPairsDescending(void *, size_t, const half *, half *, const uint64_t *, uint64_t *, int, int, int, hipStream_t)
 {
