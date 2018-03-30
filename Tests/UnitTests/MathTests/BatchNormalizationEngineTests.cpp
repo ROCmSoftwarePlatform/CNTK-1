@@ -16,7 +16,6 @@
 #include "common.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK { namespace Test {
-#if 0
 using vec = std::vector<float>;
 using BNEng = BatchNormEngine<float>;
 
@@ -326,5 +325,4 @@ BOOST_AUTO_TEST_CASE(BatchNormalizationBackward)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-#endif
 } } } }
