@@ -24,7 +24,11 @@ protected:
 
 #if defined(__HIPCC__)
 #define __CUDA_HOSTDEVICE__ __host__ __device__
-#define __INLINE__ __forceinline__ inline 
+#ifdef __HIP_PLATFORM_HCC__
+#define __INLINE__ __forceinline__ inline
+#elif defined __HIP_PLATFORM_NVCC__
+#define __INLINE__ __forceinline__
+#endif
 #else
 #define __CUDA_HOSTDEVICE__
 #define __INLINE__ inline
