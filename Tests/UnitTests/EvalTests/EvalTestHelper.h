@@ -32,7 +32,7 @@ struct EvalFixture
         m_testDataPath = m_parentPath + "/../../Tests/UnitTests/EvalTests";
 #else
         // The executable path on Linux is e.g. <cntk>/build/cpu/release/bin/
-        m_testDataPath = m_parentPath + "/../../../../Tests/UnitTests/EvalTests";
+        m_testDataPath = m_parentPath + "/../../../Tests/UnitTests/EvalTests";
 #endif
         boost::filesystem::path absTestPath(m_testDataPath);
         absTestPath = boost::filesystem::canonical(absTestPath);

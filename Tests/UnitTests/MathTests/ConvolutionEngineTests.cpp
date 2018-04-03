@@ -20,13 +20,12 @@
 #include "common.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK { namespace Test {
-#if 0
 using vec = std::vector<float>;
-using vecHalf = std::vector<half>;
+//using vecHalf = std::vector<half>;
 
 using ConvEng = ConvolutionEngine<float>;
-using ConvEngHalf = ConvolutionEngine<half>;
-
+//using ConvEngHalf = ConvolutionEngine<half>;
+#if 0
 void CopyVecFromFloatToHalf(vec& from, vecHalf& to)
 {
     to.resize(from.size());
@@ -39,7 +38,6 @@ void CopyVecFromHalfToFloat(vecHalf& from, vec& to)
     for(int i=0; i<from.size(); i++) to[i] = (float)from[i];
 }
 #endif
-
 bool AreEqual(float a, float b, float maxRelError, float maxAbsError)
 {
     float diff = std::abs(a - b);
@@ -212,7 +210,6 @@ std::vector<ConvolveGeometryPtr> GeneratePoolTestConfigs()
         TensorShape(0), TensorShape(0)));
     return res;
 }
-#if 0
 BOOST_AUTO_TEST_SUITE(ConvolutionSuite)
 
 BOOST_AUTO_TEST_CASE(ConvolutionForward)
@@ -644,7 +641,7 @@ BOOST_AUTO_TEST_CASE(MaxUnpooling)
 
 BOOST_AUTO_TEST_SUITE_END()
 
-
+#if 0
 BOOST_AUTO_TEST_SUITE(Half_ConvolutionSuite)
 
 BOOST_AUTO_TEST_CASE(ConvolutionForward)
@@ -1074,6 +1071,5 @@ BOOST_AUTO_TEST_CASE(PoolingBackward)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-
 #endif
 } } } }

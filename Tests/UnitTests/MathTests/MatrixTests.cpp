@@ -16,7 +16,6 @@
 using namespace Microsoft::MSR::CNTK;
 
 namespace Microsoft { namespace MSR { namespace CNTK { namespace Test {
-#if 0
  // TODO: do this for all math tests!
  // BOOST_GLOBAL_FIXTURE(DeterministicCPUAlgorithmsFixture);
 
@@ -1413,6 +1412,7 @@ BOOST_FIXTURE_TEST_CASE(MatrixFSAdagradUpdate_WithAndWithout_UnitGain, RandomSee
 
 BOOST_AUTO_TEST_SUITE_END()
 
+#if 0
 BOOST_AUTO_TEST_SUITE(Half_MatrixUnitTests)
 
 BOOST_FIXTURE_TEST_CASE(MatrixConstructors, RandomSeedFixture)
@@ -2820,8 +2820,8 @@ BOOST_FIXTURE_TEST_CASE(MatrixFSAdagradUpdate_WithAndWithout_UnitGain, RandomSee
     }
 }
 #endif
-#endif
 BOOST_AUTO_TEST_SUITE_END()
+#endif
 
 }
 } } }

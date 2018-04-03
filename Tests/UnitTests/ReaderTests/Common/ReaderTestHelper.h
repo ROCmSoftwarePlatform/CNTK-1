@@ -77,7 +77,7 @@ struct ReaderFixture
         m_testDataPath = m_parentPath + "/../../Tests/UnitTests/ReaderTests";
 #else
         // The executable path on Linux is e.g. <cntk>/build/cpu/release/bin/
-        m_testDataPath = m_parentPath + "/../../../../Tests/UnitTests/ReaderTests";
+        m_testDataPath = m_parentPath + "/../../../Tests/UnitTests/ReaderTests";
 #endif
         boost::filesystem::path absTestPath(m_testDataPath);
         absTestPath = boost::filesystem::canonical(absTestPath);
