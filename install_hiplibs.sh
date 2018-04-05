@@ -154,16 +154,12 @@ do
         if [ "${repoList[$i]}" != "hipDNN" ] && [ "${repoList[$i]}" != "MIOpen" ]; then
             mkdir $build_dir -p && cd $build_dir
             $cmake_it/${installDir[$i]} ${build_test[$i]} .. && make && make install
-        elif [ "${repoList[$i]}" == "MIOpen" ]; then
+	    elif [ "${repoList[$i]}" == "MIOpen" ]; then
 	        export miopengemm_DIR=$rootDir/$externalDir/miopengemm/lib/cmake/miopengemm
             mkdir $build_dir -p && cd $build_dir
             CXX=/opt/rocm/hcc/bin/hcc cmake -DMIOPEN_BACKEND=HIP -DCMAKE_PREFIX_PATH="/opt/rocm/hcc;${HIP_PATH}" -DCMAKE_CXX_FLAGS="-isystem /usr/include/x86_64-linux-gnu/" -DCMAKE_INSTALL_PREFIX=../../ .. && make && make install
         else
-            mkdir $build_dir -p && cd $build_dir
-            export MIOPEN_PATH=$rootDir/$externalDir/miopen/ 
-            export HIP_PATH=$rootDir/$externalDir/hip 
-          
-            CXX=$rootDir/$externalDir/hip/bin/hipcc $cmake_it ../ && make && make install  
+            make INSTALL_DIR=../hipdnn HIP_PATH=$rootDir/$externalDir/hip MIOPEN_PATH=$rootDir/$externalDir/miopen/
         fi
         cd $rootDir/$externalDir
     fi
