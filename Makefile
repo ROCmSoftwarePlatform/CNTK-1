@@ -195,7 +195,7 @@ endif
     INCLUDEPATH += $(HIPDNN_PATH)/include
     #LIBPATH += /opt/rocm/lib64
     LIBPATH += $(EXTERNAL_DIR)/lib64
-    LIBS_LIST += hipDNN
+    LIBS_LIST += hipdnn
     COMMON_FLAGS +=-DUSE_HIPDNN
   endif
   INCLUDEPATH += $(HIP_PATH)/include
