@@ -1156,9 +1156,9 @@ void GPUSparseMatrix<ElemType>::ConvolveAndWeightedAdd(ElemType alpha, const GPU
                 m,                   // rowDense
                 k,                   // colDense
                 n,                   // colSparse
-                numChannels,         // number of input channels
+                static_cast<int>(numChannels),         // number of input channels
                 numSteps,            // convolution num steps
-                horizontalSubsample, // convolution step size
+                static_cast<int>(horizontalSubsample), // convolution step size
                 channelwise,         // channelwise or pixelwise multiplication
                 alpha,
                 reinterpret_cast<const ElemType*>(lhs.Data()), // dense
