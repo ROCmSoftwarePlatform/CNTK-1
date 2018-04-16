@@ -116,7 +116,7 @@ std::vector<std::tuple<ConvolutionEngineKind, DEVICEID_TYPE, size_t>> GetTestEng
 std::vector<ConvolveGeometryPtr> GenerateConvTestConfigs()
 {
     std::vector<ConvolveGeometryPtr> res;
-    // REVIEW alexeyk: add test cases with even dimensions of a kernel. There are some corner cases which cuDNN does not support (which essentially require negative padding).
+    /*// REVIEW alexeyk: add test cases with even dimensions of a kernel. There are some corner cases which cuDNN does not support (which essentially require negative padding).
     for (size_t kW : {1, 3})
     {
         for (size_t kH : {1, 3})
@@ -162,7 +162,7 @@ std::vector<ConvolveGeometryPtr> GenerateConvTestConfigs()
     res.push_back(std::make_shared<ConvolveGeometry>(TensorShape(16, 16, 1),
         TensorShape(3, 3, 1), TensorShape(8), TensorShape(1, 2, 1),
         ConvolveGeometry::BoolVec{true}, ConvolveGeometry::BoolVec{true, true, false},
-        TensorShape(0), TensorShape(0)));
+        TensorShape(0), TensorShape(0)));*/
 
     // 1x1 convolution (shortcuts in ResNet).
     res.push_back(std::make_shared<ConvolveGeometry>(TensorShape(16, 16, 2),
@@ -328,8 +328,8 @@ BOOST_AUTO_TEST_CASE(ConvolutionBackwardData)
             SingleMatrix workspace(deviceId);
             SingleMatrix workspaceB(baseDeviceId);
 
-            testEng->BackwardData(srcGrad, kernel, grad, true, workspace);
-            baseEng->BackwardData(srcGradB, kernelB, gradB, true, workspaceB);
+            testEng->BackwardData(srcGrad, kernel, grad, false, workspace);
+            baseEng->BackwardData(srcGradB, kernelB, gradB, false, workspaceB);
 
             std::stringstream tmsg;
             tmsg << "Geometry: " << (std::string)(*g) << ", Batch: " << n << ", Device: " << deviceId;

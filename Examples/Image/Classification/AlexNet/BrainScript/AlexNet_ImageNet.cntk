@@ -85,11 +85,11 @@ Train = {
     
     SGD = {
         epochSize = 0
-        minibatchSize = 256
+        minibatchSize = 32
         # CNTK weights new gradient by (1-momentum) for unit gain, thus we divide Caffe's learning rate by (1-momentum)
         learningRatesPerMB = 0.1*25:0.01*25:0.001*25:0.0001*25:0.00001
         momentumPerMB = 0.9
-        maxEpochs = 112
+        maxEpochs = 10
         gradUpdateType = None
         L2RegWeight = 0.0005 # CNTK L2 regularization is per sample, thus same as Caffe
         dropoutRate = 0.5

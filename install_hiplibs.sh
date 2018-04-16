@@ -74,7 +74,7 @@ platform=$($rootDir/$externalDir/hip/bin/hipconfig --platform)
 
 dependencies=("make" "cmake-curses-gui" "pkg-config")
 if [ "$platform" == "hcc" ]; then
-	dependencies+=("python2.7" "python-yaml" "libssl-dev" "libboost-dev" "libboost-system-dev" "libboost-filesystem-dev")
+	dependencies+=("python2.7" "python-yaml" "libssl-dev")
 fi
 
 for package in "${dependencies[@]}"; do
