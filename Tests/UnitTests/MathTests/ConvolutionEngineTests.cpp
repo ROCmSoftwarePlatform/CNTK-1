@@ -116,10 +116,10 @@ std::vector<std::tuple<ConvolutionEngineKind, DEVICEID_TYPE, size_t>> GetTestEng
 std::vector<ConvolveGeometryPtr> GenerateConvTestConfigs()
 {
     std::vector<ConvolveGeometryPtr> res;
-    /*// REVIEW alexeyk: add test cases with even dimensions of a kernel. There are some corner cases which cuDNN does not support (which essentially require negative padding).
-    for (size_t kW : {1, 3})
+    // REVIEW alexeyk: add test cases with even dimensions of a kernel. There are some corner cases which cuDNN does not support (which essentially require negative padding).
+    for (size_t kW : {3})
     {
-        for (size_t kH : {1, 3})
+        for (size_t kH : {3})
         {
             for (size_t inW : {kW, 2 * kW, 2 * kW - 1})
             {
@@ -147,6 +147,8 @@ std::vector<ConvolveGeometryPtr> GenerateConvTestConfigs()
         ConvolveGeometry::BoolVec{true}, ConvolveGeometry::BoolVec{true, true, false},
         TensorShape(0), TensorShape(0)));
 
+#ifdef __HIP_PLATFORM_NVCC__
+    // PRNSOS: :currently MIOPEN doesn't support 3D convolution. shall enable these once we have such support 
     // Simple 3D convolution.
     res.push_back(std::make_shared<ConvolveGeometry>(TensorShape(5, 5, 5, 2),
         TensorShape(3, 3, 3, 2), TensorShape(2), TensorShape(1),
@@ -158,11 +160,12 @@ std::vector<ConvolveGeometryPtr> GenerateConvTestConfigs()
         TensorShape(3, 3, 2, 1), TensorShape(2), TensorShape(1),
         ConvolveGeometry::BoolVec{true}, ConvolveGeometry::BoolVec{false},
         TensorShape(0), TensorShape(0)));
+#endif
 
     res.push_back(std::make_shared<ConvolveGeometry>(TensorShape(16, 16, 1),
         TensorShape(3, 3, 1), TensorShape(8), TensorShape(1, 2, 1),
         ConvolveGeometry::BoolVec{true}, ConvolveGeometry::BoolVec{true, true, false},
-        TensorShape(0), TensorShape(0)));*/
+        TensorShape(0), TensorShape(0)));
 
     // 1x1 convolution (shortcuts in ResNet).
     res.push_back(std::make_shared<ConvolveGeometry>(TensorShape(16, 16, 2),
@@ -328,8 +331,13 @@ BOOST_AUTO_TEST_CASE(ConvolutionBackwardData)
             SingleMatrix workspace(deviceId);
             SingleMatrix workspaceB(baseDeviceId);
 
+#ifdef __HIP_PLATFORM_NVCC__
+            testEng->BackwardData(srcGrad, kernel, grad, true, workspace);
+            baseEng->BackwardData(srcGradB, kernelB, gradB, true, workspaceB);
+#else   //PRNSOS: Since MIOPEN doesn't support for alpha =  1 and beta = 0 we are switching accumulate gradients to false
             testEng->BackwardData(srcGrad, kernel, grad, false, workspace);
             baseEng->BackwardData(srcGradB, kernelB, gradB, false, workspaceB);
+#endif
 
             std::stringstream tmsg;
             tmsg << "Geometry: " << (std::string)(*g) << ", Batch: " << n << ", Device: " << deviceId;
@@ -396,9 +404,13 @@ BOOST_AUTO_TEST_CASE(ConvolutionBackwardKernel)
 
             SingleMatrix workspace(deviceId);
             SingleMatrix workspaceB(baseDeviceId);
-
+#ifdef __HIP_PLATFORM_NVCC__
             testEng->BackwardKernel(grad, in, kernel, true, false, workspace);
             baseEng->BackwardKernel(gradB, inB, kernelB, true, false, workspaceB);
+#else   //PRNSOS: Since MIOPEN doesn't support for alpha =  1 and beta = 0 we are switching accumulate gradients to false
+            testEng->BackwardKernel(grad, in, kernel, false, false, workspace);
+            baseEng->BackwardKernel(gradB, inB, kernelB, false, false, workspaceB);
+#endif
 
             std::stringstream tmsg;
             tmsg << "Geometry: " << (std::string)(*g) << ", Batch: " << n << ", Device: " << deviceId;

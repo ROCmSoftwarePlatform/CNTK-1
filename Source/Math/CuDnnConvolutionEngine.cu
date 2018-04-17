@@ -296,13 +296,8 @@ protected:
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
             auto result = finder(calgo, algoPerf); 
-#ifdef __HIP_PLATFORM_NVCC__
             auto found = std::find_if(algoPerf, algoPerf + calgo,
                 [](const hipdnnConvolutionFwdAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM && a.status == HIPDNN_STATUS_SUCCESS; });
-#elif defined __HIP_PLATFORM_HCC__
-            auto found = std::find_if(algoPerf, algoPerf + calgo,
-                [](const hipdnnConvolutionFwdAlgoPerf_t& a) { return a.fwd_algo == HIPDNN_CONVOLUTION_FWD_ALGO_GEMM /*&& a.status == HIPDNN_STATUS_SUCCESS*/; });
-#endif
             if (found == algoPerf + calgo)
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry
@@ -376,13 +371,8 @@ protected:
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
             auto result = finder(calgo, algoPerf);
-#ifdef __HIP_PLATFORM_NVCC__
             auto found = std::find_if(algoPerf, algoPerf + calgo,
                 [](const hipdnnConvolutionBwdDataAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_BWD_DATA_ALGO_1 && a.status == HIPDNN_STATUS_SUCCESS; });
-#elif defined __HIP_PLATFORM_HCC__
-            auto found = std::find_if(algoPerf, algoPerf + calgo,
-                [](const hipdnnConvolutionBwdDataAlgoPerf_t& a) { return a.bwd_data_algo == HIPDNN_CONVOLUTION_BWD_DATA_ALGO_0 /*&& a.status == HIPDNN_STATUS_SUCCESS*/; });
-#endif
         if (found == algoPerf + calgo)
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry
@@ -463,13 +453,8 @@ protected:
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount])->hipdnnStatus_t
         {
             auto result = finder(calgo, algoPerf); 
-#ifdef __HIP_PLATFORM_NVCC__
             auto found = std::find_if(algoPerf, algoPerf + calgo,
                 [](const hipdnnConvolutionBwdFilterAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_1 && a.status == HIPDNN_STATUS_SUCCESS; });
-#elif defined  __HIP_PLATFORM_HCC__
-            auto found = std::find_if(algoPerf, algoPerf + calgo,
-                [](const hipdnnConvolutionBwdFilterAlgoPerf_t& a) { return a.bwd_weights_algo == HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_1 /*&& a.status == HIPDNN_STATUS_SUCCESS*/; });
-#endif
             if (found == algoPerf + calgo)
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry
@@ -558,35 +543,7 @@ private:
     {
 	    return cudnnTohipMathType(in, out);
     }
-#elif defined  __HIP_PLATFORM_HCC__
-    hipdnnStatus_t convertType(miopenConvFwdAlgorithm_t in, hipdnnConvolutionFwdAlgo_t* out)
-    {
-        return miopenTohipConvolutionFwdAlgo(in, out);
-    }
-    hipdnnStatus_t convertType(miopenConvBwdDataAlgorithm_t in, hipdnnConvolutionBwdDataAlgo_t* out)
-    {
-        return miopenTohipConvolutionBwdDataAlgo(in, out);
-    }
-    hipdnnStatus_t convertType(miopenConvBwdWeightsAlgorithm_t in, hipdnnConvolutionBwdFilterAlgo_t* out)
-    {
-        return miopenTohipConvolutionBwdFilterAlgo(in, out);
-    }
-
-
-
-    void algoMatch(miopenConvFwdAlgorithm_t* newalgo, hipdnnConvolutionFwdAlgoPerf_t* algotype)
-    {
-    	*newalgo = (*algotype).fwd_algo ;
-    }
-    void algoMatch(miopenConvBwdDataAlgorithm_t* newalgo, hipdnnConvolutionBwdDataAlgoPerf_t* algotype)
-    {
-        *newalgo = (*algotype).bwd_data_algo ;
-    }
-    void algoMatch(miopenConvBwdWeightsAlgorithm_t* newalgo, hipdnnConvolutionBwdFilterAlgoPerf_t* algotype)
-    {
-        *newalgo = (*algotype).bwd_weights_algo ;
-    }
-#endif  
+#endif
 
     template <typename TAlgo, typename TWorkspaceSizeFinder, typename TDeterministicFinder, typename TFinder, typename TStaticFinder>
     void FindBestAlgo(size_t batchSize, TAlgo& algo, TWorkspaceSizeFinder workspaceSizeFinder, TDeterministicFinder deterministicFinder, TFinder finder, TStaticFinder staticFinder, Mat& workspace)
@@ -627,15 +584,7 @@ private:
                 workspace.Resize((algo.DeterministicAlgoWorkspaceSize + sizeof(ElemType) - 1) / sizeof(ElemType), 1, 0, false);
                 HIPDNN_CALL(deterministicFinder(calgo, algoPerf));
                 assert(calgo == 1);                                 // only one deterministic algorithm will be returned
-    	        typename TAlgo::typeL selAlgo;
-    	        typename TAlgo::typeM newAlgo;
-#ifdef __HIP_PLATFORM_NVCC__
-    	        newAlgo = (*algoPerf).algo ;
-#elif defined  __HIP_PLATFORM_HCC__
-    	        algoMatch(&newAlgo, algoPerf);
-#endif
-                HIPDNN_CALL(convertType(newAlgo, &selAlgo));
-                algo.RecordAlgoBatchSizeWorkspaceSize(true, selAlgo, batchSize, (*algoPerf).memory);
+                algo.RecordAlgoBatchSizeWorkspaceSize(true, (*algoPerf).algo, batchSize, (*algoPerf).memory);
                 algo.autotuningState = AutotuningState::Running;    // no further need for tuning since this is deterministic, directly enter running state
             }
             else
@@ -680,15 +629,7 @@ private:
                 HIPDNN_CALL(finder(calgo, algoPerf));
                 assert(calgo > 0);
                 auto res = algoPerf;        // first returned algorithm is the fastest
-    	        typename TAlgo::typeL selAlgo;
-                typename TAlgo::typeM newAlgo;
-#ifdef __HIP_PLATFORM_NVCC__
-                newAlgo = (*res).algo ;
-#elif defined __HIP_PLATFORM_HCC__
-                algoMatch(&newAlgo, res);
-#endif
-                HIPDNN_CALL(convertType(newAlgo, &selAlgo));
-                algo.RecordAlgoBatchSizeWorkspaceSize(true, selAlgo, batchSize, (*res).memory);
+                algo.RecordAlgoBatchSizeWorkspaceSize(true, (*res).algo, batchSize, (*res).memory);
 		        hipdnnMathType_t hipMT;
 #ifdef __HIP_PLATFORM_NVCC__
 		        HIPDNN_CALL(convertType((*res).mathType, &hipMT));
@@ -712,15 +653,7 @@ private:
                     HIPDNN_CALL(finder(calgo, algoPerf));
                     assert(calgo > 0);
                     auto res = algoPerf;    // first returned algorithm is the fastest
-    	            typename TAlgo::typeL selAlgo;
-                    typename TAlgo::typeM newAlgo;
-#ifdef __HIP_PLATFORM_NVCC__
-                    newAlgo = (*res).algo ;
-#elif defined __HIP_PLATFORM_HCC__
-                    algoMatch(&newAlgo, res);
-#endif
-                    HIPDNN_CALL(convertType(newAlgo, &selAlgo));
-                    algo.RecordAlgoBatchSizeWorkspaceSize(true, selAlgo, batchSize, (*res).memory);
+                    algo.RecordAlgoBatchSizeWorkspaceSize(true, (*res).algo, batchSize, (*res).memory);
 		            hipdnnMathType_t hipMT;
 #ifdef __HIP_PLATFORM_NVCC__
                     HIPDNN_CALL(convertType((*res).mathType, &hipMT));
@@ -763,12 +696,10 @@ private:
     }
 
 private:
-    template <typename T, typename L, typename M>
+    template <typename T>
     struct ConvAlgoInfo
     {
         typedef T typeT;
-        typedef L typeL;
-        typedef M typeM;
         ConvAlgoInfo()
             : LastBatchAlgoMBSize(0), MaxAlgoMBSize(0), maxMBSizeSeen(0), autotuningState(AutotuningState::Init), MaxAlgoWorkspaceSize(0), LastBatchAlgoWorkspaceSize(0), AlgoMathType(HIPDNN_TENSOR_OP_MATH)
         {
@@ -785,8 +716,8 @@ private:
         size_t DeterministicAlgoWorkspaceSize;  // workspace size for deterministic algorithm
 
         AutotuningState autotuningState;    // state of auto-tuning: Init, PendingTuning and Running
-        L selectedAlgo;     // currently selected algorithm
-        L maxAlgo;          // algorithm that was selected when the current workspace is allocated
+        decltype(T::algo) selectedAlgo;     // currently selected algorithm
+        decltype(T::algo) maxAlgo;          // algorithm that was selected when the current workspace is allocated
 
         hipdnnMathType_t AlgoMathType;
 
@@ -830,15 +761,9 @@ private:
     // Pooling specific.
     std::unique_ptr<CuDnnPool> m_pool;
 
-#ifdef __HIP_PLATFORM_NVCC__
-    ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t, hipdnnConvolutionFwdAlgo_t, decltype(hipdnnConvolutionFwdAlgoPerf_t::algo)> m_fwdAlgo;
-    ConvAlgoInfo<hipdnnConvolutionBwdDataAlgoPerf_t, hipdnnConvolutionBwdDataAlgo_t, decltype(hipdnnConvolutionBwdDataAlgoPerf_t::algo)> m_backDataAlgo;
-    ConvAlgoInfo<hipdnnConvolutionBwdFilterAlgoPerf_t, hipdnnConvolutionBwdFilterAlgo_t, decltype(hipdnnConvolutionBwdFilterAlgoPerf_t::algo)> m_backFiltAlgo;
-#elif defined __HIP_PLATFORM_HCC__
-    ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t, hipdnnConvolutionFwdAlgo_t, decltype(hipdnnConvolutionFwdAlgoPerf_t::fwd_algo)> m_fwdAlgo;
-    ConvAlgoInfo<hipdnnConvolutionBwdDataAlgoPerf_t, hipdnnConvolutionBwdDataAlgo_t, decltype(hipdnnConvolutionBwdDataAlgoPerf_t::bwd_data_algo)> m_backDataAlgo; //TODO:__add__
-    ConvAlgoInfo<hipdnnConvolutionBwdFilterAlgoPerf_t, hipdnnConvolutionBwdFilterAlgo_t, decltype(hipdnnConvolutionBwdFilterAlgoPerf_t::bwd_weights_algo)> m_backFiltAlgo;
-#endif
+    ConvAlgoInfo<hipdnnConvolutionFwdAlgoPerf_t> m_fwdAlgo;
+    ConvAlgoInfo<hipdnnConvolutionBwdDataAlgoPerf_t> m_backDataAlgo;
+    ConvAlgoInfo<hipdnnConvolutionBwdFilterAlgoPerf_t> m_backFiltAlgo;
 
     // Flag indicating whether only deterministic algorithms should be used.
     bool m_forceDeterministicAlgorithms;
