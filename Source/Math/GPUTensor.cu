@@ -812,14 +812,12 @@ static void LaunchTensorOp(ElemType beta, array<ElemType*, N> pointerVector, Ele
                                                                                                                         make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides),
                                                                                                                         make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
     }
-#if 0
     else
     {
         hipLaunchKernelGGL((_launchTensorOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, beta,  make_magic_wrapper(pointers), alpha, op, (ElementWiseOperator)(-1) /* dummy reductionOp */, regularOpStrides, regularStrides,
                                                                                                                      grid.m_N, make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides),
                                                                                                                      make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
     }
-#endif
 }
 
 // -----------------------------------------------------------------------
@@ -946,7 +944,6 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
             make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides),
             make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
     }
-#if 0
     // === simple case: NN large, one thread per output element
     else if (reductionDim == 1 ||                                     // no reduction
              grid.m_blocksPerGrid >= props.multiProcessorCount ||     // enough output elements to fill all multiprocs
@@ -961,7 +958,6 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
             make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides),
             make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
     }
-#endif
     // === optimization: simple case would not use all multiprocs
     else
     {
@@ -1010,13 +1006,11 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
         // This involves no reduction across blocks
         if (numReductionChunks == 1)
         {
-#if 0
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, 
                 beta, make_magic_wrapper(pointers), alpha, op, reductionOp,
                 make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides), NN,
                 make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides), /*reductionBegin*/ 0, reductionChunkSize,
                 make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
-#endif
         }
         // --- case (b)
         // Reduction across blocks. This is the difficult one.
@@ -1050,13 +1044,11 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
             FixedMatrix<C_int, N, K> regularStrides1(regularStrideVectors1);
             ElemType beta1  = 0;
             ElemType alpha1 = 1;
-#if 0
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, 
                 beta1, make_magic_wrapper(pointers1), alpha1, op, reductionOp,
                 make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides1), NN,
                 make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides), /*reductionBegin*/0, reductionChunkSize,
                 make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
-#endif
 
 #if 1
             // now reduce and redistribute
@@ -1098,7 +1090,6 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
 #endif
         }
 #else
-#if 0
         else if (beta == 1)
         {
             // no need to pre-scale; just add (common for gradients)
@@ -1117,7 +1108,6 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ - 1)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, /*beta=*/1, make_magic_wrapper(pointers), alpha, op, reductionOp, make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides), NN, make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides), reductionChunkSize, reductionChunkSize,
                                                                    make_magic_wrapper(regularOpStrideDivmod), make(reducingOpDimDivmod));
         }
-#endif
 #endif
     }
 }
