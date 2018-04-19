@@ -112,8 +112,13 @@ struct GridDim
 {
     enum : CUDA_LONG
     {
+#ifdef __HIP_PLATFORM_NVCC__
         maxThreadsPerBlock = 1024, // use this many threads per block
         maxWarpsPerBlock = 32,     // use this many warps per block. This means 1024 threads for warpSize=32
+#else
+        maxThreadsPerBlock = 256, // use this many threads per block
+        maxWarpsPerBlock = 4,     // use this many warps per block. This means 256 threads for warpSize=64
+#endif
     };
 
     // use these for launching
@@ -133,6 +138,8 @@ struct GridDim
         CUDA_LONG numProcs = props.multiProcessorCount;
 	CUDA_LONG warpSize = props.warpSize;
 
+       
+
         // distribute warps evenly over processors
         CUDA_LONG warpsPerProc = CeilDiv(N, numProcs * warpSize);
 
@@ -150,6 +157,16 @@ struct GridDim
         if (m_blocksPerGrid == 1)
             m_threadsPerBlock = N; // don't launch more than necessary  --TODO: Does this make a difference at all?
         assert(m_blocksPerGrid * m_threadsPerBlock >= N);
+       
+        printf("************************************************\n");
+        printf("N : %d\n",N);
+        printf("numProcs : %d\n",numProcs);
+        printf("warpSize : %d\n",warpSize);
+        printf("warpsPerProc : %d\n",warpsPerProc);
+        printf("maxWarpsPerBlock : %d\n",maxWarpsPerBlock);
+        printf("m_threadsPerBlock : %d\n",m_threadsPerBlock);
+        printf("m_blocksPerGrid : %d\n",m_blocksPerGrid);
+        printf("************************************************\n");
     }
 
     static const std::vector<hipDeviceProp_t>& GetCachedDeviceProps()
