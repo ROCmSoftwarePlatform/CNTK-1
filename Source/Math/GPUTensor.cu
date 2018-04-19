@@ -817,10 +817,10 @@ static void LaunchTensorOp(ElemType beta, array<ElemType*, N> pointerVector, Ele
     }
     else
     {
-        hipLaunchKernelGGL((_launchTensorOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, beta,  make_magic_wrapper(pointers), alpha, op, (ElementWiseOperator)(-1) /* dummy reductionOp */, regularOpStrides, regularStrides,
+        hipLaunchKernelGGL((_launchTensorOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, beta,  make_magic_wrapper(pointers), alpha, op, (ElementWiseOperator)(-1) /* dummy reductionOp */, make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides),
                                                                                                                      grid.m_N, make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides),
                                                                                                                      make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
-    }
+   }
 }
 
 // -----------------------------------------------------------------------
@@ -1109,7 +1109,7 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
                                                                    make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
             // We will leave it like this for a while, but eventually need to revisit using temporary memory.
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ - 1)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, /*beta=*/1, make_magic_wrapper(pointers), alpha, op, reductionOp, make_magic_wrapper(regularOpStrides), make_magic_wrapper(regularStrides), NN, make_magic_wrapper(reducingOpDims), make_magic_wrapper(reducingStrides), reductionChunkSize, reductionChunkSize,
-                                                                   make_magic_wrapper(regularOpStrideDivmod), make(reducingOpDimDivmod));
+                                                                   make_magic_wrapper(regularOpStrideDivmod), make_magic_wrapper(reducingOpDimDivmod));
         }
 #endif
     }
