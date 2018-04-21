@@ -1096,8 +1096,8 @@ if test x$buildtype = x
 then
     buildtype=$default_buildtype
     echo Defaulting to --with-buildtype=release
-    /bin/bash $root_dir/install_hiplibs.sh
 fi
+/bin/bash $root_dir/install_hiplibs.sh
 
 # If no math library was specified, search for mkl
 if test x$have_mkl = xno && test x$have_openblas = xno
