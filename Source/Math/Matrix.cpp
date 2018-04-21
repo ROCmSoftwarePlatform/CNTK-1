@@ -1933,8 +1933,12 @@ void Matrix<ElemType>::Resize(const size_t numRows, const size_t numCols, const 
         { m_CPUSparseMatrix->RequireSizeAndAllocate(numRows, numCols, numNZElemToReserve, growOnly, false); },
         { m_GPUSparseMatrix->RequireSizeAndAllocate(numRows, numCols, numNZElemToReserve, growOnly, false); });
 #ifdef _DEBUG
+#if !defined( __HIP_PLATFORM_HCC__)
     if (GetMatrixType() != MatrixType::SPARSE && !keepValue)
         Invalidate(); // Fill the matrix with NaNs to detect using the content which is undefined. Unfortunately this won't work for sparse matrices.
+#else
+    UNUSED(keepValue);
+#endif
 #else
     UNUSED(keepValue);
 #endif

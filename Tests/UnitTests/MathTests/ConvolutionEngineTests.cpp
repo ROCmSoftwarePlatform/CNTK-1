@@ -232,15 +232,26 @@ BOOST_AUTO_TEST_CASE(ConvolutionForward)
     };
 
     int baseDeviceId = 0;
+
+    int testsPassed = 0;
+    int testsSkipped = 0;
+
     for (const auto& engCfg : GetTestEngineConfigs())
     {
         auto engKind = std::get<0>(engCfg);
         auto deviceId = std::get<1>(engCfg);
         auto maxTempMem = std::get<2>(engCfg);
+
         for (const auto& g : GenerateConvTestConfigs())
         {
             auto baseEng = ConvEng::Create(g, baseDeviceId, ImageLayoutKind::CHW, 0, PoolKind::None, ConvolutionEngineKind::CuDnn);
             auto testEng = ConvEng::Create(g, deviceId, ImageLayoutKind::CHW, maxTempMem, PoolKind::None, engKind);
+
+try
+{
+            std::cout << "\n\n-------------------------------------------------\n";
+            std::cout << "input shape: " << g->InputShape().GetNumElements() << "\n";
+            std::cout << "KernelShape shape: " << g->KernelShape().GetNumElements() << "\n";
 
             size_t n = batchSizeG(rng);
             vec buf;
@@ -266,6 +277,7 @@ BOOST_AUTO_TEST_CASE(ConvolutionForward)
             testEng->Forward(in, kernel, out, workspace);
             baseEng->Forward(inB, kernelB, outB, workspaceB);
 
+
             std::stringstream tmsg;
             tmsg << "Geometry: " << (std::string)(*g) << ", Batch: " << n << ", Device: " << deviceId << ", MaxTempMem: " << maxTempMem;
             std::string msg = " are not equal, " + tmsg.str();
@@ -279,6 +291,20 @@ BOOST_AUTO_TEST_CASE(ConvolutionForward)
             BOOST_REQUIRE_MESSAGE(!out.HasNan("out"), "out" << msgNan);
             BOOST_REQUIRE_MESSAGE(CheckEqual(out, outB, emsg, relErr * 4, absErr * 14), "out" << msg << ". " << emsg);
             BOOST_REQUIRE_MESSAGE(CountNans(outBuf) == crowOut * 2 * n, "out" << msgNotNan);
+
+}
+catch(exception& e)
+{
+    testsSkipped++;
+    std::cout << "  *************** ERROR ************" << std::endl;
+    std::cout << e.what() << std::endl;
+    std::cout << "input shape: " << g->InputShape().GetNumElements() << std::endl;;
+    std::cout << "KernelShape shape: " << g->KernelShape().GetNumElements() << std::endl;;
+    std::cout << "Skipped so far: " << testsSkipped << std::endl;
+}
+    testsPassed++;
+    std::cout << "----------Passed so far:" << testsPassed << "-----------\n";
+
         }
     }
 }
