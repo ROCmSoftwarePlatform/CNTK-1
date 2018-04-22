@@ -17,8 +17,6 @@ repoList=(hipBLAS rocRAND HcSPARSE)
 #Installation directories
 installDir=(" " " " "hcsparse")
 
-#Commit checkout
-commit=("c1d7bf92fab7bc9f58ff7b69299926799fb04117" "1890bb31675a6cbaa7766e947c8e35c4d1010ad6" "2b9d9685e9886d5319a2e3a453a74394240a41fc")
 
 #git command
 clone="git clone https://github.com/ROCmSoftwarePlatform"
@@ -63,9 +61,7 @@ if [ "$hipRepo" == "1" ]; then
 else
 	echo -e "\n--------------------- CLONING HIP ---------------------\n"
 	git clone https://github.com/ROCm-Developer-Tools/HIP.git
-	cd HIP
-    git reset --hard fe3e3dd09a90765613f1ff35a3ffebcb2fe98ef1
-    mkdir $build_dir -p && cd $build_dir
+	cd HIP && mkdir $build_dir -p && cd $build_dir
     $cmake_it/hip .. && make && make install
     cd $rootDir/$externalDir
 fi
@@ -94,7 +90,6 @@ if [ "$platform" == "hcc" ]; then
 	export CXX=/opt/rocm/bin/hcc
 	repoList+=(MIOpenGEMM MIOpen)
 	installDir+=(miopengemm miopen)
-    commit+=("0eb1257cfaef83ea155aabd67af4437c0028db48" "08114baa029a519ea12b52c5274c0bd8f4ad0d26")
 	check rocBLAS
 	rocblasRepo=$?
 	if [ "$rocblasRepo" == "1" ]; then
@@ -103,9 +98,7 @@ if [ "$platform" == "hcc" ]; then
 		echo -e "\n--------------------- CLONING rocBLAS ---------------------\n"
 		$clone/rocBLAS.git
 		echo -e "\n--------------------- INSTALLING rocBLAS ---------------------\n"
-                cd rocBLAS
-                git reset --hard 3ba332f1c5e510024e3295ea078cb23631336f58
-                mkdir $build_dir -p && cd $build_dir
+                cd rocBLAS && mkdir $build_dir -p && cd $build_dir
                 $cmake_it/ .. && make && make install
                 cd $rootDir/$externalDir
 	fi
@@ -154,21 +147,18 @@ do
         echo -e "\n--------------------- CLONING ${repoList[$i]} ---------------------\n"
         $clone/${repoList[$i]}.git
         cd ${repoList[$i]}
-        #if [ "${repoList[$i]}" == "rocRAND" ]; then
-        #    git checkout rocm_1_7_1
-        #fi
+        if [ "${repoList[$i]}" == "rocRAND" ]; then
+            git checkout rocm_1_7_1
+        fi
         echo -e "\n--------------------- INSTALLING ${repoList[$i]} ---------------------\n"
         if [ "${repoList[$i]}" != "hipDNN" ] && [ "${repoList[$i]}" != "MIOpen" ]; then
-            git reset --hard ${commit[$i]}
             mkdir $build_dir -p && cd $build_dir
             $cmake_it/${installDir[$i]} ${build_test[$i]} .. && make && make install
 	    elif [ "${repoList[$i]}" == "MIOpen" ]; then
 	        export miopengemm_DIR=$rootDir/$externalDir/miopengemm/lib/cmake/miopengemm
-            git reset --hard ${commit[$i]}
             mkdir $build_dir -p && cd $build_dir
             CXX=/opt/rocm/hcc/bin/hcc cmake -DMIOPEN_BACKEND=HIP -DCMAKE_PREFIX_PATH="/opt/rocm/hcc;${HIP_PATH}" -DCMAKE_CXX_FLAGS="-isystem /usr/include/x86_64-linux-gnu/" -DCMAKE_INSTALL_PREFIX=../../ .. && make && make install
         else
-            git checkout debug
             make INSTALL_DIR=../hipdnn HIP_PATH=$rootDir/$externalDir/hip MIOPEN_PATH=$rootDir/$externalDir/miopen/
         fi
         cd $rootDir/$externalDir
