@@ -26,7 +26,14 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         explicit
         Magic_wrapper(T& x)
         {
-            hipHostMalloc(&p_, sizeof(T)); new (p_) T{x};
+
+            std::cout << "calling magic wrapper:\t" ;
+
+ #define SIZEOF(object) (char *)(&object+1) - (char *)(&object)
+
+            std::cout << SIZEOF(x) << std::endl;
+
+            hipHostMalloc(&p_, SIZEOF(x)); new (p_) T{x};  //sizeof(T)
         }
 
         operator T&() const [[hc]] { return p_[0]; }

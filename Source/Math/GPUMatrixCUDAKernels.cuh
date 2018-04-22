@@ -136,7 +136,7 @@ struct GridDim
         // get device information
         const auto& props = GetDeviceProps();
         CUDA_LONG numProcs = props.multiProcessorCount;
-	CUDA_LONG warpSize = props.warpSize;
+	    CUDA_LONG warpSize = props.warpSize;
 
        
 
@@ -156,8 +156,9 @@ struct GridDim
         m_blocksPerGrid = CeilDiv(N, m_threadsPerBlock);
         if (m_blocksPerGrid == 1)
             m_threadsPerBlock = N; // don't launch more than necessary  --TODO: Does this make a difference at all?
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(m_blocksPerGrid * m_threadsPerBlock >= N);
-       
+#endif
         printf("************************************************\n");
         printf("N : %d\n",N);
         printf("numProcs : %d\n",numProcs);
@@ -5193,7 +5194,9 @@ __global__ void _rcrfTransGrdComputeMax1024Labels(
             fTmp = alpha[id];
 
         fTmp2 = fTmp + pair_scores[j] - zeta[j];
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(fTmp2 <= 0.0);
+#endif
         fTmp2 += beta[j];
 
         fTmp = exp_(fTmp2);
@@ -5317,7 +5320,9 @@ __global__ void _copyTopKResults(const uint64_t* indexes, const ElemType* values
 template <int BlockSize, class ElemType>
 __global__ void _assignNumOfDiffCol(const ElemType* a, const ElemType* b, ElemType* c, CUDA_LONG crowB, CUDA_LONG ccol)
 {
+#if defined( __HIP_ENABLE_ASSERT__ )
     assert(hipGridDim_x == 1 && hipGridDim_y == 1 && hipGridDim_z == 1);
+#endif
 
     int cur = 0;
     CUDA_LONG icol = hipThreadIdx_x;

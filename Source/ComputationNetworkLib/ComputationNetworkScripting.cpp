@@ -81,23 +81,35 @@ ComputationNetwork::ComputationNetwork(const IConfigRecordPtr configp) :
 // process the special-nodes parameters
 void ComputationNetwork::ProcessSpecialNodes(const ScriptableObjects::IConfigRecord& config, std::deque<ComputationNodeBasePtr>& workList)
 {
-    for (let& id : config.GetMemberIds())
-    {
-        let pos = id.find(L"Nodes");
-        if (pos == wstring::npos || pos != id.size() - 5)  // special node name = node-group name + L"Nodes"
-            continue;
-        let nodeGroup = id.substr(0, id.size() - 5);
-        if (nodeGroupNames.find(nodeGroup) == nodeGroupNames.end())
-            continue;
 
-        let nodeSet = config[id];
-        let nodes = ScriptableObjects::ConfigArray::FlattenedVectorFrom<ComputationNodeBasePtr>(nodeSet);
-        for (let& node : nodes)
+    try
+    {
+        for (let& id : config.GetMemberIds())
         {
-            node->SetTag(nodeGroup);
-            workList.push_back(node);
+            let pos = id.find(L"Nodes");
+            if (pos == wstring::npos || pos != id.size() - 5)  // special node name = node-group name + L"Nodes"
+                continue;
+            let nodeGroup = id.substr(0, id.size() - 5);
+            if (nodeGroupNames.find(nodeGroup) == nodeGroupNames.end())
+                continue;
+
+            let nodeSet = config[id];
+
+            fprintf(stderr, "CNTK: ProcessSpecialNodes:");
+
+            let nodes = ScriptableObjects::ConfigArray::FlattenedVectorFrom<ComputationNodeBasePtr>(nodeSet);
+            for (let& node : nodes)
+            {
+                node->SetTag(nodeGroup);
+                workList.push_back(node);
+            }
         }
     }
+    catch(exception& e)
+    {
+        fprintf(stderr, "CNTK: exception in ProcessSpecialNodes, %s\n", e.what());
+    }
+    fprintf(stderr, "CNTK: EXIT ProcessSpecialNodes\n");
 }
 
 // construct a network from a list of roots (passed in 'workList')

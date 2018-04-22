@@ -314,7 +314,10 @@ hipblasHandle_t _initHIPBLAS(int devId)
 template <class ElemType>
 void GPUMatrix<ElemType>::SetDevice(DEVICEID_TYPE deviceId)
 {
+#if defined( __HIP_ENABLE_ASSERT__ )
     assert(deviceId >= 0);
+#endif
+
     CUDA_CALL(hipSetDevice(deviceId));
 }
 
@@ -612,7 +615,9 @@ std::unique_ptr<GPUMatrix<ElemType>> GPUMatrix<ElemType>::GetOrCreateWorkspace()
     // REVIEW alexeyk: not thread-safe, fine for now.
     if (m_workspace == nullptr)
         m_workspace = std::make_unique<conc_stack<std::unique_ptr<GPUMatrix<ElemType>>>>();
+#if defined( __HIP_ENABLE_ASSERT__ )
     assert(m_workspace != nullptr);
+#endif
     auto deviceId = GetComputeDeviceId();
     return m_workspace->pop_or_create([deviceId]()
                                       {
@@ -623,7 +628,9 @@ std::unique_ptr<GPUMatrix<ElemType>> GPUMatrix<ElemType>::GetOrCreateWorkspace()
 template <class ElemType>
 void GPUMatrix<ElemType>::ReleaseWorkspace(std::unique_ptr<GPUMatrix<ElemType>> src) const
 {
+#if defined( __HIP_ENABLE_ASSERT__ )
     assert(m_workspace != nullptr);
+#endif
     m_workspace->push(std::move(src));
 }
 
@@ -812,7 +819,9 @@ GPUMatrix<ElemType> GPUMatrix<ElemType>::Diagonal() const
 template <class ElemType>
 void GPUMatrix<ElemType>::MinusOneAt(GPUMatrix<ElemType>& c, const size_t position)
 {
+#if defined( __HIP_ENABLE_ASSERT__ )
     assert(position < c.GetNumElements());
+#endif
 
     CUDA_LONG n = (CUDA_LONG) c.GetNumElements();
     CUDA_LONG p = (CUDA_LONG) position;
