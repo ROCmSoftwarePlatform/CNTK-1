@@ -233,8 +233,10 @@ BOOST_AUTO_TEST_CASE(ConvolutionForward)
 
     int baseDeviceId = 0;
 
-    int testsPassed = 0;
+    int testsExecuted = 0;
     int testsSkipped = 0;
+    int testWithWrongResult = 0;
+    int testWithNaN = 0;
 
     for (const auto& engCfg : GetTestEngineConfigs())
     {
@@ -247,64 +249,70 @@ BOOST_AUTO_TEST_CASE(ConvolutionForward)
             auto baseEng = ConvEng::Create(g, baseDeviceId, ImageLayoutKind::CHW, 0, PoolKind::None, ConvolutionEngineKind::CuDnn);
             auto testEng = ConvEng::Create(g, deviceId, ImageLayoutKind::CHW, maxTempMem, PoolKind::None, engKind);
 
-try
-{
-            std::cout << "\n\n-------------------------------------------------\n";
-            std::cout << "input shape: " << g->InputShape().GetNumElements() << "\n";
-            std::cout << "KernelShape shape: " << g->KernelShape().GetNumElements() << "\n";
+            try
+            {
+                std::cout << "\n\n-------------------------------------------------\n";
+                std::cout << "input shape: " << g->InputShape().GetNumElements() << "\n";
+                std::cout << "KernelShape shape: " << g->KernelShape().GetNumElements() << "\n";
 
-            size_t n = batchSizeG(rng);
-            vec buf;
-            buf.resize(g->InputShape().GetNumElements() * n);
-            std::generate(begin(buf), end(buf), [&] { return nd(rng); });
-            SingleMatrix in(g->InputShape().GetNumElements(), n, buf.data(), deviceId, matrixFlagNormal);
-            SingleMatrix inB(g->InputShape().GetNumElements(), n, buf.data(), baseDeviceId, matrixFlagNormal);
+                size_t n = batchSizeG(rng);
+                vec buf;
+                buf.resize(g->InputShape().GetNumElements() * n);
+                std::generate(begin(buf), end(buf), [&] { return nd(rng); });
+                SingleMatrix in(g->InputShape().GetNumElements(), n, buf.data(), deviceId, matrixFlagNormal);
+                SingleMatrix inB(g->InputShape().GetNumElements(), n, buf.data(), baseDeviceId, matrixFlagNormal);
 
-            size_t mapCount = g->GetMapCount(g->InputShape().GetRank() - 1);
-            buf.resize(g->KernelShape().GetNumElements() * mapCount);
-            std::generate(begin(buf), end(buf), [&] { return nd(rng); });
-            SingleMatrix kernel(mapCount, g->KernelShape().GetNumElements(), buf.data(), deviceId, matrixFlagNormal);
-            SingleMatrix kernelB(mapCount, g->KernelShape().GetNumElements(), buf.data(), baseDeviceId, matrixFlagNormal);
+                size_t mapCount = g->GetMapCount(g->InputShape().GetRank() - 1);
+                buf.resize(g->KernelShape().GetNumElements() * mapCount);
+                std::generate(begin(buf), end(buf), [&] { return nd(rng); });
+                SingleMatrix kernel(mapCount, g->KernelShape().GetNumElements(), buf.data(), deviceId, matrixFlagNormal);
+                SingleMatrix kernelB(mapCount, g->KernelShape().GetNumElements(), buf.data(), baseDeviceId, matrixFlagNormal);
 
-            size_t crowOut = g->OutputShape().GetNumElements();
-            SingleMatrix outBuf(deviceId);
-            SingleMatrix out = initMat(outBuf, crowOut, n, buf);
-            SingleMatrix outB(out.DeepClone(), baseDeviceId);
+                size_t crowOut = g->OutputShape().GetNumElements();
+                SingleMatrix outBuf(deviceId);
+                SingleMatrix out = initMat(outBuf, crowOut, n, buf);
+                SingleMatrix outB(out.DeepClone(), baseDeviceId);
 
-            SingleMatrix workspace(deviceId);
-            SingleMatrix workspaceB(baseDeviceId);
+                SingleMatrix workspace(deviceId);
+                SingleMatrix workspaceB(baseDeviceId);
 
-            testEng->Forward(in, kernel, out, workspace);
-            baseEng->Forward(inB, kernelB, outB, workspaceB);
+                testEng->Forward(in, kernel, out, workspace);
+                baseEng->Forward(inB, kernelB, outB, workspaceB);
 
 
-            std::stringstream tmsg;
-            tmsg << "Geometry: " << (std::string)(*g) << ", Batch: " << n << ", Device: " << deviceId << ", MaxTempMem: " << maxTempMem;
-            std::string msg = " are not equal, " + tmsg.str();
-            std::string msgNan = " has NaNs, " + tmsg.str();
-            std::string msgNotNan = " has buffer overflow/underflow, " + tmsg.str();
+                std::stringstream tmsg;
+                tmsg << "Geometry: " << (std::string)(*g) << ", Batch: " << n << ", Device: " << deviceId << ", MaxTempMem: " << maxTempMem;
+                std::string msg = " are not equal, " + tmsg.str();
+                std::string msgNan = " has NaNs, " + tmsg.str();
+                std::string msgNotNan = " has buffer overflow/underflow, " + tmsg.str();
 
-            float relErr = Err<float>::Rel;
-            float absErr = Err<float>::Abs;
-            std::string emsg;
+                float relErr = Err<float>::Rel;
+                float absErr = Err<float>::Abs;
+                std::string emsg;
 
-            BOOST_REQUIRE_MESSAGE(!out.HasNan("out"), "out" << msgNan);
-            BOOST_REQUIRE_MESSAGE(CheckEqual(out, outB, emsg, relErr * 4, absErr * 14), "out" << msg << ". " << emsg);
-            BOOST_REQUIRE_MESSAGE(CountNans(outBuf) == crowOut * 2 * n, "out" << msgNotNan);
+                BOOST_REQUIRE_MESSAGE(!out.HasNan("out"), "out" << msgNan);
+                BOOST_REQUIRE_MESSAGE(CheckEqual(out, outB, emsg, relErr * 4, absErr * 14), "out" << msg << ". " << emsg);
+                BOOST_REQUIRE_MESSAGE(CountNans(outBuf) == crowOut * 2 * n, "out" << msgNotNan);
 
-}
-catch(exception& e)
-{
-    testsSkipped++;
-    std::cout << "  *************** ERROR ************" << std::endl;
-    std::cout << e.what() << std::endl;
-    std::cout << "input shape: " << g->InputShape().GetNumElements() << std::endl;;
-    std::cout << "KernelShape shape: " << g->KernelShape().GetNumElements() << std::endl;;
-    std::cout << "Skipped so far: " << testsSkipped << std::endl;
-}
-    testsPassed++;
-    std::cout << "----------Passed so far:" << testsPassed << "-----------\n";
+                bool equal = CheckEqual(out, outB, emsg, relErr * 4, absErr * 14);
+                bool hasNaN = out.HasNan("out");
 
+                if(!equal) testWithWrongResult++;
+                if(hasNaN) testWithNaN++;
+
+            }
+            catch(exception& e)
+            {
+                testsSkipped++;
+                std::cout << "  *************** ERROR ************" << std::endl;
+                std::cout << e.what() << std::endl;
+                std::cout << "input shape: " << g->InputShape().GetNumElements() << std::endl;;
+                std::cout << "KernelShape shape: " << g->KernelShape().GetNumElements() << std::endl;;
+                std::cout << "Skipped so far: " << testsSkipped << std::endl;
+            }
+            testsExecuted++;
+            std::cout << "-----ConvolutionForward: Executed:" << testsExecuted << ", failed to execute:" << testsSkipped
+                      << ", wrong result:" << testWithWrongResult << ", has NaN:" <<  testWithNaN << std::endl;
         }
     }
 }
@@ -326,6 +334,12 @@ BOOST_AUTO_TEST_CASE(ConvolutionBackwardData)
     };
 
     int baseDeviceId = 0;
+
+    int testsExecuted = 0;
+    int testsSkipped = 0;
+    int testWithWrongResult = 0;
+    int testWithNaN = 0;
+
     for (const auto& engCfg : GetTestEngineConfigs())
     {
         auto engKind = std::get<0>(engCfg);
@@ -335,49 +349,75 @@ BOOST_AUTO_TEST_CASE(ConvolutionBackwardData)
         {
             auto baseEng = ConvEng::Create(g, baseDeviceId, ImageLayoutKind::CHW, 0, PoolKind::None, ConvolutionEngineKind::CuDnn);
             auto testEng = ConvEng::Create(g, deviceId, ImageLayoutKind::CHW, maxTempMem, PoolKind::None, engKind);
+            try
+            {
+                std::cout << "\n\n-------------------------------------------------\n";
+                std::cout << "input shape: " << g->InputShape().GetNumElements() << "\n";
+                std::cout << "KernelShape shape: " << g->KernelShape().GetNumElements() << "\n";
 
-            size_t n = batchSizeG(rng);
-            vec buf;
-            buf.resize(g->OutputShape().GetNumElements() * n);
-            std::generate(begin(buf), end(buf), [&] { return nd(rng); });
-            SingleMatrix srcGrad(g->OutputShape().GetNumElements(), n, buf.data(), deviceId, matrixFlagNormal);
-            SingleMatrix srcGradB(g->OutputShape().GetNumElements(), n, buf.data(), baseDeviceId, matrixFlagNormal);
+                size_t n = batchSizeG(rng);
+                vec buf;
+                buf.resize(g->OutputShape().GetNumElements() * n);
+                std::generate(begin(buf), end(buf), [&] { return nd(rng); });
+                SingleMatrix srcGrad(g->OutputShape().GetNumElements(), n, buf.data(), deviceId, matrixFlagNormal);
+                SingleMatrix srcGradB(g->OutputShape().GetNumElements(), n, buf.data(), baseDeviceId, matrixFlagNormal);
 
-            size_t mapCount = g->GetMapCount(g->InputShape().GetRank() - 1);
-            buf.resize(g->KernelShape().GetNumElements() * mapCount);
-            std::generate(begin(buf), end(buf), [&] { return nd(rng); });
-            SingleMatrix kernel(mapCount, g->KernelShape().GetNumElements(), buf.data(), deviceId, matrixFlagNormal);
-            SingleMatrix kernelB(mapCount, g->KernelShape().GetNumElements(), buf.data(), baseDeviceId, matrixFlagNormal);
+                size_t mapCount = g->GetMapCount(g->InputShape().GetRank() - 1);
+                buf.resize(g->KernelShape().GetNumElements() * mapCount);
+                std::generate(begin(buf), end(buf), [&] { return nd(rng); });
+                SingleMatrix kernel(mapCount, g->KernelShape().GetNumElements(), buf.data(), deviceId, matrixFlagNormal);
+                SingleMatrix kernelB(mapCount, g->KernelShape().GetNumElements(), buf.data(), baseDeviceId, matrixFlagNormal);
 
-            size_t crowGrad = g->InputShape().GetNumElements();
-            SingleMatrix gradBuf(deviceId);
-            SingleMatrix grad = initMat(gradBuf, crowGrad, n, buf);
-            SingleMatrix gradB(grad.DeepClone(), baseDeviceId);
+                size_t crowGrad = g->InputShape().GetNumElements();
+                SingleMatrix gradBuf(deviceId);
+                SingleMatrix grad = initMat(gradBuf, crowGrad, n, buf);
+                SingleMatrix gradB(grad.DeepClone(), baseDeviceId);
 
-            SingleMatrix workspace(deviceId);
-            SingleMatrix workspaceB(baseDeviceId);
+                SingleMatrix workspace(deviceId);
+                SingleMatrix workspaceB(baseDeviceId);
 
-#ifdef __HIP_PLATFORM_NVCC__
-            testEng->BackwardData(srcGrad, kernel, grad, true, workspace);
-            baseEng->BackwardData(srcGradB, kernelB, gradB, true, workspaceB);
-#else   //PRNSOS: Since MIOPEN doesn't support for alpha =  1 and beta = 0 we are switching accumulate gradients to false
-            testEng->BackwardData(srcGrad, kernel, grad, false, workspace);
-            baseEng->BackwardData(srcGradB, kernelB, gradB, false, workspaceB);
-#endif
+    #ifdef __HIP_PLATFORM_NVCC__
+                testEng->BackwardData(srcGrad, kernel, grad, true, workspace);
+                baseEng->BackwardData(srcGradB, kernelB, gradB, true, workspaceB);
+    #else   //PRNSOS: Since MIOPEN doesn't support for alpha =  1 and beta = 0 we are switching accumulate gradients to false
+                testEng->BackwardData(srcGrad, kernel, grad, false, workspace);
+                baseEng->BackwardData(srcGradB, kernelB, gradB, false, workspaceB);
+    #endif
 
-            std::stringstream tmsg;
-            tmsg << "Geometry: " << (std::string)(*g) << ", Batch: " << n << ", Device: " << deviceId;
-            std::string msg = " are not equal, " + tmsg.str();
-            std::string msgNan = " has NaNs, " + tmsg.str();
-            std::string msgNotNan = " has buffer overflow/underflow, " + tmsg.str();
+                std::stringstream tmsg;
+                tmsg << "Geometry: " << (std::string)(*g) << ", Batch: " << n << ", Device: " << deviceId;
+                std::string msg = " are not equal, " + tmsg.str();
+                std::string msgNan = " has NaNs, " + tmsg.str();
+                std::string msgNotNan = " has buffer overflow/underflow, " + tmsg.str();
 
-            float relErr = Err<float>::Rel;
-            float absErr = Err<float>::Abs;
-            std::string emsg;
+                float relErr = Err<float>::Rel;
+                float absErr = Err<float>::Abs;
+                std::string emsg;
 
-            BOOST_REQUIRE_MESSAGE(!grad.HasNan("grad"), "grad" << msgNan);
-            BOOST_REQUIRE_MESSAGE(CheckEqual(grad, gradB, emsg, relErr * 16, absErr * 16), "grad" << msg << ". " << emsg);
-            BOOST_REQUIRE_MESSAGE(CountNans(gradBuf) == crowGrad * 2 * n, "grad" << msgNotNan);
+                BOOST_REQUIRE_MESSAGE(!grad.HasNan("grad"), "grad" << msgNan);
+                BOOST_WARN_MESSAGE(CheckEqual(grad, gradB, emsg, relErr * 16, absErr * 16), "grad" << msg << ". " << emsg);
+                BOOST_REQUIRE_MESSAGE(CountNans(gradBuf) == crowGrad * 2 * n, "grad" << msgNotNan);
+
+                bool equal = CheckEqual(grad, gradB, emsg, relErr * 16, absErr * 16);
+                bool hasNaN = grad.HasNan("grad");
+
+                if(!equal) testWithWrongResult++;
+                if(hasNaN) testWithNaN++;
+            }
+            catch(exception& e)
+            {
+                testsSkipped++;
+                std::cout << "  *************** ERROR ************" << std::endl;
+                std::cout << e.what() << std::endl;
+                std::cout << "input shape: " << g->InputShape().GetNumElements() << std::endl;;
+                std::cout << "KernelShape shape: " << g->KernelShape().GetNumElements() << std::endl;;
+                std::cout << "Skipped so far: " << testsSkipped << std::endl;
+            }
+
+            testsExecuted++;
+            std::cout << "----------ConvolutionBackwardData:  Executed:" << testsExecuted << ", failed to execute:" << testsSkipped
+                      << ", wrong result:" << testWithWrongResult << ", has NaN:" <<  testWithNaN << std::endl;
+
         }
     }
 }
@@ -509,6 +549,7 @@ BOOST_AUTO_TEST_CASE(PoolingForward)
                 std::string emsg;
 
                 BOOST_REQUIRE_MESSAGE(!out.HasNan("out"), "out" << msgNan);
+                //BOOST_WARN_MESSAGE(CheckEqual(out, outB, emsg, relErr, absErr * 8), "out" << msg << ". " << emsg);
                 BOOST_REQUIRE_MESSAGE(CheckEqual(out, outB, emsg, relErr, absErr * 8), "out" << msg << ". " << emsg);
                 BOOST_REQUIRE_MESSAGE(CountNans(outBuf) == crowOut * 2 * n, "out" << msgNotNan);
             }
