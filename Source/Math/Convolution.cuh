@@ -44,7 +44,10 @@ __global__ void kConvolutionForward(int batchSize, const ElemType* __restrict__ 
     {
         int colBase = mpRowCol[row];
         int ivBase = mpRowIwht[row];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(0 <= colBase && colBase < srcVecSize);
+#endif
 
         comp_t sum = 0;
         int i0 = mpRowRun[row];
@@ -56,7 +59,11 @@ __global__ void kConvolutionForward(int batchSize, const ElemType* __restrict__ 
             if (runs[imask + i] == 0)
                 continue;
             int dcol = runs[i0 + i];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
             assert(0 <= colBase + dcol && colBase + dcol < srcVecSize);
+#endif
+
             sum += (comp_t)kernel[ivBase + skip + i] * (comp_t)src[colBase + dcol];
         }
         dst[row] = sum;
@@ -83,7 +90,10 @@ __global__ void kConvolutionBackwardData(int batchSize, const ElemType* __restri
     {
         int colBase = mpRowCol[row];
         int ivBase = mpRowIwht[row];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(0 <= colBase && colBase < dstVecSize);
+#endif
 
         comp_t g = srcGrad[row];
         int i0 = mpRowRun[row];
@@ -95,7 +105,11 @@ __global__ void kConvolutionBackwardData(int batchSize, const ElemType* __restri
             if (runs[imask + i] == 0)
                 continue;
             int dcol = runs[i0 + i];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
             assert(0 <= colBase + dcol && colBase + dcol < dstVecSize);
+#endif
+
             atomicAdd(&grad[colBase + dcol], (ElemType)((comp_t)g * (comp_t)kernel[ivBase + skip + i]));
         }
         srcGrad += hipBlockDim_y * srcVecSize;
@@ -122,7 +136,10 @@ __global__ void kConvolutionBackwardKernel(int batchSize, int inVecSize, int out
     {
         int colBase = mpRowCol[row];
         int ivBase = mpRowIwht[row];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(0 <= colBase && colBase < inVecSize);
+#endif
 
         comp_t g = srcGrad[row];
         int i0 = mpRowRun[row];
@@ -134,7 +151,11 @@ __global__ void kConvolutionBackwardKernel(int batchSize, int inVecSize, int out
             if (runs[imask + i] == 0)
                 continue;
             int dcol = runs[i0 + i];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
             assert(0 <= colBase + dcol && colBase + dcol < inVecSize);
+#endif
+
             atomicAdd(&kernelGrad[ivBase + skip + i], (ElemType)((comp_t)g * (comp_t)in[colBase + dcol]));
         }
         in += hipBlockDim_y * inVecSize;
@@ -157,7 +178,10 @@ __global__ void kMaxPoolingForward(int batchSize, const int* mpRowCol, const int
     for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(0 <= colBase && colBase < srcVecSize);
+#endif
 
         int i0 = mpRowIndices[row];
         int size = indices[i0++];
@@ -165,7 +189,9 @@ __global__ void kMaxPoolingForward(int batchSize, const int* mpRowCol, const int
         for (int i = 1; i < size; i++)
         {
             int dcol = indices[i0 + i];
+#if defined( __HIP_ENABLE_ASSERT__ )
             assert(0 <= colBase + dcol && colBase + dcol < srcVecSize);
+#endif
             res = max(res, src[colBase + dcol]);
         }
         dst[row] = res;
@@ -193,17 +219,28 @@ __global__ void kMaxPoolingBackward(int batchSize, const ElemType* out, const El
     for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(0 <= colBase && colBase < dstVecSize);
+#endif
 
         int i0 = mpRowIndices[row];
         int size = indices[i0++];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(size > 0);
+#endif
+
         ElemType g = srcGrad[row];
         ElemType m = out[row];
         for (int i = 0; i < size; i++)
         {
             int dcol = indices[i0 + i];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
             assert(0 <= colBase + dcol && colBase + dcol < dstVecSize);
+#endif
+
             if (in[colBase + dcol] >= m)
             {
                 atomicAdd(&grad[colBase + dcol], g);
@@ -415,7 +452,10 @@ __global__ void kMaxUnpooling(int batchSize, const int* mpRowCol, const int* mpR
     for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(0 <= colBase && colBase < dstVecSize);
+#endif
 
         int i0 = mpRowIndices[row];
         int size = indices[i0++];
@@ -425,7 +465,11 @@ __global__ void kMaxUnpooling(int batchSize, const int* mpRowCol, const int* mpR
         for (int i = 1; i < size; i++)
         {
             int dcol = indices[i0 + i];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
             assert(0 <= colBase + dcol && colBase + dcol < dstVecSize);
+#endif
+
             curMax = max(curMax, poolIn[colBase + dcol]);
             if (curMax > prevMax)
             {
@@ -436,7 +480,10 @@ __global__ void kMaxUnpooling(int batchSize, const int* mpRowCol, const int* mpR
         }
 
         int dcol = indices[i0 + imax];
-        assert(0 <= colBase + dcol && colBase + dcol < dstVecSize);
+
+#if defined( __HIP_ENABLE_ASSERT__ )
+            assert(0 <= colBase + dcol && colBase + dcol < dstVecSize);
+#endif
 
         dst[colBase + dcol] = src[row];
 
@@ -462,7 +509,10 @@ __global__ void kAveragePoolingForward(int batchSize, const int* mpRowCol, const
     for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(0 <= colBase && colBase < srcVecSize);
+#endif
 
         int i0 = mpRowIndices[row];
         int size = indices[i0++];
@@ -470,7 +520,11 @@ __global__ void kAveragePoolingForward(int batchSize, const int* mpRowCol, const
         for (int i = 0; i < size; i++)
         {
             int dcol = indices[i0 + i];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
             assert(0 <= colBase + dcol && colBase + dcol < srcVecSize);
+#endif
+
             sum += (comp_t)src[colBase + dcol];
         }
         dst[row] = sum / (comp_t)size;
@@ -495,16 +549,27 @@ __global__ void kAveragePoolingBackward(int batchSize, const int* mpRowCol, cons
     for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
     {
         int colBase = mpRowCol[row];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(0 <= colBase && colBase < dstVecSize);
+#endif
 
         int i0 = mpRowIndices[row];
         int size = indices[i0++];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
         assert(size > 0);
+#endif
+
         ElemType g = srcGrad[row] / size;
         for (int i = 0; i < size; i++)
         {
             int dcol = indices[i0 + i];
+
+#if defined( __HIP_ENABLE_ASSERT__ )
             assert(0 <= colBase + dcol && colBase + dcol < dstVecSize);
+#endif
+
             atomicAdd(&grad[colBase + dcol], g);
         }
 
