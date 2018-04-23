@@ -24,8 +24,8 @@ const float Consts<float>::Zero = 0;
 template <>
 const double Consts<double>::Zero = 0;
 
-//const float Consts<half>::Zero = 0;
-//const float Consts<half>::One = 1;
+const float Consts<half>::Zero = 0;
+const float Consts<half>::One = 1;
 
 
 CuDnnTensor::CuDnnTensor()
@@ -90,15 +90,15 @@ hipdnnDataType_t CuDnnTensor::GetDataType()
         return HIPDNN_DATA_FLOAT;
     else if (typeid(ElemType) == typeid(double))
         return HIPDNN_DATA_DOUBLE;
-    /*else if (typeid(ElemType) == typeid(half))
-        return HIPDNN_DATA_HALF;*/
+    else if (typeid(ElemType) == typeid(half))
+        return HIPDNN_DATA_HALF;
     else
         InvalidArgument("hipDNN engine currently supports only single and double precision data types.");
 }
 
 template hipdnnDataType_t CuDnnTensor::GetDataType<float>();
 template hipdnnDataType_t CuDnnTensor::GetDataType<double>();
-//template hipdnnDataType_t CuDnnTensor::GetDataType<half>();
+template hipdnnDataType_t CuDnnTensor::GetDataType<half>();
 
 CuDnn::ptr_t CuDnn::Instance()
 {

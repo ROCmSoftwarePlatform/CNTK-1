@@ -173,6 +173,6 @@ void CuDnnRNNExecutor<ElemType>::BackwardWeightsCore(const GPUMatrix<ElemType>& 
 
 template class CuDnnRNNExecutor<double>;
 template class CuDnnRNNExecutor<float>;
-//template class CuDnnRNNExecutor<half>;
+template class CuDnnRNNExecutor<half>;
 
 } } }

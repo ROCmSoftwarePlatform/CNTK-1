@@ -444,7 +444,7 @@ private:
 
 template class CntkBatchNormEngine<float, float>;
 template class CntkBatchNormEngine<double, double>;
-//template class CntkBatchNormEngine<half, float>;
+template class CntkBatchNormEngine<half, float>;
 
 template <typename T> bool HasFlag(T src, T testFlag)
 {
@@ -478,6 +478,6 @@ std::unique_ptr<BatchNormEngine<InoutType, StatType>> BatchNormEngine<InoutType,
 
 template class BatchNormEngine<float, float>;
 template class BatchNormEngine<double, double>;
-//template class BatchNormEngine<half, float>;
+template class BatchNormEngine<half, float>;
 
 }}}

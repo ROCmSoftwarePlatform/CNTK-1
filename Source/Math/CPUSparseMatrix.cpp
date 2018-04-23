@@ -1711,7 +1711,7 @@ ElemType CPUSparseMatrix<ElemType>::SumOfElements() const
 }
 
 // specialization to RunTimeError for now due to omp implementation only support build-in type
-/*template <>
+template <>
 half CPUSparseMatrix<half>::FrobeniusNorm() const
 {
     RuntimeError("half FrobeniusNorm not supported.");
@@ -1720,7 +1720,7 @@ template <>
 half CPUSparseMatrix<half>::SumOfElements() const
 {
     RuntimeError("half SumOfElements not supported.");
-}*/
+}
 
 template <typename ElemType>
 MATH_API File& operator>>(File& stream, CPUSparseMatrix<ElemType>& us)
@@ -1819,12 +1819,12 @@ MATH_API File& operator<<(File& stream, const CPUSparseMatrix<ElemType>& us)
 
 template class CPUSparseMatrix<float>;
 template class CPUSparseMatrix<double>;
-//template class CPUSparseMatrix<half>;
+template class CPUSparseMatrix<half>;
 
 // instantiate learner methods
 template void CPUSparseMatrix<float>::AdaDelta(CPUMatrix<float>& c, CPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon, int* timestamps, int currentTimestamp);
 template void CPUSparseMatrix<double>::AdaDelta(CPUMatrix<double>& c, CPUMatrix<double>& functionValues, double learningRate, double rho, double epsilon, int* timestamps, int currentTimestamp);
-//template void CPUSparseMatrix<half>::AdaDelta(CPUMatrix<float>& c, CPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon, int* timestamps, int currentTimestamp);
+template void CPUSparseMatrix<half>::AdaDelta(CPUMatrix<float>& c, CPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon, int* timestamps, int currentTimestamp);
 
 // We use Matrix<char> as the backing store for QuantizedMatrix
 // Let's explciitly instantiate the methods we need for that purpose

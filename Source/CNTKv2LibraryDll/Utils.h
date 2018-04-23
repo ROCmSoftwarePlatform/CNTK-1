@@ -751,9 +751,9 @@ namespace CNTK
     }
 
     // half is V1 ElemType, so specialize here instead of in CNTKLibrary.h
-    /*template<>
+    template<>
     inline DataType AsDataType<half>()
     {
         return DataType::Float16;
-    }*/
+    }
 }

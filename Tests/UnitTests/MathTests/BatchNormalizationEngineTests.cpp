@@ -16,6 +16,7 @@
 #include "common.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK { namespace Test {
+
 using vec = std::vector<float>;
 using BNEng = BatchNormEngine<float>;
 

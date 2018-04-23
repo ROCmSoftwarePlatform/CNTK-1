@@ -72,7 +72,7 @@ public:
 protected:
     vector<MemRequestInfo<float>> m_memRequestInfoFloatVec; 
     vector<MemRequestInfo<double>> m_memRequestInfoDoubleVec;
-    //vector<MemRequestInfo<half>> m_memRequestInfoHalfVec;
+    vector<MemRequestInfo<half>> m_memRequestInfoHalfVec;
     set<DEVICEID_TYPE> m_deviceIDSet; 
     int m_stepCounter; 
 
@@ -152,7 +152,7 @@ public:
         // MatrixPool is not templated, so we call both float and double versions here 
         OptimizedMemoryAllocationFunc<float>(); 
         OptimizedMemoryAllocationFunc<double>();
-        //OptimizedMemoryAllocationFunc<half>();
+        OptimizedMemoryAllocationFunc<half>();
         return; 
     }
 

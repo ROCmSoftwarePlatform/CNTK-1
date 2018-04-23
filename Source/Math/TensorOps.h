@@ -65,7 +65,7 @@ OverloadUnaryMathFns(atanh);
 // Add overload for half math functions(Assume CUDA 9)
 // Only enable fp16 math for sm_60(P100) and sm_70+(V100)
 // Not using macro above because of unstable/lack of API
-/*DECL half exp_(half v) {
+DECL half exp_(half v) {
 #if __CUDA_ARCH__ >= 700 || __CUDA_ARCH__ == 600
     return hexp(v);
 #else
@@ -97,12 +97,12 @@ DECL half fabs_(half v) {
     short t = *(short*)&v & 0x7FFF;    //TODO: Check this!
     return *(half*)(&t);
 }
-*/
+
 // add int version to fabs_ overload
 DECL int fabs_(int v) {
     return abs(v);
 }
-/*
+
 DECL half cos_(half v) {
 #if __CUDA_ARCH__ >= 700 || __CUDA_ARCH__ == 600
     return hcos(v);
@@ -129,7 +129,7 @@ DECL half floor_(half v) {
 
 DECL half log1p_(half v) {
     return half(log1pf((float)v));
-}*/
+}
 
 // isnan
 DECL bool isnan_(float v) {
@@ -138,44 +138,44 @@ DECL bool isnan_(float v) {
 DECL bool isnan_(double v) {
     return v != v;
 }
-/*DECL bool isnan_(half v) {
+DECL bool isnan_(half v) {
 #if __CUDA_ARCH__ >= 700 || __CUDA_ARCH__ == 600
     return __hisnan(v);
 #else
     return v != v;
 #endif
-}*/
+}
 
 // max/min
 DECL float max(float a, float b) {
     return fmaxf(a,b);
 }
-/*DECL half max(half a, half b) {
+DECL half max(half a, half b) {
     return (float)a > (float)b ? a : b;
-}*/
-/*DECL float max(float a, half b) {
+}
+DECL float max(float a, half b) {
     return a > (float)b ? a : (float)b;
-}*/
-/*DECL float max(half a, float b) {
+}
+DECL float max(half a, float b) {
     return (float)a > b ? (float)a : b;
-}*/
+}
 DECL float min(float a, float b) {
     return fminf(a,b);
 }
-/*DECL half min(half a, half b) {
+DECL half min(half a, half b) {
     return (float)a < (float)b ? a : b;
-}*/
+}
 
 // overload for CUDA only functions
 #if defined(__HIPCC__)
 
-/*DECL half rsqrt_(half v) {
+DECL half rsqrt_(half v) {
 #if __CUDA_ARCH__ >= 700 || __CUDA_ARCH__ == 600
     return hrsqrt(v);
 #else
     return half(rsqrtf((float)v));
 #endif
-}*/
+}
 DECL float rsqrt_(float v) {
     return rsqrtf(v);
 }
@@ -208,9 +208,9 @@ DECL double rsqrt_(double v) {
 // #pragma fast-math pop
 OverloadBinaryMathFns(pow);
 
-/*DECL half pow_(half v,  half e) {
+DECL half pow_(half v,  half e) {
     return half(powf((float)v , (float)e));     //TODO: Improve efficiency?
-}*/
+}
 
 template<typename T>
 DECL T safepow_(T base, T exponent)

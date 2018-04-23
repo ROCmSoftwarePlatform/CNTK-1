@@ -167,7 +167,7 @@ namespace Operations
         return rsqrt(a);
     }
 
-    /*__device__ half RSqrt(half a)
+    __device__ half RSqrt(half a)
     {
 #if __CUDA_ARCH__ >= 600 //TODO: __hip__
         return hrsqrt(a);
@@ -175,7 +175,7 @@ namespace Operations
         //return __float2half(rsqrtf(__half2float(a))); //TODO: PRAS_AMD
         return (half)(rsqrtf((float)(a)));
 #endif
-    }*/
+    }
 }
 
 // This function is used to select correct unroll factor.

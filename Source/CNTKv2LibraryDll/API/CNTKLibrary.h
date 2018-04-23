@@ -113,8 +113,8 @@ namespace CNTK
             return DataType::Float;
         else if (std::is_same<ElementType, double>())
             return DataType::Double;
-        /*else if (std::is_same<ElementType, float16>())
-            return DataType::Float16;*/
+        else if (std::is_same<ElementType, float16>())
+            return DataType::Float16;
         else
             NOT_IMPLEMENTED;
     }
@@ -125,8 +125,8 @@ namespace CNTK
             return "Float";
         else if (dataType == DataType::Double)
             return "Double";
-        /*else if (dataType == DataType::Float16)
-            return "Float16";*/
+        else if (dataType == DataType::Float16)
+            return "Float16";
         else
             LogicError("Unknown DataType.");
     }
@@ -751,9 +751,9 @@ namespace CNTK
             case DataType::Double:
                 SetValue(value);
                 break;
-            /*case DataType::Float16:
+            case DataType::Float16:
                 SetValue(float16::create(value));
-                break;*/
+                break;
             default:
                 LogicError("Unsupported DataType %s.", DataTypeName(m_dataType));
                 break;
@@ -851,7 +851,7 @@ namespace CNTK
         ///
         /// Fill 'this' NDArrayView with the specified value. The underlying DataType of 'this' view should be DataType::Double.
         ///
-        //CNTK_API void SetValue(float16 value);
+        CNTK_API void SetValue(float16 value);
 
         ///
         /// Creates a new NDArrayView with newly allocated storage on the specified device and copies 'this' view's contents into the newly allocated view.
@@ -2916,10 +2916,10 @@ namespace CNTK
             {
                 CopyVariableValueToVector<double>(outputVariable, sequences);
             }
-            /*else if (dataType == DataType::Float16)
+            else if (dataType == DataType::Float16)
             {
                 CopyVariableValueToVector<float16>(outputVariable, sequences);
-            }*/
+            }
         }
 
         ///

@@ -103,7 +103,7 @@ BOOST_AUTO_TEST_CASE(OldRnnForwardProp)
 
 BOOST_AUTO_TEST_SUITE_END()
 
-/*BOOST_AUTO_TEST_SUITE(Half_MathTensorTests)
+BOOST_AUTO_TEST_SUITE(Half_MathTensorTests)
 
 BOOST_AUTO_TEST_CASE(ElementwiseAddition)
 {
@@ -191,6 +191,6 @@ BOOST_AUTO_TEST_CASE(OldRnnForwardProp)
     TestOldRnnForwardPropSRP<half>();
 }
 
-BOOST_AUTO_TEST_SUITE_END()*/
+BOOST_AUTO_TEST_SUITE_END()
 
 }}}}

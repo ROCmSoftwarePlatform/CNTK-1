@@ -429,6 +429,7 @@ MATH_SRC =\
 	$(SOURCEDIR)/Math/CPUMatrixHalf.cpp \
 	$(SOURCEDIR)/Math/CPUMatrixTensorFloat.cpp \
 	$(SOURCEDIR)/Math/CPUMatrixTensorDouble.cpp \
+	$(SOURCEDIR)/Math/CPUMatrixTensorHalf.cpp \
 	$(SOURCEDIR)/Math/CPURNGHandle.cpp \
 	$(SOURCEDIR)/Math/CPUSparseMatrix.cpp \
 	$(SOURCEDIR)/Math/ConvolutionEngine.cpp \
@@ -664,7 +665,7 @@ $(PROPOSAL_LAYER_LIB): $(PROPOSAL_LAYER_LIBRARY_OBJ) | $(CNTKLIBRARY_LIB)
 	@echo $(SEPARATOR)
 	@echo creating $@ for $(ARCH) with build type $(BUILDTYPE)
 	@mkdir -p $(dir $@)
-	$(CXX) $(LDFLAGS) -shared  $(patsubst %,-L%, $(LIBDIR) $(LIBPATH)) $(patsubst %,$(RPATH)%, $(LIBDIR) $(LIBPATH) $(ORIGINDIR)) -o $@ $^ -l$(CNTKLIBRARY)
+	$(CXX) $(LDFLAGS) -shared $(CXXFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH)) $(patsubst %,$(RPATH)%, $(LIBDIR) $(LIBPATH) $(ORIGINDIR)) -o $@ $^ -l$(CNTKLIBRARY)
 
 
 ########################################
@@ -1388,7 +1389,7 @@ UNITTEST_MATH_SRC = \
 	$(SOURCEDIR)/../Tests/UnitTests/MathTests/MatrixTests.cpp \
 	$(SOURCEDIR)/../Tests/UnitTests/MathTests/MatrixLearnerTests.cpp \
 	$(SOURCEDIR)/../Tests/UnitTests/MathTests/stdafx.cpp \
-	#$(SOURCEDIR)/../Tests/UnitTests/MathTests/HalfGPUTests.cpp \
+	$(SOURCEDIR)/../Tests/UnitTests/MathTests/HalfGPUTests.cpp \
 
 UNITTEST_MATH_SRC += $(CNTK_COMMON_SRC)
 UNITTEST_MATH_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(UNITTEST_MATH_SRC))

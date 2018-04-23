@@ -24,7 +24,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
     public:
         Magic_wrapper() = default;
         explicit
-        Magic_wrapper(T& x)
+        Magic_wrapper(const T& x)
         {
 
             std::cout << "calling magic wrapper:\t" ;
@@ -36,16 +36,15 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             hipHostMalloc(&p_, SIZEOF(x)); new (p_) T{x};  //sizeof(T)
         }
 
-        operator T&() const [[hc]] { return p_[0]; }
-        operator T&() [[hc]] { return p_[0]; }
+        operator const T&() const [[hc]] { return p_[0]; }
     };
 
   template<typename T>
-  Magic_wrapper<T> make_magic_wrapper(T& x)
+  Magic_wrapper<T> make_magic_wrapper(const T& x)
   {
     return Magic_wrapper<T>{x};
   }
-  #define reference_to_const(...) __VA_ARGS__ &
+  #define reference_to_const(...) __VA_ARGS__ const&
 #else
   #define make_magic_wrapper(x) x
   #define reference_to_const(...) __VA_ARGS__
