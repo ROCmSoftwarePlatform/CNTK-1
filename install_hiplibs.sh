@@ -103,7 +103,6 @@ if [ "$install" == "0" ]; then
         echo -e "$NC $spacef CLONING HIP $spaceb"
         git clone https://github.com/ROCm-Developer-Tools/HIP.git
         cd HIP
-        git reset --hard fe3e3dd09a90765613f1ff35a3ffebcb2fe98ef1
     else
         echo -e "$NC $spacef Installing the available Source Code $spaceb"
         cd $HIP_SCP
@@ -148,7 +147,6 @@ if [ "$platform" == "hcc" ]; then
     libList+=(rocblas miopengemm MIOpen)
     headerList+=(rocblas miogemm miopen)
     scpLIST+=(rocBLAS_SCP MIOpenGEMM_SCP MIOpen_SCP)
-    commitID=("8191174dda9737a5be7eb8cd2a3618c9850e9b1a" "0eb1257cfaef83ea155aabd67af4437c0028db48" "08114baa029a519ea12b52c5274c0bd8f4ad0d26")
 fi
 
 repoList+=(rocRAND HcSPARSE hipBLAS hipDNN)
@@ -156,7 +154,6 @@ installDir+=(hiprand hcsparse hipblas hipDNN)
 libList+=(hiprand hipsparse hipblas hipDNN)
 scpLIST+=(rocRAND_SCP HcSPARSE_SCP hipBLAS_SCP hipDNN_SCP)
 headerList+=(hiprand hipsparse hipblas hipDNN)
-commitID+=("1890bb31675a6cbaa7766e947c8e35c4d1010ad6" "2b9d9685e9886d5319a2e3a453a74394240a41fc" "c1d7bf92fab7bc9f58ff7b69299926799fb04117" "72228b27277b0e2a15d30edd6f421b2b73881ff1")
 
 echo -e "\n\n"
 
@@ -259,7 +256,6 @@ do
             echo -e "$NC $spacef CLONING ${repoList[$i]} $spaceb"
             $clone/${repoList[$i]}.git
             cd ${repoList[$i]}
-            git reset --hard ${commit[$i]}
         else
             echo -e "$YELLOW $spacef Installing the available Source Code $spaceb"
             cd ${pathlist["${scpLIST[$i]}"]}
