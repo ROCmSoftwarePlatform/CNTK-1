@@ -446,7 +446,9 @@ public:
 
 template class HardmaxNode<float>;
 template class HardmaxNode<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class HardmaxNode<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 
 
@@ -771,7 +773,9 @@ public:                                                                 \
                                                                         \
 template class ClassName<float>;                                        \
 template class ClassName<double>;                                       \
+#ifdef __HIP_ENABLE_HALF__
 template class ClassName<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 DefineComparisonNode(LessNode,         -1, 0)
 DefineComparisonNode(EqualNode,         0, 0)

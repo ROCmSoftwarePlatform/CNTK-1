@@ -138,8 +138,9 @@ private:
 
 template class CuDnnBatchNormEngine<float, float>;
 template class CuDnnBatchNormEngine<double, double>;
+#ifdef __HIP_ENABLE_HALF__
 template class CuDnnBatchNormEngine<half, float>;
-
+#endif //__HIP_ENABLE_HALF__
 template <typename InoutType, typename StatType>
 std::unique_ptr<BatchNormEngine<InoutType, StatType>> CuDnnBatchNormEngineFactory<InoutType, StatType>::Create(DEVICEID_TYPE deviceId, const TensorShape& inOutT,
                                                                                          bool spatial, ImageLayoutKind imageLayout)
@@ -149,8 +150,9 @@ std::unique_ptr<BatchNormEngine<InoutType, StatType>> CuDnnBatchNormEngineFactor
 
 template class CuDnnBatchNormEngineFactory<float, float>;
 template class CuDnnBatchNormEngineFactory<double, double>;
+#ifdef __HIP_ENABLE_HALF__
 template class CuDnnBatchNormEngineFactory<half, float>;
-
+#endif //__HIP_ENABLE_HALF__
 CudaTimer::~CudaTimer()
 {
     // TODO: Should not throw if std::uncaught_exception()

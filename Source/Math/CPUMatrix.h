@@ -14,7 +14,9 @@
 #include <ctime>
 #include <limits.h>
 #include "QuantizedOperations.h"
+#ifdef __HIP_ENABLE_HALF__
 #include "half.hpp"
+#endif /*__HIP_ENABLE_HALF__*/
 
 //#include "GPUMatrix.h"
 //#include "CPUSparseMatrix.h"
@@ -583,7 +585,9 @@ private:
 
 typedef CPUMatrix<float> CPUSingleMatrix;
 typedef CPUMatrix<double> CPUDoubleMatrix;
+#ifdef __HIP_ENABLE_HALF__
 typedef CPUMatrix<half> CPUHalfMatrix;
+#endif  //__HIP_ENABLE_HALF__
 
 template<typename ElemType>
 void CPUMatrixTensorOpImpl(ElemType beta, const CPUMatrix<ElemType>& a, CPUMatrix<ElemType>& o, ElemType alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,

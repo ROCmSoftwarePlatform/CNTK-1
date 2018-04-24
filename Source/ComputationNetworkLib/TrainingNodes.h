@@ -2394,8 +2394,11 @@ class BatchNormalizationNode : public ComputationNodeNonLooping<ElemType>, publi
     typedef ComputationNodeNonLooping<ElemType> Base; UsingComputationNodeMembersBoilerplate;
     static const std::wstring TypeName() { return L"BatchNormalization"; }
 
+#ifdef __HIP_ENABLE_HALF__
     typedef typename std::conditional<std::is_same<ElemType, half>::value, float, ElemType>::type StatType;
-
+#else
+    typedef typename std::conditional<std::is_same<ElemType, float>::value, float, ElemType>::type StatType;
+#endif /*__HIP_ENABLE_HALF__*/
     // inputs
     // TODO: Change all of these throughout the codebase to 'class enum'. Also change all places where we still use integer constants.
     static const size_t DATA      = 0;

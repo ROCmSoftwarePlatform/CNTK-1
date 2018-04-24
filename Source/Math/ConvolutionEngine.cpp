@@ -1177,6 +1177,7 @@ std::unique_ptr<ConvolutionEngine<ElemType>> ConvolutionEngine<ElemType>::Create
 }
 
 // only GPU supports fp16 convolution
+#ifdef __HIP_ENABLE_HALF__
 template <>
 std::unique_ptr<ConvolutionEngine<half>> ConvolutionEngine<half>::Create(ConvolveGeometryPtr geometry, DEVICEID_TYPE deviceId,
     ImageLayoutKind imageLayout, size_t maxTempMemSizeInSamples, PoolKind poolKind,
@@ -1208,9 +1209,11 @@ std::unique_ptr<ConvolutionEngine<half>> ConvolutionEngine<half>::Create(Convolv
 
     return nullptr;
 }
+#endif //__HIP_ENABLE_HALF__
 
 template class ConvolutionEngine<float>;
 template class ConvolutionEngine<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class ConvolutionEngine<half>;
-
+#endif //__HIP_ENABLE_HALF__
 }}}

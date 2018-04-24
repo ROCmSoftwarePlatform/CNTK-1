@@ -873,7 +873,9 @@ protected:
 
 template class OneHotNode<float>;
 template class OneHotNode<double>;
-template class OneHotNode<half>;
+#ifdef __HIP_ENABLE_HALF__
+    template class OneHotNode<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 #ifdef COMING_SOON
 

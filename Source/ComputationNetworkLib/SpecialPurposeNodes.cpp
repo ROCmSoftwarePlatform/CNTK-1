@@ -144,6 +144,8 @@ template <class ElemType>
 
 template class TraceNode<float>;
 template class TraceNode<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class TraceNode<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 }}}

@@ -63,12 +63,14 @@ static __inline__ __device__ double atomicAdd(double* address, double val)
   } while (!hc::atomic_compare_exchange(address_as_ull, reinterpret_cast<uint64_t*>(&old_x), *reinterpret_cast<uint64_t*>(&new_x)));
 }
 #endif
+#ifdef __HIP_ENABLE_HALF__
 // overload atomicAdd for half
 static __inline__ __device__ half atomicAdd(half* address, half val)
 {
     assert(false); // TODO: implement later
     return val;
 }
+#endif /*__HIP_ENABLE_HALF__*/
 
 
 // TODO: replace this with TensorOps.h LogAdd(). It differs in using ElemType throughout, while this one seems to use 'double' versions of exp() and log().

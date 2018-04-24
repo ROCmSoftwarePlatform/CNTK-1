@@ -1208,7 +1208,9 @@ atomic_ullong TimeStamp::s_timeStampCounter = ATOMIC_VAR_INIT(0);
 
 template <> map<size_t, map<size_t, shared_ptr<SingleMatrix>>> ComputationNode<float>::s_constOnes{};
 template <> map<size_t, map<size_t, shared_ptr<DoubleMatrix>>> ComputationNode<double>::s_constOnes{};
+#ifdef __HIP_ENABLE_HALF__
 template <> map<size_t, map<size_t, shared_ptr<HalfMatrix>>> ComputationNode<half>::s_constOnes{};
+#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // instantiate the core class templates
@@ -1216,7 +1218,9 @@ template <> map<size_t, map<size_t, shared_ptr<HalfMatrix>>> ComputationNode<hal
 
 template class ComputationNode<float>;
 template class ComputationNode<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class ComputationNode<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 }}}
 

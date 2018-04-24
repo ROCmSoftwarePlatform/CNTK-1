@@ -444,8 +444,9 @@ private:
 
 template class CntkBatchNormEngine<float, float>;
 template class CntkBatchNormEngine<double, double>;
+#ifdef __HIP_ENABLE_HALF__
 template class CntkBatchNormEngine<half, float>;
-
+#endif /*__HIP_ENABLE_HALF__*/
 template <typename T> bool HasFlag(T src, T testFlag)
 {
     return ((int)src & (int)testFlag) != 0;
@@ -478,6 +479,7 @@ std::unique_ptr<BatchNormEngine<InoutType, StatType>> BatchNormEngine<InoutType,
 
 template class BatchNormEngine<float, float>;
 template class BatchNormEngine<double, double>;
+#ifdef __HIP_ENABLE_HALF__
 template class BatchNormEngine<half, float>;
-
+#endif /*__HIP_ENABLE_HALF__*/
 }}}

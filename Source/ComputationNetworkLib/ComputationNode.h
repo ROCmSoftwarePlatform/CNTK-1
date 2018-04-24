@@ -2575,6 +2575,7 @@ public:
 
 #pragma endregion base computation class
 
+#ifdef __HIP_ENABLE_HALF__
 #define SMART_NODE_INVOKE(nodeClass, node, func, ...)                           \
     do {                                                                        \
         if (dynamic_pointer_cast<nodeClass<float>>(node))                       \
@@ -2597,4 +2598,26 @@ public:
             ret = dynamic_pointer_cast<nodeClass<half>>(node)->func(__VA_ARGS__);   \
         else LogicError("Unknown ComputationNode type");                            \
     } while(0)
+
+#else
+
+#define SMART_NODE_INVOKE(nodeClass, node, func, ...)                           \
+    do {                                                                        \
+        if (dynamic_pointer_cast<nodeClass<float>>(node))                       \
+            dynamic_pointer_cast<nodeClass<float>>(node)->func(__VA_ARGS__);    \
+        else if (dynamic_pointer_cast<nodeClass<double>>(node))                 \
+            dynamic_pointer_cast<nodeClass<double>>(node)->func(__VA_ARGS__);   \
+        else                                                                    \
+            LogicError("Unknown nodeClass type");                               \
+    } while(0)
+
+#define SMART_NODE_INVOKE_WITH_RET(nodeClass, node, func, ret, ...)                 \
+    do {                                                                            \
+        if (dynamic_pointer_cast<nodeClass<float>>(node))                           \
+            ret = dynamic_pointer_cast<nodeClass<float>>(node)->func(__VA_ARGS__);  \
+        else if (dynamic_pointer_cast<nodeClass<double>>(node))                     \
+            ret = dynamic_pointer_cast<nodeClass<double>>(node)->func(__VA_ARGS__); \
+        else LogicError("Unknown ComputationNode type");                            \
+    } while(0)
+#endif /*__HIP_ENABLE_HALF__*/
 }}}

@@ -113,8 +113,10 @@ namespace CNTK
             return DataType::Float;
         else if (std::is_same<ElementType, double>())
             return DataType::Double;
+#ifdef __HIP_ENABLE_HALF__
         else if (std::is_same<ElementType, float16>())
             return DataType::Float16;
+#endif /*__HIP_ENABLE_HALF__*/
         else
             NOT_IMPLEMENTED;
     }
@@ -125,8 +127,10 @@ namespace CNTK
             return "Float";
         else if (dataType == DataType::Double)
             return "Double";
+#ifdef __HIP_ENABLE_HALF__
         else if (dataType == DataType::Float16)
-            return "Float16";
+                    return "Float16";
+#endif /*__HIP_ENABLE_HALF__*/
         else
             LogicError("Unknown DataType.");
     }
@@ -751,9 +755,11 @@ namespace CNTK
             case DataType::Double:
                 SetValue(value);
                 break;
+#ifdef __HIP_ENABLE_HALF__
             case DataType::Float16:
                 SetValue(float16::create(value));
                 break;
+#endif /*__HIP_ENABLE_HALF__*/
             default:
                 LogicError("Unsupported DataType %s.", DataTypeName(m_dataType));
                 break;
@@ -851,7 +857,9 @@ namespace CNTK
         ///
         /// Fill 'this' NDArrayView with the specified value. The underlying DataType of 'this' view should be DataType::Double.
         ///
+#ifdef __HIP_ENABLE_HALF__
         CNTK_API void SetValue(float16 value);
+#endif /*__HIP_ENABLE_HALF__*/
 
         ///
         /// Creates a new NDArrayView with newly allocated storage on the specified device and copies 'this' view's contents into the newly allocated view.
@@ -2916,10 +2924,12 @@ namespace CNTK
             {
                 CopyVariableValueToVector<double>(outputVariable, sequences);
             }
+#ifdef __HIP_ENABLE_HALF__
             else if (dataType == DataType::Float16)
             {
                 CopyVariableValueToVector<float16>(outputVariable, sequences);
             }
+#endif /*__HIP_ENABLE_HALF__*/
         }
 
         ///

@@ -934,6 +934,7 @@ bool CuDnnConvolutionEngineFactory<ElemType>::IsSupported(DEVICEID_TYPE deviceId
 
 template class CuDnnConvolutionEngineFactory<float>;
 template class CuDnnConvolutionEngineFactory<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class CuDnnConvolutionEngineFactory<half>;
-
+#endif //__HIP_ENABLE_HALF__
 } } }

@@ -587,11 +587,15 @@ template<class ElemType, int direction>
 // instantiate the classes that derive from the above
 template class PastValueNode<float>;
 template class PastValueNode<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class PastValueNode<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 template class FutureValueNode<float>;
 template class FutureValueNode<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class FutureValueNode<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // DelayedValueNodeState -- helper class for exporting/importing state from/to DelayedValueNodes.

@@ -54,11 +54,13 @@ struct Consts
     static const ElemType One;
 };
 
+#ifdef __HIP_ENABLE_HALF__
 template <>
 struct Consts<half>
 {
     static const float Zero;
     static const float One;
 };
+#endif //__HIP_ENABLE_HALF__
 
 } } }

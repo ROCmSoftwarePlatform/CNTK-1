@@ -47,7 +47,9 @@ template <class ElemType>
 
 template class RandomDistributionNode<float>;
 template class RandomDistributionNode<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class RandomDistributionNode<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 template<class ElemType>
 void RandomSampleNodeBase<ElemType>::Validate(bool isFinalValidationPass)
@@ -232,7 +234,9 @@ bool RandomSampleNode<ElemType>::IsOutOfDateWrtInputs() const
 
 template class RandomSampleNode<float>;
 template class RandomSampleNode<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class RandomSampleNode<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 template<class ElemType>
 double RandomSampleInclusionFrequencyNode<ElemType>::EstimateNumberOfTries()
@@ -305,7 +309,9 @@ void RandomSampleInclusionFrequencyNode<ElemType>::Validate(bool isFinalValidati
 
 template class RandomSampleInclusionFrequencyNode<float>;
 template class RandomSampleInclusionFrequencyNode<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class RandomSampleInclusionFrequencyNode<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 template<class ElemType>
 void DropoutNode<ElemType>::Save(File& fstream) const
@@ -339,10 +345,14 @@ void BatchNormalizationNode<ElemType>::AttachInputs(const std::vector<Computatio
 
 template class DropoutNode<float>;
 template class DropoutNode<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class DropoutNode<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 template class BatchNormalizationNode<float>;
 template class BatchNormalizationNode<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class BatchNormalizationNode<half>;
+#endif /*__HIP_ENABLE_HALF__*/
 
 }}}
