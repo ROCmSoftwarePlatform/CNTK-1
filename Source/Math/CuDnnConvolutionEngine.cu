@@ -13,7 +13,7 @@
 #include "half.hpp"
 
 //temporary...
-//#define _HIPDBG_
+#define _HIPDBG_
 
 // We want tensor core be enabled in order to get(v7)/find tensor core results. But if algo without tensorcore is faster, the only way to force faster algo is to turn it off. Since re-tuning can happen quite often in CNTK, it gets bad if we don't do it carefully. It also require move to get_v7 and we can't test until we can run fp16.
 // For now, let's keep it simple and enable tensor core all the time for fp16.
@@ -302,7 +302,7 @@ protected:
 #elif defined (__HIP_PLATFORM_HCC__)
             int calgo;
             hipdnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount];
-            finder(calgo, algoPerf);
+            return finder(calgo, algoPerf);
 #endif
 
         };
@@ -360,7 +360,6 @@ protected:
         //else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
         // Perform forward convolution operation.
         std::cout<<"CNTK: Invoking hipdnnConvolutionForward"<<std::endl;
-        m_fwdAlgo.selectedAlgo = HIPDNN_CONVOLUTION_FWD_ALGO_GEMM;//HIPDNN_CONVOLUTION_FWD_ALGO_DIRECT;//HIPDNN_CONVOLUTION_FWD_ALGO_WINOGRAD;//HIPDNN_CONVOLUTION_FWD_ALGO_FFT ;
         std::cout<<"CNTK: SelectedAlgo"<<m_fwdAlgo.selectedAlgo<<std::endl;
         std::cout<<"CNTK: workspace Buffer Size"<<workspace.BufferSize()<<std::endl;
         HIPDNN_CALL(hipdnnConvolutionForward(*m_cudnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
@@ -396,7 +395,7 @@ protected:
 #elif defined (__HIP_PLATFORM_HCC__)
             int calgo;
             hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount];
-            finder(calgo, algoPerf);
+            return finder(calgo, algoPerf);
 #endif
 
         };
@@ -437,7 +436,7 @@ protected:
         if(m_dataType == HIPDNN_DATA_HALF) HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, m_backDataAlgo.AlgoMathType));
         //else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
         
-        m_backDataAlgo.selectedAlgo =  HIPDNN_CONVOLUTION_BWD_DATA_ALGO_0;
+        std::cout<<"CNTK: SelectedAlgo"<<m_backDataAlgo.selectedAlgo<<std::endl;
         std::cout<<"accumulateGradient"<<accumulateGradient<<std::endl;
         HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_cudnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_inT, ptr(grad)));
     }
@@ -480,7 +479,7 @@ protected:
 #elif defined (__HIP_PLATFORM_HCC__)
             int calgo;
             hipdnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount];
-            finder(calgo, algoPerf);
+            return finder(calgo, algoPerf);
 #endif
         };
         // find deterministic algorithm 
@@ -519,7 +518,7 @@ protected:
         // Compute gradients with respect to the output tensor (data).
         if(m_dataType == HIPDNN_DATA_HALF) HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, m_backFiltAlgo.AlgoMathType));
         //else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
-        m_backFiltAlgo.selectedAlgo =  HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_0;
+        //m_backFiltAlgo.selectedAlgo =  HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_0;
         std::cout<<"Invoking hipdnnconvolution Backward filter"<<std::endl;
         HIPDNN_CALL(hipdnnConvolutionBackwardFilter(*m_cudnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
     }
@@ -579,6 +578,7 @@ private:
 	    return cudnnTohipMathType(in, out);
     }
 #endif
+
 
     template <typename TAlgo, typename TWorkspaceSizeFinder, typename TDeterministicFinder, typename TFinder, typename TStaticFinder>
     void FindBestAlgo(size_t batchSize, TAlgo& algo, TWorkspaceSizeFinder workspaceSizeFinder, TDeterministicFinder deterministicFinder, TFinder finder, TStaticFinder staticFinder, Mat& workspace)
