@@ -1,31 +1,27 @@
 #!/bin/bash
 
-#Script directory
-rootDir=$(dirname "$(readlink -f "$0")")
+rootDir=$(dirname "$(readlink -f "$0")") #Script directory
 cd $rootDir
 
-#External Directory
-externalDir=external/HIP
+externalDir=external/HIP #External Directory
+rocmDir=/opt/rocm
 mkdir ${externalDir} -p
 cd ${externalDir}
 cur_dir=$(pwd)
-mkdir lib64 -p
 
-#List of repos to be cloned and installed
-repoList=(hipBLAS rocRAND HcSPARSE)
+RED=$(tput setaf 1) GREEN=$(tput setaf 2) YELLOW=$(tput setaf 3) NC=$(tput sgr0) #output colours
 
-#Installation directories
-installDir=(" " " " "hcsparse")
-
-
-#git command
 clone="git clone https://github.com/ROCmSoftwarePlatform"
 
 #build steps
+
 build_dir=build
-cmake_it="cmake -DCMAKE_INSTALL_PREFIX=../.."
+cmake_it="cmake "
 build_test=("" "-DCMAKE_MODULE_PATH=$rootDir/$externalDir/hip/cmake -DBUILD_TEST=OFF" "" "")
+install=0
 remove="rm -rf"
+spacef="\n\t\t-----"
+spaceb="-----\n\t\t"
 
 #function for building - TODO:
 #build ()
@@ -43,9 +39,10 @@ remove="rm -rf"
 #}
 
 #function to check if local repo exists already
+
 check()
 {
-	Repo=$(echo $(pwd)/$1|cut -d' ' -f1)
+	Repo=$(echo $rocmDir/$1|cut -d' ' -f1)
 	if [ -d $Repo ]; then
 		return 1
 	return 0
@@ -53,24 +50,83 @@ check()
 }
 
 #HIP installation
-echo -e "\n--------------------- HIP LIBRARY INSTALLATION ---------------------\n"
-check HIP
+
+echo -e "$GREEN $spacef HIP LIBRARY INSTALLATION $spaceb"
+echo -e "$GREEN $spacef Please specify path for the following , skip if Invalid :$spaceb" 
+read -p "$YELLOW HIP SOURCE CODE :" HIP_SCP
+
+#if [[ -z "$HIP_SCP" ]]; then
+#    echo "No value entered"
+#else
+if [[ "$HIP_SCP" ]]; then
+    #if [ !"$(ls -A $HIP_SCP)" ]; then
+    if [ $(find $HIP_SCP -maxdepth 0 -type d -empty 2>/dev/null) ]; then
+        echo -e "$RED $spacef Specified directory is Empty. HIP header and shared object will be checked under /opt/rocm , if not found HIP will be pulled and installed !$spaceb"
+    fi
+fi
+
+check hip
 hipRepo=$?
+install=0
+
 if [ "$hipRepo" == "1" ]; then
-	echo -e "\t\t----- HIP already exists -----\n"
-else
 	echo -e "\n--------------------- CLONING HIP ---------------------\n"
 	git clone https://github.com/ROCm-Developer-Tools/HIP.git
 	cd HIP && mkdir $build_dir -p && cd $build_dir
     $cmake_it/hip .. && make && make install
+    echo -e "$YELLOW $spacef HIP already installed , Checking for the necessary files $spaceb"
+    HIPCONFIG=`find $rocmDir/hip/bin -name hipconfig -printf '%h\n' -quit`
+    if [ -n "$HIPCONFIG" ]; then
+        platform=$($rocmDir/hip/bin/hipconfig --platform)
+        HEADER=`find $rocmDir/hip -name hip_runtime.h -printf '%h\n' -quit`
+        if [ -n "$HEADER" ]; then
+            echo -e "$GREEN Found HIP Header \t: $HEADER"
+            if [ "$platform" == "hcc" ]; then
+                FILE=`find $rocmDir/hip -name libhip_hcc.so -printf '%h\n' -quit`
+                if [ -n "$FILE" ]; then
+                    echo -e "$GREEN Found HIP libs   \t: $FILE"
+                    install=1
+                fi
+            else
+                install=1
+            fi
+        else
+            echo -e "$RED $spacef Necessary files not found ! HIP will be freshly installed $spaceb"
+        fi
+    else
+        echo -e "$RED $spacef hipconfig not found ! HIP will be freshly installed $spaceb"
+    fi
+fi
+
+if [ "$install" == "0" ]; then
+    if [[ -z "$HIP_SCP" ]]; then
+        echo -e "$NC $spacef CLONING HIP $spaceb"
+        git clone https://github.com/ROCm-Developer-Tools/HIP.git
+        cd HIP
+        git reset --hard fe3e3dd09a90765613f1ff35a3ffebcb2fe98ef1
+    else
+        echo -e "$NC $spacef Installing the available Source Code $spaceb"
+        cd $HIP_SCP
+    fi
+    mkdir $build_dir -p && cd $build_dir
+    $cmake_it .. && make && sudo make install
+>>>>>>> 07b0309e92ad5d7bb96738127d8b8e0a97e8f2a4
     cd $rootDir/$externalDir
 fi
 
-export HIP_PATH="$rootDir/$externalDir/hip"
-HIP_PATH="$rootDir/$externalDir/hip"
+echo -e "$YELLOW $spacef HIP installation complete $spaceb"
+export HIP_PATH=$rocmDir/hip
 
 #platform deducing
-platform=$($rootDir/$externalDir/hip/bin/hipconfig --platform)
+
+platform=$($HIP_PATH/bin/hipconfig --platform)
+
+if [ "$platform" == "nvcc" ]; then
+	sudo mkdir -p /opt/rocm/hip/lib/cmake/hip
+	sudo cp $rootDir/hip-config.cmake /opt/rocm/hip/lib/cmake/hip
+fi
+
+#dependencies
 
 dependencies=("make" "cmake-curses-gui" "pkg-config")
 if [ "$platform" == "hcc" ]; then
@@ -84,112 +140,232 @@ for package in "${dependencies[@]}"; do
     fi
 done
 
-#extra repos for hcc
+#repos needed for AMD
+
+if [ "$platform" == "hcc" ]; then
+    repoList+=(rocBLAS MIOpenGEMM MIOpen)
+    installDir+=(rocblas miopengemm miopen)
+    libList+=(rocblas miopengemm MIOpen)
+    headerList+=(rocblas miogemm miopen)
+    scpLIST+=(rocBLAS_SCP MIOpenGEMM_SCP MIOpen_SCP)
+    commitID=("8191174dda9737a5be7eb8cd2a3618c9850e9b1a" "0eb1257cfaef83ea155aabd67af4437c0028db48" "08114baa029a519ea12b52c5274c0bd8f4ad0d26")
+fi
+
+repoList+=(rocRAND HcSPARSE hipBLAS hipDNN)
+installDir+=(hiprand hcsparse hipblas hipDNN)
+libList+=(hiprand hipsparse hipblas hipDNN)
+scpLIST+=(rocRAND_SCP HcSPARSE_SCP hipBLAS_SCP hipDNN_SCP)
+headerList+=(hiprand hipsparse hipblas hipDNN)
+commitID+=("1890bb31675a6cbaa7766e947c8e35c4d1010ad6" "2b9d9685e9886d5319a2e3a453a74394240a41fc" "c1d7bf92fab7bc9f58ff7b69299926799fb04117" "72228b27277b0e2a15d30edd6f421b2b73881ff1")
+
+echo -e "\n\n"
+
+#read source code paths
+
+declare -A pathlist
+for i in "${!repoList[@]}"
+do
+    loop=0
+    while [[ "$loop" == "0" ]]
+    do
+        read -p "$YELLOW ${repoList[$i]} Source Code Path :" pathlist[${scpLIST[$i]}]
+        if [[ "${pathlist["${scpLIST[$i]}"]}" ]] && ! [[ -e "${pathlist["${scpLIST[$i]}"]}" ]]; then
+            echo -e "$RED \n Please enter a valid directory\n"
+        else
+            if [[ "${pathlist["${scpLIST[$i]}"]}" ]]; then
+                if [ $(find "${pathlist["${scpLIST[$i]}"]}" -maxdepth 0 -type d -empty 2>/dev/null) ]; then
+                    echo -e "$RED $spacef Specified directory is Empty. HIP header and shared object will be checked under /opt/rocm , if not found HIP will be pulled and installed !$spaceb"
+                fi
+            fi
+            loop=1
+        fi
+    done
+done
+
+echo -e "\n\n"
+
 if [ "$platform" == "hcc" ]; then
 	export HIP_SUPPORT=on
 	export CXX=/opt/rocm/bin/hcc
-	repoList+=(MIOpenGEMM MIOpen)
-	installDir+=(miopengemm miopen)
-	check rocBLAS
-	rocblasRepo=$?
-	if [ "$rocblasRepo" == "1" ]; then
-		echo -e "\t\t----- rocBLAS already exists -----\n"
-	else
-		echo -e "\n--------------------- CLONING rocBLAS ---------------------\n"
-		$clone/rocBLAS.git
-		echo -e "\n--------------------- INSTALLING rocBLAS ---------------------\n"
-                cd rocBLAS && mkdir $build_dir -p && cd $build_dir
-                $cmake_it/ .. && make && make install
-                cd $rootDir/$externalDir
-	fi
-	export rocblas_DIR=$rootDir/$externalDir/rocblas/lib/cmake/rocblas
 #dependencies for miopengemm
 
-	#opencl
-	#sudo apt update
-	sudo apt install ocl-icd-opencl-dev
+    #opencl
+    #sudo apt update
+    sudo apt install ocl-icd-opencl-dev
 
-	#rocm make package
-	git clone https://github.com/RadeonOpenCompute/rocm-cmake.git
-	cd rocm-cmake
-	mkdir $build_dir -p && cd $build_dir
-	$cmake_it/ ..
-	cmake --build . --target install
-	export ROCM_DIR=$(pwd)/../share/rocm/cmake/
-	cd $rootDir/$externalDir
+    #rocm make package
+    check rocm-cmake
+    rocmcmakeRepo=$?
+    FILE=`find $rocmDir -iname ROCMConfig.cmake -print -quit`
+    if ! [ -n "$FILE" ]; then
+        git clone https://github.com/RadeonOpenCompute/rocm-cmake.git
+        cd rocm-cmake
+        mkdir $build_dir -p && cd $build_dir
+        $cmake_it/ ..
+        sudo cmake --build . --target install
+    fi
+    cd $rootDir/$externalDir
 
 #dependencies for miopen
 
-	#clang-ocl
-	git clone https://github.com/RadeonOpenCompute/clang-ocl.git
-	cd clang-ocl
-	mkdir $build_dir -p && cd $build_dir
-	$cmake_it/ ..
-	cmake --build . --target install
-	cd $rootDir/$externalDir
+    #clang-ocl
+    check clang-ocl
+    clangoclRepo=$?
+    FILE=`find $rocmDir/bin -iname clang-ocl -print -quit`
+    if ! [ -n "$FILE" ]; then
+        git clone https://github.com/RadeonOpenCompute/clang-ocl.git
+        cd clang-ocl
+        mkdir $build_dir -p && cd $build_dir
+        $cmake_it/ ..
+        sudo cmake --build . --target install
+    fi
+    cd $rootDir/$externalDir
 
-	#ssl
-	#sudo apt-get install libssl-dev
+    #ssl
+    #sudo apt-get install libssl-dev
 fi
-
-repoList+=(hipDNN)
-installDir+=("hipdnn")
 
 #cloning and install
 for i in "${!repoList[@]}"
 do
     #check if local repo exists
-    check ${repoList[$i]}
+    echo -e "$YELLOW $spacef Installing ${repoList[$i]} & Checking ${installDir[$i]} $spaceb"
+    install=0
+    check ${installDir[$i]}
     localRepo=$?
     if [ "$localRepo" == "1" ]; then
-        echo -e "\t\t----- ${repoList[$i]} already exists -----\n"
-    else
-        echo -e "\n--------------------- CLONING ${repoList[$i]} ---------------------\n"
-        $clone/${repoList[$i]}.git
-        cd ${repoList[$i]}
-        if [ "${repoList[$i]}" == "rocRAND" ]; then
-            git checkout rocm_1_7_1
+        echo -e "$YELLOW $spacef ${repoList[$i]} already installed $spaceb"
+        #cd $rocmDir/${libList[$i]}/lib
+        FILE=`find $rocmDir/${installDir[$i]} -iname lib${libList[$i]}.so -print -quit`
+        if [ -n "$FILE" ]; then
+               echo -e "$GREEN Found ${repoList[$i]} libs  \t: $FILE"
+               if [ "${repoList[$i]}" == "MIOpenGEMM" ]; then
+                   HEADER=`find $rocmDir/${installDir[$i]} -iname miogemm.hpp -print -quit`
+               else
+                   HEADER=`find $rocmDir/${installDir[$i]} \( -iname ${headerList[$i]}.h -o -iname ${headerList[$i]}.hpp \) -print -quit`
+               fi
+               if [ -n "$HEADER" ]; then
+                   echo -e "$GREEN Found ${repoList[$i]} header \t: $HEADER"
+                   install=1
+               else
+                   echo -e "$RED Broken library - header files not found. Library will be installed fresh\n"
+               fi
+        else
+               echo -e "$RED Broken library - shared object Not found.Library will be installed fresh\n"
         fi
-        echo -e "\n--------------------- INSTALLING ${repoList[$i]} ---------------------\n"
+    fi
+    if [ "$install" == "0" ]; then
+        if [[ -z "${pathlist["${scpLIST[$i]}"]}" ]]; then
+            echo -e "$NC $spacef CLONING ${repoList[$i]} $spaceb"
+            $clone/${repoList[$i]}.git
+            cd ${repoList[$i]}
+            git reset --hard ${commit[$i]}
+        else
+            echo -e "$YELLOW $spacef Installing the available Source Code $spaceb"
+            cd ${pathlist["${scpLIST[$i]}"]}
+        fi
+        echo -e "$NC $spacef INSTALLING ${repoList[$i]} $spaceb"
         if [ "${repoList[$i]}" != "hipDNN" ] && [ "${repoList[$i]}" != "MIOpen" ]; then
             mkdir $build_dir -p && cd $build_dir
-            $cmake_it/${installDir[$i]} ${build_test[$i]} .. && make && make install
-	    elif [ "${repoList[$i]}" == "MIOpen" ]; then
-	        export miopengemm_DIR=$rootDir/$externalDir/miopengemm/lib/cmake/miopengemm
+            $cmake_it .. && make -j $(nproc) && sudo make install
+        elif [ "${repoList[$i]}" == "MIOpen" ]; then
+	        #export miopengemm_DIR=$rootDir/$externalDir/miopengemm/lib/cmake/miopengemm
+            wget -O half.zip https://sourceforge.net/projects/half/files/half/1.12.0/half-1.12.0.zip/download && unzip half.zip -d half && cd half/include 
+            HALF_DIRECTORY=$(pwd)
+            cd $rootDir/$externalDir/${repoList[$i]}
             mkdir $build_dir -p && cd $build_dir
-            CXX=/opt/rocm/hcc/bin/hcc cmake -DMIOPEN_BACKEND=HIP -DCMAKE_PREFIX_PATH="/opt/rocm/hcc;${HIP_PATH}" -DCMAKE_CXX_FLAGS="-isystem /usr/include/x86_64-linux-gnu/" -DCMAKE_INSTALL_PREFIX=../../ .. && make && make install
+            CXX=/opt/rocm/hcc/bin/hcc cmake -DMIOPEN_BACKEND=HIP -DCMAKE_PREFIX_PATH="/opt/rocm/hcc;${HIP_PATH}" -DHALF_INCLUDE_DIR=$HALF_DIRECTORY -DCMAKE_CXX_FLAGS="-isystem /usr/include/x86_64-linux-gnu/" .. && make -j $(nproc) && sudo make install
         else
-            make INSTALL_DIR=../hipdnn HIP_PATH=$rootDir/$externalDir/hip MIOPEN_PATH=$rootDir/$externalDir/miopen/
+            make -j $(nproc)
         fi
         cd $rootDir/$externalDir
     fi
 done
 
-#cloning cub-hip
-cubRepo=$(echo $(pwd)/cub-hip |cut -d' ' -f1)
-if [ -d $cubRepo ]; then
-    echo -e "\t\t----- CUB-HIP already exists -----\n"
-else
+#cub-hip
+
+check cub-hip
+cubRepo=$?
+install=0
+if [ "$cubRepo" == "1" ]; then
+    echo -e "$YELLOW $spacef CUB-HIP already exists $spaceb"
+    FILE=`find $rocmDir/cub-hip -iname cub.cuh -print -quit`
+    if [ -n "$FILE" ]; then
+        echo -e "$GREEN Found cub header : $FILE \n"
+        install=1
+    else
+        echo -e "$RED Header not found. CUB will be pulled and installed fresh\n"
+    fi
+fi
+
+if [ "$install" == "0" ]; then
+    echo -e "$NC $spacef CLONING CUB-HIP $spaceb"
     git clone https://github.com/ROCmSoftwarePlatform/cub-hip.git
     cd cub-hip
     git checkout hip_port_1.7.4
     #git checkout 3effedd23f4e80ccec5d0808d8349f7d570e488e
+    sudo cp -r ../cub-hip /opt/rocm/
     cd $rootDir/$externalDir
 fi
 
 #copying shared objects
-DIRS=`ls -l --time-style="long-iso" . | egrep '^d' | awk '{print $8}'`
-for DIR in $DIRS
+
+repoList+=(hipRAND)
+installDir+=(hiprand hip)
+libList+=(hiprand)
+headerList+=(hiprand)
+
+for DIR in "${!installDir[@]}"
 do
-    cd $DIR
+    cd /opt/rocm/${installDir[$DIR]}
     SUB=`ls -l --time-style="long-iso" $MYDIR | egrep '^d' | awk '{print $8}'`
     for sub in $SUB
     do
         if [ "$sub" == "lib" ]; then
-            cp -a lib/. ../lib64/
+            sudo cp -a lib/. /opt/rocm/lib64/
         fi
     done
-    cd ..
 done
 
-echo -e "\n--------------------- HIP LIB INSTALLATION COMPLETE ---------------------\n"
+cd $rootDir
+
+#validating if all libs are installed proper
+
+echo -e "$YELLOW $spacef Validating the installation process $spaceb"
+for i in "${!repoList[@]}"
+do
+    perfect=0
+    check ${installDir[$i]}
+    localRepo=$?
+    if [ "$localRepo" == "1" ]; then
+        FILE=`find $rocmDir/${installDir[$i]} -name lib${libList[$i]}.so -print -quit`
+        if [ -n "$FILE" ]; then
+               HEADER=`find $rocmDir/${installDir[$i]} \( -name ${headerList[$i]}.h -o -name ${headerList[$i]}.hpp \) -print -quit`
+               if [ -n "$HEADER" ]; then
+                   #echo "Found ${repoList[$i]} header \t: $HEADER"
+                   echo -e "\n $GREEN ${repoList[$i]} installed properly"
+                   perfect=1
+               else
+                   echo -e "\n $RED ${repoList[$i]} Broken - header files not found."
+               fi
+        else
+               echo -e "\n $RED ${repoList[$i]}Broken - shared object Not found."
+        fi
+    fi
+
+    if [ "$perfect" == "0" ]; then
+        echo -e "\n $RED ${repoList[$i]} is not installed properly. Kindly check the error log"
+    fi
+done
+
+echo -e "$YELLOW $spacef Validation done $spaceb"
+
+echo -e "$GREEN $spacef HIP LIB INSTALLATION COMPLETE $spaceb"
+
+echo -e "\n\n $NC Do you wish to remove the cloned source repos ?"
+select choice in "Yes" "No"; do
+    case $choice in
+        Yes ) rm -rf $rootDir/$externalDir ; break;;
+        No ) exit ;;
+    esac
+done
