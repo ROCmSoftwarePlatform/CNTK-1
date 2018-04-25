@@ -97,6 +97,7 @@ fi
 if [ "$install" == "0" ]; then
     if [[ -z "$HIP_SCP" ]]; then
         echo -e "$NC $spacef CLONING HIP $spaceb"
+        rm -rf HIP
         git clone https://github.com/ROCm-Developer-Tools/HIP.git
         cd HIP
     else
@@ -249,6 +250,7 @@ do
     if [ "$install" == "0" ]; then
         if [[ -z "${pathlist["${scpLIST[$i]}"]}" ]]; then
             echo -e "$NC $spacef CLONING ${repoList[$i]} $spaceb"
+            rm -rf ${repoList[$i]}
             $clone/${repoList[$i]}.git
             cd ${repoList[$i]}
         else
