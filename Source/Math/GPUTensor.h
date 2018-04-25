@@ -18,8 +18,6 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
   template<typename T>
     class Magic_wrapper {
-        // TODO: this is temporary, and it has the unpleasant property of
-        //       leaking memory.
         T* p_ = nullptr;
     public:
         Magic_wrapper() = default;
@@ -31,9 +29,20 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 
  #define SIZEOF(object) (char *)(&object+1) - (char *)(&object)
 
-            std::cout << SIZEOF(x) << std::endl;
+            std::cout << sizeof(x) << std::endl;
 
             hipHostMalloc(&p_, SIZEOF(x)); new (p_) T{x};  //sizeof(T)
+            std::cout<<"Magic wrapped object allocated "<<this->p_<<std::endl;
+        }
+
+        ~Magic_wrapper() {
+        	size_t deallocateSize = 0;;
+        	std::cout<<"Attempting to deallocate pointer\t"<<this->p_<<std::endl;
+        	hipMemPtrGetInfo(p_, &deallocateSize);
+        	std::cout<<"deallocate Size\t"<<deallocateSize<<std::endl;
+        	if (deallocateSize > 0) {
+        	   //ipHostFree(p_);
+        	}
         }
 
         operator const T&() const [[hc]] { return p_[0]; }
