@@ -14,6 +14,7 @@ using namespace Microsoft::MSR::CNTK;
 
 namespace Microsoft { namespace MSR { namespace CNTK { namespace Test {
 
+#ifdef __HIP_ENABLE_HALF__
 // Tests from GPUMatrixCudaBlasTests.cpp
 BOOST_AUTO_TEST_SUITE(Half_GPUMatrixSuite)
 
@@ -974,6 +975,7 @@ BOOST_FIXTURE_TEST_CASE(GPUMatrixFileWriteRead, RandomSeedFixture)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
+#endif // __HIP_ENABLE_HALF__
 
 }
 } } }

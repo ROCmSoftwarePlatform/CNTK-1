@@ -461,12 +461,16 @@ void ComputationNetwork::InitLearnableParameters(const ComputationNodeBasePtr& n
                                                  bool initOnCPUOnly /*= false*/) const
 {
     randomSeed += GetRandomSeedOffset();
+#ifdef __HIP_ENABLE_HALF__
     if (TryPostInitParameters<float> (node, initString, initValue, randomSeed, initOnCPUOnly) ||
         TryPostInitParameters<double>(node, initString, initValue, randomSeed, initOnCPUOnly) ||
-#ifdef __HIP_ENABLE_HALF__
         TryPostInitParameters<half>  (node, initString, initValue, randomSeed, initOnCPUOnly))
-#endif /*__HIP_ENABLE_HALF__*/
     	return;
+#else  //__HIP_ENABLE_HALF__
+    if (TryPostInitParameters<float> (node, initString, initValue, randomSeed, initOnCPUOnly) ||
+        TryPostInitParameters<double>(node, initString, initValue, randomSeed, initOnCPUOnly))
+    	return;
+#endif /*__HIP_ENABLE_HALF__*/
     LogicError("InitLearnableParameters: Input node is not a LearnableParameter<float or double or half>");
 }
 
@@ -701,7 +705,8 @@ void ComputationNetwork::SetSeqParam(ComputationNetworkPtr net,
             auto nodeh = dynamic_pointer_cast<ConvolutionNode<half>>(*nodeIter);
             if (nodeh)
                 nodeh->SetmMaxTempMemSizeInSamples(maxTempMemSizeInSamples);
-#endif /*__HIP_ENABLE_HALF__*/        }
+#endif /*__HIP_ENABLE_HALF__*/        
+        }
     }
 }
 
@@ -1578,9 +1583,7 @@ template void ComputationNetwork::ReadPersistableParameters<half>(size_t modelVe
 template void ComputationNetwork::PerformSVDecomposition<half>(const map<wstring, float>& SVDConfig, size_t alignedsize);
 template /*static*/ void ComputationNetwork::SetBatchNormalizationTimeConstants<half>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double normalizationTimeConstant, double& prevNormalizationTimeConstant, double blendTimeConstant, double& prevBlendTimeConstant);
 template void ComputationNetwork::SetSeqParam<half>(ComputationNetworkPtr net, const ComputationNodeBasePtr criterionNode, const double& hsmoothingWeight, const double& frameDropThresh, const bool& doreferencealign,
-#endif /*__HIP_ENABLE_HALF__*/
 		const double& amf, const double& lmf, const double& wp, const double& bMMIfactor, const bool& sMBR);
-#ifdef __HIP_ENABLE_HALF__
 template void ComputationNetwork::SaveToDbnFile<half>(ComputationNetworkPtr net, const std::wstring& fileName) const;
 #endif /*__HIP_ENABLE_HALF__*/
 

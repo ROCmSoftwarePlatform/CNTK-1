@@ -378,11 +378,13 @@ namespace CNTK
                 if (!ReadData<double>(wrapper, dst))
                     return false;                
             }
+#ifdef __HIP_ENABLE_HALF__
             else if (dst.GetDataType() == DataType::Float16)
             {
                 if (!ReadData<float, float16>(wrapper, dst))
                     return false;
             }
+#endif
         }
         return true;
     }

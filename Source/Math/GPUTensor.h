@@ -53,7 +53,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
   {
     return Magic_wrapper<T>{x};
   }
-  #define reference_to_const(...) __VA_ARGS__ const&
+  #define reference_to_const(...) __VA_ARGS__ &
 #else
   #define make_magic_wrapper(x) x
   #define reference_to_const(...) __VA_ARGS__

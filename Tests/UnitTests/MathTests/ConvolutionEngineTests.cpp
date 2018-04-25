@@ -84,6 +84,7 @@ size_t CountNans(const SingleMatrix& src)
     return n;
 }
 
+#ifdef __HIP_ENABLE_HALF__
 size_t CountNans(const HalfMatrix& src)
 {
     size_t n = 0;
@@ -93,6 +94,7 @@ size_t CountNans(const HalfMatrix& src)
     }
     return n;
 }
+#endif
 
 // Returns vector of engine config parameters: <kind, device, maxTempMemSizeInSamples>
 std::vector<std::tuple<ConvolutionEngineKind, DEVICEID_TYPE, size_t>> GetTestEngineConfigs()

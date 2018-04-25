@@ -1373,9 +1373,12 @@ void Matrix<ElemType>::CastAssignValuesOf(const MatrixBase& other) /*override*/ 
     const Matrix<double> * otherd = dynamic_cast<const Matrix<double>*>(&other);
 #ifdef __HIP_ENABLE_HALF__
     const Matrix<half> * otherh = dynamic_cast<const Matrix<half>*>(&other);
-#endif //__HIP_ENABLE_HALF__
     if (!otherf && !otherd && !otherh)
         LogicError("CastAssignValuesOf: Only accepts float, double and half matrices.");
+#else
+    if (!otherf && !otherd)
+        LogicError("CastAssignValuesOf: Only accepts float and double.");
+#endif //__HIP_ENABLE_HALF__
 
     DISPATCH_MATRIX_ON_FLAG(
         this,
@@ -1383,7 +1386,9 @@ void Matrix<ElemType>::CastAssignValuesOf(const MatrixBase& other) /*override*/ 
         {
             if (otherf) DoCastAssignValuesOf(*this, *otherf);
             if (otherd) DoCastAssignValuesOf(*this, *otherd);
+#ifdef __HIP_ENABLE_HALF__
             if (otherh) DoCastAssignValuesOf(*this, *otherh);
+#endif
         },
         {
             if (otherf) m_GPUMatrix->template CastAssignValuesOf<float>(otherf->m_GPUMatrix.get());
@@ -1395,7 +1400,9 @@ void Matrix<ElemType>::CastAssignValuesOf(const MatrixBase& other) /*override*/ 
         {
             if (otherf) DoCastAssignValuesOf(*this, *otherf);
             if (otherd) DoCastAssignValuesOf(*this, *otherd);
+#ifdef __HIP_ENABLE_HALF__
             if (otherh) DoCastAssignValuesOf(*this, *otherh);
+#endif //__HIP_ENABLE_HALF__
         },
         {
             if (otherf) m_GPUSparseMatrix->template DeepCast<float>(*otherf->m_GPUSparseMatrix);

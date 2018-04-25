@@ -1293,6 +1293,7 @@ template void TensorOpN<double, 4>(double beta, array<double*, 4> pointers, doub
                                    const array<size_t, 4>& offsets,
                                    const SmallVector<size_t>& regularOpDims, const array<SmallVector<ptrdiff_t>, 4>& regularStrides,
                                    const SmallVector<size_t>& reducingOpDims, const array<SmallVector<ptrdiff_t>, 4>& reducingStrides);
+#ifdef __HIP_ENABLE_HALF__
 template void TensorOpN<half, 2>(half beta, array<half*, 2> pointers, half alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
                                   const array<size_t, 2>& offsets,
                                   const SmallVector<size_t>& regularOpDims, const array<SmallVector<ptrdiff_t>, 2>& regularStrides,
@@ -1305,11 +1306,13 @@ template void TensorOpN<half, 4>(half beta, array<half*, 4> pointers, half alpha
                                   const array<size_t, 4>& offsets,
                                   const SmallVector<size_t>& regularOpDims, const array<SmallVector<ptrdiff_t>, 4>& regularStrides,
                                   const SmallVector<size_t>& reducingOpDims, const array<SmallVector<ptrdiff_t>, 4>& reducingStrides);
-
+#endif //__HIP_ENABLE_HALF__
 
 template void LaunchUnaryTensorOp(float beta, const float* pa, float* pb, float alpha, ElementWiseOperator op, size_t regularOpDim);
 template void LaunchUnaryTensorOp(double beta, const double* pa, double* pb, double alpha, ElementWiseOperator op, size_t regularOpDim);
+#ifdef __HIP_ENABLE_HALF__
 template void LaunchUnaryTensorOp(half beta, const half* pa, half* pb, half alpha, ElementWiseOperator op, size_t regularOpDim);
+#endif //__HIP_ENABLE_HALF__
 
 }}}
 

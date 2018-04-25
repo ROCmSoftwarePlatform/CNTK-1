@@ -106,7 +106,6 @@ DECL int fabs_(int v) {
 }
 
 #ifdef __HIP_ENABLE_HALF__
-
 DECL half cos_(half v) {
 #if __CUDA_ARCH__ >= 700 || __CUDA_ARCH__ == 600
     return hcos(v);
@@ -143,6 +142,8 @@ DECL bool isnan_(float v) {
 DECL bool isnan_(double v) {
     return v != v;
 }
+
+#ifdef __HIP_ENABLE_HALF__
 DECL bool isnan_(half v) {
 #if __CUDA_ARCH__ >= 700 || __CUDA_ARCH__ == 600
     return __hisnan(v);
@@ -150,12 +151,18 @@ DECL bool isnan_(half v) {
     return v != v;
 #endif
 }
+#endif
 
 
 // max/min
 DECL float max(float a, float b) {
     return fmaxf(a,b);
 }
+
+DECL float min(float a, float b) {
+    return fminf(a,b);
+}
+
 #ifdef __HIP_ENABLE_HALF__
 DECL half max(half a, half b) {
     return (float)a > (float)b ? a : b;
@@ -165,9 +172,6 @@ DECL float max(float a, half b) {
 }
 DECL float max(half a, float b) {
     return (float)a > b ? (float)a : b;
-}
-DECL float min(float a, float b) {
-    return fminf(a,b);
 }
 DECL half min(half a, half b) {
     return (float)a < (float)b ? a : b;
@@ -184,7 +188,8 @@ DECL half rsqrt_(half v) {
     return half(rsqrtf((float)v));
 #endif
 }
-#ifdef __HIP_ENABLE_HALF__
+#endif __HIP_ENABLE_HALF__
+
 DECL float rsqrt_(float v) {
     return rsqrtf(v);
 }
@@ -221,7 +226,7 @@ OverloadBinaryMathFns(pow);
 DECL half pow_(half v,  half e) {
     return half(powf((float)v , (float)e));     //TODO: Improve efficiency?
 }
-#ifdef __HIP_ENABLE_HALF__
+#endif // __HIP_ENABLE_HALF__
 
 template<typename T>
 DECL T safepow_(T base, T exponent)

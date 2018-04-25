@@ -941,7 +941,9 @@ namespace CNTK
 
     template std::shared_ptr<Matrix<float>> NDArrayView::GetWritableMatrix<float>(size_t rowColSplitPoint/* = AutoSelectRowColSplitPoint*/);
     template std::shared_ptr<Matrix<double>> NDArrayView::GetWritableMatrix<double>(size_t rowColSplitPoint/* = AutoSelectRowColSplitPoint*/);
+#ifdef __HIP_ENABLE_HALF__
     template std::shared_ptr<Matrix<half>> NDArrayView::GetWritableMatrix<half>(size_t rowColSplitPoint/* = AutoSelectRowColSplitPoint*/);
+#endif
     template TensorView<float>* NDArrayView::GetWritableTensorView<float>();
     template TensorView<double>* NDArrayView::GetWritableTensorView<double>();
 #ifdef __HIP_ENABLE_HALF__
