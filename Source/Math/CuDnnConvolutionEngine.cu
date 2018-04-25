@@ -730,14 +730,11 @@ private:
                 
                 auto res = algoPerf;        // first returned algorithm is the fastest
                 algo.RecordAlgoBatchSizeWorkspaceSize(true, (*res).algo, batchSize, (*res).memory);
-		        hipdnnMathType_t hipMT;
 #ifdef __HIP_PLATFORM_NVCC__
-		        HIPDNN_CALL(convertType((*res).mathType, &hipMT));
+                algo.AlgoMathType = (*res).mathType;
 #elif defined __HIP_PLATFORM_HCC__
-                hipMT = HIPDNN_DEFAULT_MATH; //TODO: PRAS_AMD
+                algo.AlgoMathType = HIPDNN_DEFAULT_MATH; //TODO: PRAS_AMD
 #endif
-                
-                algo.AlgoMathType = hipMT;
                 algo.autotuningState = AutotuningState::Running;
                 if (algo.MaxAlgoWorkspaceSize < curSize)   // need to shrink the workspace
                     workspace.Resize((curSize + sizeof(ElemType) - 1) / sizeof(ElemType), 1, 0, false);
@@ -755,13 +752,11 @@ private:
                     assert(calgo > 0);
                     auto res = algoPerf;    // first returned algorithm is the fastest
                     algo.RecordAlgoBatchSizeWorkspaceSize(true, (*res).algo, batchSize, (*res).memory);
-		            hipdnnMathType_t hipMT;
 #ifdef __HIP_PLATFORM_NVCC__
-                    HIPDNN_CALL(convertType((*res).mathType, &hipMT));
+                    algo.AlgoMathType = (*res).mathType;
 #elif defined __HIP_PLATFORM_HCC__
-                    hipMT = HIPDNN_DEFAULT_MATH; //TODO: PRAS_AMD
+                    algo.AlgoMathType = HIPDNN_DEFAULT_MATH; //TODO: PRAS_AMD
 #endif
-                    algo.AlgoMathType = hipMT;
                     algo.autotuningState = AutotuningState::Running;
                 }
                 catch (...)
