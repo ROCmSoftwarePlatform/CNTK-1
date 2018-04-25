@@ -355,10 +355,12 @@ echo -e "$YELLOW $spacef Validation done $spaceb"
 
 echo -e "$GREEN $spacef HIP LIB INSTALLATION COMPLETE $spaceb"
 
-echo -e "\n\n $NC Do you wish to remove the cloned source repos ?"
-select choice in "Yes" "No"; do
+while [[ 1 ]]
+do
+    read -p "$NC Do you wish to remove the cloned source repos ? [ Yes / No ] " choice
     case $choice in
-        Yes ) rm -rf $rootDir/$externalDir ; break;;
-        No ) exit ;;
+        [Yy][eE][sS] | [y] ) rm -rf $rootDir/$externalDir ; echo -e "$GREEN $spacef Repos removed $spaceb" ; break;;
+        [Nn][Oo] | [n] ) echo -e "$GREEN $spacef Repos not removed $spaceb" ; break;;
+        * ) echo -e "$RED $spacef Invalid Input - Enter either Yes / No $spaceb $NC" ;;
     esac
 done
