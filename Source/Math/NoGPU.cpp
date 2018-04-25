@@ -785,7 +785,9 @@ template class MATH_API GPUSparseMatrix<short>;
 template class MATH_API GPUSparseMatrix<char>;
 template class MATH_API GPUSparseMatrix<float>;
 template class MATH_API GPUSparseMatrix<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class MATH_API GPUSparseMatrix<half>;
+#endif //__HIP_ENABLE_HALF__
 template class MATH_API GPUSparseMatrix<int>;
 
 template <typename ElemType>
@@ -796,8 +798,9 @@ MATH_API File& operator>>(File& stream, GPUSparseMatrix<ElemType>& us)
 
 template MATH_API File& operator>>(File& stream, GPUSparseMatrix<float>& us);
 template MATH_API File& operator>>(File& stream, GPUSparseMatrix<double>& us);
+#ifdef __HIP_ENABLE_HALF__
 template MATH_API File& operator>>(File& stream, GPUSparseMatrix<half>& us);
-
+#endif //__HIP_ENABLE_HALF__
 template <typename ElemType>
 MATH_API File& operator<<(File& stream, const GPUSparseMatrix<ElemType>& us)
 {
@@ -805,8 +808,9 @@ MATH_API File& operator<<(File& stream, const GPUSparseMatrix<ElemType>& us)
 }
 template MATH_API File& operator<<(File& stream, const GPUSparseMatrix<float>& us);
 template MATH_API File& operator<<(File& stream, const GPUSparseMatrix<double>& us);
+#ifdef __HIP_ENABLE_HALF__
 template MATH_API File& operator<<(File& stream, const GPUSparseMatrix<half>& us);
-
+#endif //__HIP_ENABLE_HALF__
 #pragma region DeviceBoundNumber class
 
 template <class ElemType>
@@ -2469,11 +2473,15 @@ template class GPUMatrix<short>;
 template class GPUMatrix<char>;
 template class GPUMatrix<float>;
 template class GPUMatrix<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class GPUMatrix<half>;
+#endif //__HIP_ENABLE_HALF__
 template class GPUMatrix<int>;
 template class DeviceBoundNumber<float>;
 template class DeviceBoundNumber<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class DeviceBoundNumber<half>;
+#endif //__HIP_ENABLE_HALF__
 template MatrixQuantizerGPU<float>::~MatrixQuantizerGPU();
 template MatrixQuantizerGPU<double>::~MatrixQuantizerGPU();
 template void MatrixQuantizerGPU<float>::QuantizeAsync(const Matrix<float>&, const Matrix<float>&, QuantizedMatrix<float>&, Matrix<float>&, bool);
@@ -2481,59 +2489,84 @@ template void MatrixQuantizerGPU<double>::QuantizeAsync(const Matrix<double>&, c
 
 template void GPUMatrix<char>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<char>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
+#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<char>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
+#endif //__HIP_ENABLE_HALF__
 template void GPUMatrix<short>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<short>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
+#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<short>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
+#endif //__HIP_ENABLE_HALF__
 template void GPUMatrix<int>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<int>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
+#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<int>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
+#endif //__HIP_ENABLE_HALF__
 template void GPUMatrix<float>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<float>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
+#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<float>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
+#endif //__HIP_ENABLE_HALF__
 template void GPUMatrix<double>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<double>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
+#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<double>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
 template void GPUMatrix<half>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<half>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
 template void GPUMatrix<half>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
-
+#endif //__HIP_ENABLE_HALF__
 template void GPUMatrix<float>::AdaDelta<float>(GPUMatrix<float>& gradients, GPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon);
 template void GPUMatrix<double>::AdaDelta<double>(GPUMatrix<double>& gradients, GPUMatrix<double>& functionValues, double learningRate, double rho, double epsilon);
+#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<float>::AdaDelta<half>(GPUMatrix<half>& gradients, GPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon);
+#endif //__HIP_ENABLE_HALF__
 
 template void GPUMatrix<float>::BatchNormalizationForward(const GPUMatrix<float>& scale, const GPUMatrix<float>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, GPUMatrix<float>& runMean, GPUMatrix<float>& runVariance, GPUMatrix<float>& out, double epsilon, GPUMatrix<float>& saveMean, GPUMatrix<float>& saveInvStdDev) const;
 template void GPUMatrix<double>::BatchNormalizationForward(const GPUMatrix<double>& scale, const GPUMatrix<double>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, GPUMatrix<double>& runMean, GPUMatrix<double>& runVariance, GPUMatrix<double>& out, double epsilon, GPUMatrix<double>& saveMean, GPUMatrix<double>& saveInvStdDev) const;
+#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<half>::BatchNormalizationForward(const GPUMatrix<float>& scale, const GPUMatrix<float>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, GPUMatrix<float>& runMean, GPUMatrix<float>& runVariance, GPUMatrix<half>& out, double epsilon, GPUMatrix<float>& saveMean, GPUMatrix<float>& saveInvStdDev) const;
+#endif //__HIP_ENABLE_HALF__
 
 template void GPUMatrix<float>::BatchNormalizationBackward(const GPUMatrix<float>& in, GPUMatrix<float>& grad, const GPUMatrix<float>& scale, double blendFactor, const GPUMatrix<float>& saveMean, const GPUMatrix<float>& saveInvStdDev, GPUMatrix<float>& scaleGrad, GPUMatrix<float>& biasGrad) const;
 template void GPUMatrix<double>::BatchNormalizationBackward(const GPUMatrix<double>& in, GPUMatrix<double>& grad, const GPUMatrix<double>& scale, double blendFactor, const GPUMatrix<double>& saveMean, const GPUMatrix<double>& saveInvStdDev, GPUMatrix<double>& scaleGrad, GPUMatrix<double>& biasGrad) const;
-template void GPUMatrix<half>::BatchNormalizationBackward(const GPUMatrix<half>& in, GPUMatrix<half>& grad, const GPUMatrix<float>& scale, double blendFactor, const GPUMatrix<float>& saveMean, const GPUMatrix<float>& saveInvStdDev, GPUMatrix<float>& scaleGrad, GPUMatrix<float>& biasGrad) const;
 
+#ifdef __HIP_ENABLE_HALF__
+template void GPUMatrix<half>::BatchNormalizationBackward(const GPUMatrix<half>& in, GPUMatrix<half>& grad, const GPUMatrix<float>& scale, double blendFactor, const GPUMatrix<float>& saveMean, const GPUMatrix<float>& saveInvStdDev, GPUMatrix<float>& scaleGrad, GPUMatrix<float>& biasGrad) const;
+#endif //__HIP_ENABLE_HALF__
 
 template void GPUSparseMatrix<char>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<char>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
+#ifdef __HIP_ENABLE_HALF__
 template void GPUSparseMatrix<char>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
+#endif //__HIP_ENABLE_HALF__
 template void GPUSparseMatrix<short>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<short>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
-template void GPUSparseMatrix<short>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
-template void GPUSparseMatrix<int>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
+#ifdef __HIP_ENABLE_HALF__
+ void GPUSparseMatrix<short>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
+#endif //__HIP_ENABLE_HALF__
+ template void GPUSparseMatrix<int>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<int>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
+#ifdef __HIP_ENABLE_HALF__
 template void GPUSparseMatrix<int>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
+#endif //__HIP_ENABLE_HALF__
 template void GPUSparseMatrix<float>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<float>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
+#ifdef __HIP_ENABLE_HALF__
 template void GPUSparseMatrix<float>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
+#endif //__HIP_ENABLE_HALF__
 template void GPUSparseMatrix<double>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<double>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
+#ifdef __HIP_ENABLE_HALF__
 template void GPUSparseMatrix<double>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
 template void GPUSparseMatrix<half>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<half>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
 template void GPUSparseMatrix<half>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
-
+#endif //__HIP_ENABLE_HALF__
 template void GPUSparseMatrix<float>::AdaDelta<float>(GPUMatrix<float>&c, GPUMatrix<float>&functionValues, float learningRate, float rho, float epsilon, int* timestamps, int currentTimestamp);
 template void GPUSparseMatrix<double>::AdaDelta<double>(GPUMatrix<double>&c, GPUMatrix<double>&functionValues, double learningRate, double rho, double epsilon, int* timestamps, int currentTimestamp);
+#ifdef __HIP_ENABLE_HALF__
 template void GPUSparseMatrix<half>::AdaDelta<float>(GPUMatrix<float>&c, GPUMatrix<float>&functionValues, float learningRate, float rho, float epsilon, int* timestamps, int currentTimestamp);
-
+#endif //__HIP_ENABLE_HALF__
 template <class ElemType>
 hipblasHandle_t GPUMatrix<ElemType>::s_cuHandle[GPUMatrix<ElemType>::MaxGpus] = {0};
 
@@ -2555,7 +2588,9 @@ bool CuDnnConvolutionEngineFactory<ElemType>::IsSupported(DEVICEID_TYPE, Convolv
 
 template class CuDnnConvolutionEngineFactory<float>;
 template class CuDnnConvolutionEngineFactory<double>;
+#ifdef __HIP_ENABLE_HALF__
 template class CuDnnConvolutionEngineFactory<half>;
+#endif //__HIP_ENABLE_HALF__
 
 template <class InoutType, class StatType>
 std::unique_ptr<BatchNormEngine<InoutType, StatType>> CuDnnBatchNormEngineFactory<InoutType, StatType>::Create(DEVICEID_TYPE deviceId, const TensorShape& inOutT,
@@ -2566,7 +2601,9 @@ std::unique_ptr<BatchNormEngine<InoutType, StatType>> CuDnnBatchNormEngineFactor
 
 template class CuDnnBatchNormEngineFactory<float, float>;
 template class CuDnnBatchNormEngineFactory<double, double>;
+#ifdef __HIP_ENABLE_HALF__
 template class CuDnnBatchNormEngineFactory<half, float>;
+#endif //__HIP_ENABLE_HALF__
 
 CudaTimer::~CudaTimer()
 {

@@ -21,10 +21,17 @@
 
 namespace Microsoft { namespace MSR { namespace CNTK { namespace Test {
 using vec = std::vector<float>;
-//using vecHalf = std::vector<half>;
+
+#ifdef __HIP_ENABLE_HALF
+using vecHalf = std::vector<half>;
+#endif //__HIP_ENABLE_HALF__
 
 using ConvEng = ConvolutionEngine<float>;
+#ifdef __HIP_ENABLE_HALF__
 using ConvEngHalf = ConvolutionEngine<half>;
+#endif //__HIP_ENABLE_HALF__
+
+#ifdef __HIP_ENABLE_HALF__
 void CopyVecFromFloatToHalf(vec& from, vecHalf& to)
 {
     to.resize(from.size());
@@ -36,6 +43,8 @@ void CopyVecFromHalfToFloat(vecHalf& from, vec& to)
     to.resize(from.size());
     for(int i=0; i<from.size(); i++) to[i] = (float)from[i];
 }
+#endif //__HIP_ENABLE_HALF__
+
 bool AreEqual(float a, float b, float maxRelError, float maxAbsError)
 {
     float diff = std::abs(a - b);
@@ -54,6 +63,7 @@ bool AreEqual(double a, double b, double maxRelError, double maxAbsError)
     return diff < largest * maxRelError;
 }
 
+#ifdef __HIP_ENABLE_HALF__
 bool AreEqual(float a, half b, float maxRelError, float maxAbsError)
 {
     float diff = std::abs(a - (float)b);
@@ -62,6 +72,7 @@ bool AreEqual(float a, half b, float maxRelError, float maxAbsError)
     float largest = std::max(std::abs(a), std::abs((float)b));
     return diff < largest * maxRelError;
 }
+#endif
 
 size_t CountNans(const SingleMatrix& src)
 {
@@ -718,6 +729,9 @@ BOOST_AUTO_TEST_CASE(MaxUnpooling)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+
+#ifdef __HIP_ENABLE_HALF__
+
 BOOST_AUTO_TEST_SUITE(Half_ConvolutionSuite)
 
 BOOST_AUTO_TEST_CASE(ConvolutionForward)
@@ -1147,6 +1161,6 @@ BOOST_AUTO_TEST_CASE(PoolingBackward)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-#endif
+#endif //__HIP_ENABLE_HALF__
 
 } } } }
