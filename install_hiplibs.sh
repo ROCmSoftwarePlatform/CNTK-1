@@ -70,10 +70,6 @@ hipRepo=$?
 install=0
 
 if [ "$hipRepo" == "1" ]; then
-	echo -e "\n--------------------- CLONING HIP ---------------------\n"
-	git clone https://github.com/ROCm-Developer-Tools/HIP.git
-	cd HIP && mkdir $build_dir -p && cd $build_dir
-    $cmake_it/hip .. && make && make install
     echo -e "$YELLOW $spacef HIP already installed , Checking for the necessary files $spaceb"
     HIPCONFIG=`find $rocmDir/hip/bin -name hipconfig -printf '%h\n' -quit`
     if [ -n "$HIPCONFIG" ]; then
@@ -109,7 +105,6 @@ if [ "$install" == "0" ]; then
     fi
     mkdir $build_dir -p && cd $build_dir
     $cmake_it .. && make && sudo make install
->>>>>>> 07b0309e92ad5d7bb96738127d8b8e0a97e8f2a4
     cd $rootDir/$externalDir
 fi
 
