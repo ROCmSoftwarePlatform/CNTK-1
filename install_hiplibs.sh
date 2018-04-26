@@ -9,7 +9,7 @@ mkdir ${externalDir} -p
 cd ${externalDir}
 cur_dir=$(pwd)
 
-RED=$(tput setaf 1) GREEN=$(tput setaf 2) YELLOW=$(tput setaf 3) NC=$(tput sgr0) #output colours
+RED=$(tput setaf 1) GREEN=$(tput setaf 2) NC=$(tput sgr0) #output colours
 
 clone="git clone https://github.com/ROCmSoftwarePlatform"
 
@@ -52,8 +52,8 @@ check()
 #HIP installation
 
 echo -e "$GREEN $spacef HIP LIBRARY INSTALLATION $spaceb"
-echo -e "$GREEN $spacef Please specify path for the following , skip if Invalid :$spaceb" 
-read -p "$YELLOW HIP SOURCE CODE :" HIP_SCP
+echo -e "$GREEN Please specify the local source code path. Press [ENTER] to skip :\n" 
+read -p "$NC HIP SOURCE CODE :" HIP_SCP
 
 #if [[ -z "$HIP_SCP" ]]; then
 #    echo "No value entered"
@@ -70,7 +70,7 @@ hipRepo=$?
 install=0
 
 if [ "$hipRepo" == "1" ]; then
-    echo -e "$YELLOW $spacef HIP already installed , Checking for the necessary files $spaceb"
+    echo -e "$NC $spacef HIP already installed , Checking for the necessary files $spaceb"
     HIPCONFIG=`find $rocmDir/hip/bin -name hipconfig -printf '%h\n' -quit`
     if [ -n "$HIPCONFIG" ]; then
         platform=$($rocmDir/hip/bin/hipconfig --platform)
@@ -109,7 +109,7 @@ if [ "$install" == "0" ]; then
     cd $rootDir/$externalDir
 fi
 
-echo -e "$YELLOW $spacef HIP installation complete $spaceb"
+echo -e "$NC $spacef HIP installation complete $spaceb"
 export HIP_PATH=$rocmDir/hip
 
 #platform deducing
@@ -161,7 +161,7 @@ do
     loop=0
     while [[ "$loop" == "0" ]]
     do
-        read -p "$YELLOW ${repoList[$i]} Source Code Path :" pathlist[${scpLIST[$i]}]
+        read -p "$NC ${repoList[$i]} Source Code Path :" pathlist[${scpLIST[$i]}]
         if [[ "${pathlist["${scpLIST[$i]}"]}" ]] && ! [[ -e "${pathlist["${scpLIST[$i]}"]}" ]]; then
             echo -e "$RED \n Please enter a valid directory\n"
         else
@@ -222,12 +222,12 @@ fi
 for i in "${!repoList[@]}"
 do
     #check if local repo exists
-    echo -e "$YELLOW $spacef Installing ${repoList[$i]} & Checking ${installDir[$i]} $spaceb"
+    echo -e "$NC $spacef Installing ${repoList[$i]} & Checking ${installDir[$i]} $spaceb"
     install=0
     check ${installDir[$i]}
     localRepo=$?
     if [ "$localRepo" == "1" ]; then
-        echo -e "$YELLOW $spacef ${repoList[$i]} already installed $spaceb"
+        echo -e "$NC $spacef ${repoList[$i]} already installed $spaceb"
         #cd $rocmDir/${libList[$i]}/lib
         FILE=`find $rocmDir/${installDir[$i]} -iname lib${libList[$i]}.so -print -quit`
         if [ -n "$FILE" ]; then
@@ -254,7 +254,7 @@ do
             $clone/${repoList[$i]}.git
             cd ${repoList[$i]}
         else
-            echo -e "$YELLOW $spacef Installing the available Source Code $spaceb"
+            echo -e "$NC $spacef Installing the available Source Code $spaceb"
             cd ${pathlist["${scpLIST[$i]}"]}
         fi
         echo -e "$NC $spacef INSTALLING ${repoList[$i]} $spaceb"
@@ -281,7 +281,7 @@ check cub-hip
 cubRepo=$?
 install=0
 if [ "$cubRepo" == "1" ]; then
-    echo -e "$YELLOW $spacef CUB-HIP already exists $spaceb"
+    echo -e "$NC $spacef CUB-HIP already exists $spaceb"
     FILE=`find $rocmDir/cub-hip -iname cub.cuh -print -quit`
     if [ -n "$FILE" ]; then
         echo -e "$GREEN Found cub header : $FILE \n"
@@ -324,7 +324,7 @@ cd $rootDir
 
 #validating if all libs are installed proper
 
-echo -e "$YELLOW $spacef Validating the installation process $spaceb"
+echo -e "$NC $spacef Validating the installation process $spaceb"
 for i in "${!repoList[@]}"
 do
     perfect=0
@@ -351,7 +351,7 @@ do
     fi
 done
 
-echo -e "$YELLOW $spacef Validation done $spaceb"
+echo -e "$NC $spacef Validation done $spaceb"
 
 echo -e "$GREEN $spacef HIP LIB INSTALLATION COMPLETE $spaceb"
 
@@ -359,8 +359,8 @@ while [[ 1 ]]
 do
     read -p "$NC Do you wish to remove the cloned source repos ? [ Yes / No ] " choice
     case $choice in
-        [Yy][eE][sS] | [y] ) rm -rf $rootDir/$externalDir ; echo -e "$GREEN $spacef Repos removed $spaceb" ; break;;
-        [Nn][Oo] | [n] ) echo -e "$GREEN $spacef Repos not removed $spaceb" ; break;;
+        [Yy][eE][sS] | [y] ) rm -rf $rootDir/$externalDir ; echo -e "$GREEN $spacef Repos removed $spaceb $NC" ; break;;
+        [Nn][Oo] | [n] ) echo -e "$GREEN $spacef Repos not removed $spaceb $NC" ; break;;
         * ) echo -e "$RED $spacef Invalid Input - Enter either Yes / No $spaceb $NC" ;;
     esac
 done
