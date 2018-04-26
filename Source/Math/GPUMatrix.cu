@@ -2993,11 +2993,14 @@ void GPUMatrix<ElemType>::VectorMax(GPUMatrix<ElemType>& maxIndexes, GPUMatrix<E
     // Determine temp buffer size needed for SortPairsDescending to sort values on the first pass.
     size_t cbtemp = 0;
     // If first param is nullptr then no actual work is done except writing result to cbtemp.
+#ifdef __HIP_ENABLE_CUB__
     CUDA_CALL(SortPairsDescending(nullptr, cbtemp, inVal, outVal1, inIdx, outIdx, celt, 0, sizeof(ElemType) * 8, t_stream));
+#endif /*__HIP_ENABLE_CUB__*/
     size_t ctemp1 = (cbtemp + sizeof(ElemType) - 1) / sizeof(ElemType);
     cbtemp = 0;
-    //CUDA_CALL(hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairs(nullptr, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream)));
-    //CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
+#ifdef __HIP_ENABLE_CUB__
+    CUDA_CALL(cub::DeviceRadixSort::SortPairs(nullptr, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
+#endif /*__HIP_ENABLE_CUB__*/
     size_t ctemp2 = (cbtemp + sizeof(ElemType) - 1) / sizeof(ElemType);
     size_t ctemp = std::max(ctemp1, ctemp2);
     cbtemp = ctemp * sizeof(ElemType);
@@ -3023,10 +3026,13 @@ void GPUMatrix<ElemType>::VectorMax(GPUMatrix<ElemType>& maxIndexes, GPUMatrix<E
     int cblock = (celt + ThreadsPerBlock - 1) / ThreadsPerBlock;
     hipLaunchKernelGGL((_initIndicesForSort), dim3(cblock), dim3(ThreadsPerBlock), 0, t_stream, inIdx, m, n);
     // Sort by values.
+#ifdef __HIP_ENABLE_CUB__
     CUDA_CALL(SortPairsDescending(ptmp, cbtemp, inVal, outVal1, inIdx, outIdx, celt, 0, sizeof(ElemType) * 8, t_stream));
+#endif /*__HIP_ENABLE_CUB__*/
     // Sort by column indices. outIdx contains indices after the first pass so it's used as an input.
-    //CUDA_CALL(hipCUDAErrorTohipError(cub::DeviceRadixSort::SortPairs(ptmp, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream)));
-    //CUDA_CALL(cub::DeviceRadixSort::SortPairs(ptmp, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
+#ifdef __HIP_ENABLE_CUB__
+    CUDA_CALL(cub::DeviceRadixSort::SortPairs(ptmp, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
+#endif /*__HIP_ENABLE_CUB__*/
     // Copy results.
     cblock = (topK * n + ThreadsPerBlock - 1) / ThreadsPerBlock;
     hipLaunchKernelGGL((_copyTopKResults), dim3(cblock), dim3(ThreadsPerBlock), 0, t_stream, static_cast<const uint64_t*>(inIdx), static_cast<const ElemType*>(outVal2), static_cast<ElemType*>(maxIndexes.Data()), static_cast<ElemType*>(maxValues.Data()), static_cast<CUDA_LONG>(m), static_cast<CUDA_LONG>(n), static_cast<int>(topK));

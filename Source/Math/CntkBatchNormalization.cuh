@@ -126,21 +126,21 @@ __device__ __forceinline__ void StoreValues<4, float, float>(const float src[4],
 template <typename T>
 __device__ __forceinline__ T Shuffle(T input, int srcLane, unsigned int mask)
 {
-#ifdef __HIP_DEVICE_COMPILE__
+#ifdef __HIP_DEVICE_COMPILE__ && defined ( __HIP_ENABLE_CUB__ )
     // shfl is supported only on Kepler+
 
 #if defined( __HIP_ENABLE_ASSERT__ )
     static_assert( __HIP_ARCH_HAS_WARP_SHUFFLE__, "CNTK only supports only Kepler GPU architecture or newer.");
-#endif
+#endif /*__HIP_ENABLE_ASSERT__*/
 #if CUDA_VERSION >= 9000 || defined (__HIP_PLATFORM_HCC__)
-    return input;//cub::ShuffleIndex(input, srcLane, CUB_PTX_WARP_THREADS, mask); // Need cub > 1.7.0
+    return cub::ShuffleIndex(input, srcLane, CUB_PTX_WARP_THREADS, mask); // Need cub > 1.7.0
 #else
-    return input;//cub::ShuffleIndex(input, srcLane);
-#endif
+    return cub::ShuffleIndex(input, srcLane);
+#endif /*CUDA_VERSION || __HIP_PLATFORM_HCC__*/
 #else
     assert(false);
     return input; // keep compiler happy
-#endif
+#endif /*__HIP_DEVICE_COMPILE__ && __HIP_ENABLE_CUB__*/
 }
 
 namespace Operations
@@ -1030,7 +1030,8 @@ __global__ void kComputeSpatialScaleAndBiasGradients(int vectorSize, int spatial
         }
     }
     __syncthreads();
-/*    using BlockReduce = cub::BlockReduce<comp_t, BlockDimX, cub::BLOCK_REDUCE_WARP_REDUCTIONS, BlockDimY>;
+#ifdef __HIP_ENABLE_CUB__
+    using BlockReduce = cub::BlockReduce<comp_t, BlockDimX, cub::BLOCK_REDUCE_WARP_REDUCTIONS, BlockDimY>;
     // Note: must use separate temp storages for each reduction.
     __shared__ typename BlockReduce::TempStorage tmp1;
     comp_t dsRes = BlockReduce(tmp1).Sum(ds);
@@ -1040,7 +1041,8 @@ __global__ void kComputeSpatialScaleAndBiasGradients(int vectorSize, int spatial
     {
         dScale[hipBlockIdx_x] = dsRes;
         dBias[hipBlockIdx_x] = dbRes;
-    }*/
+    }
+#endif /*__HIP_ENABLE_CUB__*/
 }
 
 template <int U>

@@ -22,7 +22,7 @@
 namespace Microsoft { namespace MSR { namespace CNTK { namespace Test {
 using vec = std::vector<float>;
 
-#ifdef __HIP_ENABLE_HALF
+#ifdef __HIP_ENABLE_HALF__
 using vecHalf = std::vector<half>;
 #endif //__HIP_ENABLE_HALF__
 

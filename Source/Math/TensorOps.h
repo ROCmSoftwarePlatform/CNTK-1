@@ -188,7 +188,7 @@ DECL half rsqrt_(half v) {
     return half(rsqrtf((float)v));
 #endif
 }
-#endif __HIP_ENABLE_HALF__
+#endif // __HIP_ENABLE_HALF__
 
 DECL float rsqrt_(float v) {
     return rsqrtf(v);
