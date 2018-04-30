@@ -820,26 +820,29 @@ static void LaunchTensorOp(ElemType beta, array<ElemType*, N> pointerVector, Ele
    
  
     //Allocate all kernel structure arguments as device pointers
-    hipMalloc((void **)&d_pointers, sizeof(FixedArray<ElemType*, N>));
-    hipMalloc((void **)&d_regularOpStrides, sizeof(FixedArray<C_unsigned_int, K>));
-    hipMalloc((void **)&d_regularStrides, sizeof(FixedMatrix<C_int, N, K>));
-    hipMalloc((void **)&d_reducingOpDims, sizeof(FixedArray<C_unsigned_int, 0>));
-    hipMalloc((void **)&d_reducingStrides, sizeof(FixedMatrix<C_int, N, 0>));
-    hipMalloc((void **)&d_regularOpStrideDivmod, sizeof(FixedArray<fast_divmod, K>));
-    hipMalloc((void **)&d_reducingOpDimDivmod, sizeof(FixedArray<fast_divmod, 0>));
+    hipMalloc((void **)&d_pointers, SIZEOF(pointers));
+    hipMalloc((void **)&d_regularOpStrides, SIZEOF(regularOpStrides));
+    hipMalloc((void **)&d_regularStrides, SIZEOF(regularStrides));
+    hipMalloc((void **)&d_reducingOpDims, SIZEOF(reducingOpDims));
+    hipMalloc((void **)&d_reducingStrides, SIZEOF(reducingStrides));
+    hipMalloc((void **)&d_regularOpStrideDivmod, SIZEOF(regularOpStrideDivmod));
+    hipMalloc((void **)&d_reducingOpDimDivmod, SIZEOF(reducingOpDimDivmod));
     hipMalloc((void **)&d_numElements, sizeof(CUDA_LONG));
 
     //Copy from host  to device kernel structure arguments
-    hipMemcpy(d_pointers, &pointers, sizeof(FixedArray<ElemType*, N>), hipMemcpyHostToDevice);
-    hipMemcpy(d_regularOpStrides, &regularOpStrides, sizeof(FixedArray<C_unsigned_int, K>), hipMemcpyHostToDevice);
-    hipMemcpy(d_regularStrides, &regularStrides, sizeof(FixedMatrix<C_int, N, K>), hipMemcpyHostToDevice);
-    hipMemcpy(d_reducingOpDims, &reducingOpDims, sizeof(FixedArray<C_unsigned_int, 0>), hipMemcpyHostToDevice);
-    hipMemcpy(d_reducingStrides, &reducingStrides, sizeof(FixedMatrix<C_int, N, 0>), hipMemcpyHostToDevice);
-    hipMemcpy(d_regularOpStrideDivmod, &regularOpStrideDivmod, sizeof(FixedArray<fast_divmod, K>), hipMemcpyHostToDevice);
-    hipMemcpy(d_reducingOpDimDivmod, &reducingOpDimDivmod, sizeof(FixedArray<fast_divmod, 0>), hipMemcpyHostToDevice);
+    hipMemcpy(d_pointers, &pointers, SIZEOF(pointers), hipMemcpyHostToDevice);
+    hipMemcpy(d_regularOpStrides, &regularOpStrides, SIZEOF(regularOpStrides), hipMemcpyHostToDevice);
+    hipMemcpy(d_regularStrides, &regularStrides, SIZEOF(regularStrides), hipMemcpyHostToDevice);
+    hipMemcpy(d_reducingOpDims, &reducingOpDims, SIZEOF(reducingOpDims), hipMemcpyHostToDevice);
+    hipMemcpy(d_reducingStrides, &reducingStrides, SIZEOF(reducingStrides), hipMemcpyHostToDevice);
+    hipMemcpy(d_regularOpStrideDivmod, &regularOpStrideDivmod, SIZEOF(regularOpStrideDivmod), hipMemcpyHostToDevice);
+    hipMemcpy(d_reducingOpDimDivmod, &reducingOpDimDivmod, SIZEOF(reducingOpDimDivmod), hipMemcpyHostToDevice);
     hipMemcpy(d_numElements, &numElements, sizeof(CUDA_LONG), hipMemcpyHostToDevice);
 
-    // Print RegularOpStrides
+
+
+ 
+   // Print RegularOpStrides
     for(int i =0; i < K ; i++) {
        std::cout<<"i:"<<i<<regularOpStrideVector[i]<<std::endl;        
     }
@@ -998,23 +1001,23 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
 
 
     //Allocate all kernel structure arguments as device pointers
-    hipMalloc((void **)&d_pointers, sizeof(FixedArray<ElemType*, N>));
-    hipMalloc((void **)&d_regularOpStrides, sizeof(FixedArray<C_unsigned_int, K>));
-    hipMalloc((void **)&d_regularStrides, sizeof(FixedMatrix<C_int, N, K>));
-    hipMalloc((void **)&d_reducingOpDims, sizeof(FixedArray<C_unsigned_int, M>));
-    hipMalloc((void **)&d_reducingStrides, sizeof(FixedMatrix<C_int, N, M>));
-    hipMalloc((void **)&d_regularOpStrideDivmod, sizeof(FixedArray<fast_divmod, K>));
-    hipMalloc((void **)&d_reducingOpDimDivmod, sizeof(FixedArray<fast_divmod, M>));
+    hipMalloc((void **)&d_pointers, SIZEOF(pointers));
+    hipMalloc((void **)&d_regularOpStrides, SIZEOF(regularOpStrides));
+    hipMalloc((void **)&d_regularStrides, SIZEOF(regularStrides));
+    hipMalloc((void **)&d_reducingOpDims, SIZEOF(reducingOpDims));
+    hipMalloc((void **)&d_reducingStrides, SIZEOF(reducingStrides));
+    hipMalloc((void **)&d_regularOpStrideDivmod, SIZEOF(regularOpStrideDivmod));
+    hipMalloc((void **)&d_reducingOpDimDivmod, SIZEOF(reducingOpDimDivmod));
     hipMalloc((void **)&d_numElements, sizeof(CUDA_LONG));
 
     //Copy from host  to device kernel structure arguments
-    hipMemcpy(d_pointers, &pointers, sizeof(FixedArray<ElemType*, N>), hipMemcpyHostToDevice);
-    hipMemcpy(d_regularOpStrides, &regularOpStrides, sizeof(FixedArray<C_unsigned_int, K>), hipMemcpyHostToDevice);
-    hipMemcpy(d_regularStrides, &regularStrides, sizeof(FixedMatrix<C_int, N, K>), hipMemcpyHostToDevice);
-    hipMemcpy(d_reducingOpDims, &reducingOpDims, sizeof(FixedArray<C_unsigned_int, M>), hipMemcpyHostToDevice);
-    hipMemcpy(d_reducingStrides, &reducingStrides, sizeof(FixedMatrix<C_int, N, M>), hipMemcpyHostToDevice);
-    hipMemcpy(d_regularOpStrideDivmod, &regularOpStrideDivmod, sizeof(FixedArray<fast_divmod, K>), hipMemcpyHostToDevice);
-    hipMemcpy(d_reducingOpDimDivmod, &reducingOpDimDivmod, sizeof(FixedArray<fast_divmod, M>), hipMemcpyHostToDevice);
+    hipMemcpy(d_pointers, &pointers, SIZEOF(pointers), hipMemcpyHostToDevice);
+    hipMemcpy(d_regularOpStrides, &regularOpStrides, SIZEOF(regularOpStrides), hipMemcpyHostToDevice);
+    hipMemcpy(d_regularStrides, &regularStrides, SIZEOF(regularStrides), hipMemcpyHostToDevice);
+    hipMemcpy(d_reducingOpDims, &reducingOpDims, SIZEOF(reducingOpDims), hipMemcpyHostToDevice);
+    hipMemcpy(d_reducingStrides, &reducingStrides, SIZEOF(reducingStrides), hipMemcpyHostToDevice);
+    hipMemcpy(d_regularOpStrideDivmod, &regularOpStrideDivmod, SIZEOF(regularOpStrideDivmod), hipMemcpyHostToDevice);
+    hipMemcpy(d_reducingOpDimDivmod, &reducingOpDimDivmod, SIZEOF(reducingOpDimDivmod), hipMemcpyHostToDevice);
     hipMemcpy(d_numElements, &numElements, sizeof(CUDA_LONG), hipMemcpyHostToDevice);
 
 
