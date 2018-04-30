@@ -185,8 +185,10 @@ namespace CNTK
     {
         if (GetDataType() == DataType::Double)
             SetValue((double)value);
+#ifdef __HIP_ENABLE_HALF__
         else if (GetDataType() == DataType::Float16)
             SetValue((float16)value);
+#endif /*__HIP_ENABLE_HALF__*/
         else
         {
             if (IsSparse())
@@ -874,8 +876,10 @@ namespace CNTK
             scalar = *(cpuData->DataBuffer<float>());
         else if (scalarData->GetDataType() == DataType::Double)
             scalar = static_cast<ElementType>(*(cpuData->DataBuffer<double>()));
+#ifdef __HIP_ENABLE_HALF__
         else if (scalarData->GetDataType() == DataType::Float16)
             scalar = static_cast<ElementType>(*(cpuData->DataBuffer<float16>()));
+#endif/*__HIP_ENABLE_HALF__*/
         else
             LogicError("NDArrayView::AsScalar: Unsupported DataType");
 
