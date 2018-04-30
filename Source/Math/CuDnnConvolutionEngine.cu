@@ -114,9 +114,11 @@ public:
         HIPDNN_CALL(hipdnnSetConvolutionNdDescriptor(m_conv, (int)dim_size, pad.data(),
                                                    stride.data(), dilation.data(),
                                                    HIPDNN_CROSS_CORRELATION, dataType == HIPDNN_DATA_HALF ? HIPDNN_DATA_FLOAT : dataType));
+#if !defined(__HIP_PLATFORM_HCC__)
         // allow tensor core for fp16 by default
         if(dataType == HIPDNN_DATA_HALF)
             HIPDNN_CALL(hipdnnSetConvolutionMathType(m_conv, HIPDNN_TENSOR_OP_MATH));
+#endif
     }
 
     ~CuDnnConv()
@@ -313,14 +315,25 @@ protected:
             std::cout<<"CNTK: ENTER deterministicFinder"<<std::endl;
 #endif
             
-            auto result = finder(calgo, algoPerf); 
+            auto result = finder(calgo, algoPerf);
+#ifdef _HIPDBG_
+            std::cout<<"CNTK: After Finder - selected Algo : " << (*algoPerf).algo <<std::endl;
+#endif
+#if defined (__HIP_PLATFORM_HCC__)
+            auto found = std::find_if(algoPerf, algoPerf + calgo,
+                [](const hipdnnConvolutionFwdAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_FWD_ALGO_GEMM && a.status == HIPDNN_STATUS_SUCCESS; });
+#else
             auto found = std::find_if(algoPerf, algoPerf + calgo,
                 [](const hipdnnConvolutionFwdAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM && a.status == HIPDNN_STATUS_SUCCESS; });
+#endif
 
             if (found == algoPerf + calgo  && m_forceDeterministicAlgorithms )
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
 
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry
+#ifdef _HIPDBG_
+            std::cout<<"After Found - selected Algo : " << (*algoPerf).algo <<std::endl;
+#endif
             calgo = 1;              // set count of algorithms
 #ifdef _HIPDBG_
             std::cout<<"CNTK: EXIT deterministicFinder"<<std::endl;
@@ -357,7 +370,9 @@ protected:
         };
         FindBestAlgo(batchSize, m_fwdAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         if(m_dataType == HIPDNN_DATA_HALF) HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, m_fwdAlgo.AlgoMathType));
+#if !defined(__HIP_PLATFORM_HCC__)
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
+#endif
         // Perform forward convolution operation.
         std::cout<<"CNTK: Invoking hipdnnConvolutionForward"<<std::endl;
         std::cout<<"CNTK: SelectedAlgo"<<m_fwdAlgo.selectedAlgo<<std::endl;
@@ -434,8 +449,10 @@ protected:
         FindBestAlgo(batchSize, m_backDataAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Compute gradients with respect to the output tensor (data).
         if(m_dataType == HIPDNN_DATA_HALF) HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, m_backDataAlgo.AlgoMathType));
+#if !defined(__HIP_PLATFORM_HCC__)
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
-        
+#endif
+
         std::cout<<"CNTK: SelectedAlgo"<<m_backDataAlgo.selectedAlgo<<std::endl;
         std::cout<<"accumulateGradient"<<accumulateGradient<<std::endl;
         HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_cudnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, ptr(grad)));
@@ -517,7 +534,9 @@ protected:
         FindBestAlgo(batchSize, m_backFiltAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Compute gradients with respect to the output tensor (data).
         if(m_dataType == HIPDNN_DATA_HALF) HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, m_backFiltAlgo.AlgoMathType));
+#if !defined(__HIP_PLATFORM_HCC__)
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
+#endif
         //m_backFiltAlgo.selectedAlgo =  HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_0;
         std::cout<<"Invoking hipdnnconvolution Backward filter"<<std::endl;
         HIPDNN_CALL(hipdnnConvolutionBackwardFilter(*m_cudnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
