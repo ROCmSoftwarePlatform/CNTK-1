@@ -184,7 +184,12 @@ BOOST_FIXTURE_TEST_CASE(GPUSparseTimesDenseRandom, RandomSeedFixture)
                         }
                         // SPARSE
                         GPUMatrix<float> lhsDense(c_deviceIdZero);
-                        lhsDense.AssignTruncateBottomOf(GPUMatrix<float>::RandomUniform(dim1, dim2, c_deviceIdZero, -3.0f, 1.0f, IncrementCounter()), 0);
+
+                        if (dim1 > 1 && dim2 > 1)
+                            lhsDense.AssignTruncateBottomOf(GPUMatrix<float>::RandomUniform(dim1, dim2, c_deviceIdZero, -1.0f, 1.0f, IncrementCounter()), 0);
+                        else
+                            lhsDense = GPUMatrix<float>::RandomUniform(dim1, dim2, c_deviceIdZero, 0.1f, 1.0f, IncrementCounter());
+
                         GPUSparseMatrix<float> lhs(lhsDense, sparseFormat);
 
                         // DENSE
