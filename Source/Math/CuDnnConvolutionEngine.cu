@@ -315,14 +315,25 @@ protected:
             std::cout<<"CNTK: ENTER deterministicFinder"<<std::endl;
 #endif
             
-            auto result = finder(calgo, algoPerf); 
+            auto result = finder(calgo, algoPerf);
+#ifdef _HIPDBG_
+            std::cout<<"CNTK: After Finder - selected Algo : " << (*algoPerf).algo <<std::endl;
+#endif
+#if defined (__HIP_PLATFORM_HCC__)
+            auto found = std::find_if(algoPerf, algoPerf + calgo,
+                [](const hipdnnConvolutionFwdAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_FWD_ALGO_GEMM && a.status == HIPDNN_STATUS_SUCCESS; });
+#else
             auto found = std::find_if(algoPerf, algoPerf + calgo,
                 [](const hipdnnConvolutionFwdAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM && a.status == HIPDNN_STATUS_SUCCESS; });
+#endif
 
             if (found == algoPerf + calgo  && m_forceDeterministicAlgorithms )
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
 
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry
+#ifdef _HIPDBG_
+            std::cout<<"After Found - selected Algo : " << (*algoPerf).algo <<std::endl;
+#endif
             calgo = 1;              // set count of algorithms
 #ifdef _HIPDBG_
             std::cout<<"CNTK: EXIT deterministicFinder"<<std::endl;
@@ -363,7 +374,6 @@ protected:
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
 #endif
         // Perform forward convolution operation.
-        m_fwdAlgo.selectedAlgo = HIPDNN_CONVOLUTION_FWD_ALGO_GEMM;
         std::cout<<"CNTK: Invoking hipdnnConvolutionForward"<<std::endl;
         std::cout<<"CNTK: SelectedAlgo"<<m_fwdAlgo.selectedAlgo<<std::endl;
         std::cout<<"CNTK: workspace Buffer Size"<<workspace.BufferSize()<<std::endl;
