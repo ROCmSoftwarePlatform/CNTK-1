@@ -10,7 +10,7 @@
 configure=$0
 build_top=$PWD
 root_dir=$(dirname "$(readlink -f "$0")")
-external_dir=$root_dir/external/HIP
+install_dir=/opt/rocm
 
 cuda_path=
 cuda_check=include/cuda.h
@@ -156,7 +156,7 @@ default_halide="halide"
 
 function default_paths ()
 {
-    echo $build_top $external_dir $default_path_list $HOME
+    echo $build_top $install_dir $default_path_list $HOME
 }
 
 # $1 is directory
@@ -1388,7 +1388,7 @@ if test $enable_cuda = yes || test $enable_hip = yes ; then
         echo HIP_PATH=$hip_path >> $config
 	echo CUB_PATH=$cubhip_path >> $config
         echo HIPDNN_PATH=$hipdnn_path >> $config
-        echo EXTERNAL_DIR=$external_dir >> $config
+        echo INSTALL_DIR=$install_dir >> $config
     fi
     [ -z "$nccl_path" ] || echo NCCL_PATH=$nccl_path >> $config
 fi
@@ -1470,3 +1470,4 @@ echo '>make -j $(nproc) all'
 echo to build
 
 # vim:set expandtab tabstop=4 shiftwidth=4:
+

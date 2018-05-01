@@ -178,7 +178,7 @@ endif
 
 ifeq ($(HIP_PLATFORM), hcc)
   LIBS_LIST += hipblas hip_hcc hiprand hipsparse MIOpen
-  INCLUDEPATH += ${EXTERNAL_DIR}/miopen/include/
+  INCLUDEPATH += ${INSTALL_DIR}/miopen/include/
 endif
 
   ifndef CUB_PATH
@@ -188,22 +188,22 @@ endif
 
   DEVICE = gpu
 
-  INCLUDEPATH+=$(CUB_PATH) ${EXTERNAL_DIR}/cub-hip/external/Thrust
+  INCLUDEPATH+=$(CUB_PATH) ${INSTALL_DIR}/cub-hip/external/Thrust
 
 # Set up CUDA includes and libraries
   ifdef HIPDNN_PATH
     INCLUDEPATH += $(HIPDNN_PATH)/include
     #LIBPATH += /opt/rocm/lib64
-    LIBPATH += $(EXTERNAL_DIR)/lib64
+    LIBPATH += $(INSTALL_DIR)/lib64
     LIBS_LIST += hipDNN
     COMMON_FLAGS +=-DUSE_HIPDNN
   endif
   INCLUDEPATH += $(HIP_PATH)/include
-  INCLUDEPATH += $(EXTERNAL_DIR)/hipblas/include/
-  INCLUDEPATH += $(EXTERNAL_DIR)/hiprand/include/
-  INCLUDEPATH += $(EXTERNAL_DIR)/rocrand/include/
-  INCLUDEPATH += $(EXTERNAL_DIR)/hcsparse/include/
-  LIBPATH += $(EXTERNAL_DIR)/lib64
+  INCLUDEPATH += $(INSTALL_DIR)/hipblas/include/
+  INCLUDEPATH += $(INSTALL_DIR)/hiprand/include/
+  INCLUDEPATH += $(INSTALL_DIR)/rocrand/include/
+  INCLUDEPATH += $(INSTALL_DIR)/hcsparse/include/
+  LIBPATH += $(INSTALL_DIR)/lib64
 
 else
   DEVICE = cpu
@@ -1621,3 +1621,4 @@ clean:
 buildall : $(ALL)
 	@echo $(SEPARATOR)
 	@echo finished building for $(ARCH) with build type $(BUILDTYPE)
+
