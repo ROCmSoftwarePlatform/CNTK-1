@@ -12,54 +12,6 @@
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 
-// Manual Serialization strategy to bypass the serialization attempted by compiler
-#if defined(__HIP_PLATFORM_HCC__)
-  #include <hip/hip_hcc.h>
-
-  template<typename T>
-    class Magic_wrapper {
-        T* p_ = nullptr;
-    public:
-        Magic_wrapper() = default;
-        explicit
-        Magic_wrapper(const T& x)
-        {
-
-            std::cout << "calling magic wrapper:\t" ;
-
- #define SIZEOF(object) (char *)(&object+1) - (char *)(&object)
-
-            std::cout << sizeof(x) << std::endl;
-
-            hipHostMalloc(&p_, SIZEOF(x)); new (p_) T{x};  //sizeof(T)
-            std::cout<<"Magic wrapped object allocated "<<this->p_<<std::endl;
-        }
-
-        ~Magic_wrapper() {
-        	size_t deallocateSize = 0;;
-        	std::cout<<"Attempting to deallocate pointer\t"<<this->p_<<std::endl;
-        	hipMemPtrGetInfo(p_, &deallocateSize);
-        	std::cout<<"deallocate Size\t"<<deallocateSize<<std::endl;
-        	if (deallocateSize > 0) {
-        	   //ipHostFree(p_);
-        	}
-        }
-
-        operator const T&() const [[hc]] { return p_[0]; }
-    };
-
-  template<typename T>
-  Magic_wrapper<T> make_magic_wrapper(const T& x)
-  {
-    return Magic_wrapper<T>{x};
-  }
-  #define reference_to_const(...) __VA_ARGS__ &
-#else
-  #define make_magic_wrapper(x) x
-  #define reference_to_const(...) __VA_ARGS__
-#endif
-
-
 // GPUMatrix::TensorOp() interfaces with actual tensor code through these two functions, which are independent of the GPUMatrix class
 
 #define C_size_t CUDA_LONG
