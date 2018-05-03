@@ -418,8 +418,13 @@ protected:
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
             auto result = finder(calgo, algoPerf);
+#ifdef __HIP_PLATFORM_HCC__
+            auto found = std::find_if(algoPerf, algoPerf + calgo,
+                [](const hipdnnConvolutionBwdDataAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_BWD_DATA_ALGO_0 && a.status == HIPDNN_STATUS_SUCCESS; });
+#elif defined __HIP_PLATFORM_NVCC__
             auto found = std::find_if(algoPerf, algoPerf + calgo,
                 [](const hipdnnConvolutionBwdDataAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_BWD_DATA_ALGO_1 && a.status == HIPDNN_STATUS_SUCCESS; });
+#endif
             if (found == algoPerf + calgo && m_forceDeterministicAlgorithms)
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
 
