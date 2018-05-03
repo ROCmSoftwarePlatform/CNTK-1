@@ -133,9 +133,9 @@ __device__ __forceinline__ T Shuffle(T input, int srcLane, unsigned int mask)
     static_assert( __HIP_ARCH_HAS_WARP_SHUFFLE__, "CNTK only supports only Kepler GPU architecture or newer.");
 #endif /*__HIP_ENABLE_ASSERT__*/
 #if CUDA_VERSION >= 9000 || defined (__HIP_PLATFORM_HCC__)
-    return cub::ShuffleIndex(input, srcLane, CUB_PTX_WARP_THREADS, mask); // Need cub > 1.7.0
+    return hipcub::ShuffleIndex<CUB_PTX_WARP_THREADS>(input, srcLane, mask); // Need cub > 1.7.0
 #else
-    return cub::ShuffleIndex(input, srcLane);
+    return hipcub::ShuffleIndex(input, srcLane);
 #endif /*CUDA_VERSION || __HIP_PLATFORM_HCC__*/
 #else
     assert(false);
@@ -1031,7 +1031,7 @@ __global__ void kComputeSpatialScaleAndBiasGradients(int vectorSize, int spatial
     }
     __syncthreads();
 #ifdef __HIP_ENABLE_CUB__
-    using BlockReduce = cub::BlockReduce<comp_t, BlockDimX, cub::BLOCK_REDUCE_WARP_REDUCTIONS, BlockDimY>;
+    using BlockReduce = hipcub::BlockReduce<comp_t, BlockDimX, hipcub::BLOCK_REDUCE_WARP_REDUCTIONS, BlockDimY>;
     // Note: must use separate temp storages for each reduction.
     __shared__ typename BlockReduce::TempStorage tmp1;
     comp_t dsRes = BlockReduce(tmp1).Sum(ds);
