@@ -180,6 +180,7 @@ endif
 ifeq ($(HIP_PLATFORM), hcc)
   LIBS_LIST += hipblas hip_hcc hiprand hipsparse MIOpen
   INCLUDEPATH += ${INSTALL_DIR}/miopen/include/
+  INCLUDEPATH += $(INSTALL_DIR)/rocprim/include/
 endif
 
   ifndef CUB_PATH
@@ -204,6 +205,7 @@ endif
   INCLUDEPATH += $(INSTALL_DIR)/hiprand/include/
   INCLUDEPATH += $(INSTALL_DIR)/rocrand/include/
   INCLUDEPATH += $(INSTALL_DIR)/hcsparse/include/
+  INCLUDEPATH += $(INSTALL_DIR)/hipcub/include/
   LIBPATH += $(INSTALL_DIR)/lib64
 
 else

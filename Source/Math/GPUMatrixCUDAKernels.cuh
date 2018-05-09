@@ -25,7 +25,7 @@
 #include "fpgeneric.h"
 #pragma pop_macro("TENSOR_OPS_DECL")
 #ifdef __HIP_ENABLE_CUB__
-#include <cub/cub.cuh>
+#include <hipcub/hipcub.hpp>
 #endif /*__HIP_ENABLE_CUB__*/
 
 // We would like to use 64-bit integer to support large matrices. However, CUDA seems to support only 32-bit integer
@@ -5361,7 +5361,7 @@ __global__ void _assignNumOfDiffCol(const ElemType* a, const ElemType* b, ElemTy
         cur += (irow == crowB);
     }
 #ifdef __HIP_ENABLE_CUB__
-    using BlockReduceT = cub::BlockReduce<int, BlockSize>;
+    using BlockReduceT = hipcub::BlockReduce<int, BlockSize>;
     __shared__ typename BlockReduceT::TempStorage tmp;
 
     int res = BlockReduceT(tmp).Sum(cur);

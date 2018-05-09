@@ -34,7 +34,7 @@
 #pragma warning(disable : 4706) // assignment within conditional expression
 #endif
 #ifdef __HIP_ENABLE_CUB__
-#include <cub/cub.cuh>
+#include <hipcub/hipcub.hpp>
 #endif /*__HIP_ENABLE_CUB__*/
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -764,11 +764,11 @@ inline hipsparseStatus_t hipsparsedotiHelper(hipsparseHandle_t, int, const half 
 #ifdef __HIP_ENABLE_CUB__
 inline hipError_t SortPairsDescending(void *d_temp_storage, size_t &temp_storage_bytes, const float *d_keys_in, float *d_keys_out, const uint64_t *d_values_in, uint64_t *d_values_out, int num_items, int begin_bit, int end_bit, hipStream_t stream)
 {
-    return cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream);
+    return hipcub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream);
 }
 inline hipError_t SortPairsDescending(void *d_temp_storage, size_t &temp_storage_bytes, const double *d_keys_in, double *d_keys_out, const uint64_t *d_values_in, uint64_t *d_values_out, int num_items, int begin_bit, int end_bit, hipStream_t stream)
 {
-    return cub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream);
+    return hipcub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream);
 }
 #endif /*__HIP_ENABLE_CUB__*/
 #ifdef __HIP_ENABLE_HALF__
