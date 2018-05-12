@@ -175,6 +175,7 @@ ifeq ($(HIP_PLATFORM), nvcc)
     LIBS_LIST += nccl
     COMMON_FLAGS += -DUSE_NCCL
   endif
+  INCLUDEPATH += $(INSTALL_DIR)/cub
 endif
 
 ifeq ($(HIP_PLATFORM), hcc)
@@ -184,13 +185,13 @@ ifeq ($(HIP_PLATFORM), hcc)
 endif
 
   ifndef CUB_PATH
-    $(info defaulting CUB_PATH to /usr/local/cub-1.4.1)
-    CUB_PATH=/usr/local/cub-hip
+    $(info defaulting CUB_PATH to /opt/rocm/hipcub)
+    CUB_PATH=/opt/rocm/hipcub
   endif
 
   DEVICE = gpu
 
-  INCLUDEPATH+=$(CUB_PATH) ${INSTALL_DIR}/cub-hip/external/Thrust
+  INCLUDEPATH+=$(CUB_PATH)/include
 
 # Set up CUDA includes and libraries
   ifdef HIPDNN_PATH
@@ -205,7 +206,6 @@ endif
   INCLUDEPATH += $(INSTALL_DIR)/hiprand/include/
   INCLUDEPATH += $(INSTALL_DIR)/rocrand/include/
   INCLUDEPATH += $(INSTALL_DIR)/hcsparse/include/
-  INCLUDEPATH += $(INSTALL_DIR)/hipcub/include/
   LIBPATH += $(INSTALL_DIR)/lib64
 
 else

@@ -283,9 +283,17 @@ done
 #copying shared objects
 
 repoList+=(hipRAND hipCUB)
-installDir+=(rocrand rocprim)
+installDir+=(rocrand)
 libList+=(rocrand)
-headerList+=(rocrand rocprim)
+headerList+=(rocrand)
+
+if [ "$platform" == "hcc" ];then
+    installDir+=(rocprim)
+    headerList+=(rocprim)
+elif [ "$platform" == "nvcc" ];then
+    installDir+=(cub)
+    headerList+=(cub.cuh)
+fi
 
 for DIR in "${!installDir[@]}"
 do
@@ -310,7 +318,7 @@ do
     check ${installDir[$i]}
     localRepo=$?
     if [ "$localRepo" == "1" ]; then
-        HEADER=`find $rocmDir/${installDir[$i]} \( -name ${headerList[$i]}.h -o -name ${headerList[$i]}.hpp \) -print -quit`
+        HEADER=`find $rocmDir/${installDir[$i]} \( -name ${headerList[$i]}.h -o -name ${headerList[$i]}.hpp -o -name ${headerList[$i]} \) -print -quit`
         if [ -n "$HEADER" ]; then
             #echo -e "Found ${repoList[$i]} header \t: $HEADER"
             if [ "${repoList[$i]}" != "hipCUB" ] && [ "${repoList[$i]}" != "rocPRIM" ]; then

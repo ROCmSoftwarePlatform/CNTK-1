@@ -126,7 +126,7 @@ __device__ __forceinline__ void StoreValues<4, float, float>(const float src[4],
 template <typename T>
 __device__ __forceinline__ T Shuffle(T input, int srcLane, unsigned int mask)
 {
-#ifdef __HIP_DEVICE_COMPILE__ && defined ( __HIP_ENABLE_CUB__ )
+#if defined (__HIP_DEVICE_COMPILE__) && defined ( __HIP_ENABLE_CUB__ )
     // shfl is supported only on Kepler+
 
 #if defined( __HIP_ENABLE_ASSERT__ )
