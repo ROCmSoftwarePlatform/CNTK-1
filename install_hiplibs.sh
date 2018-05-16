@@ -145,11 +145,11 @@ if [ "$platform" == "hcc" ]; then
     scpLIST+=(rocBLAS_SCP MIOpenGEMM_SCP MIOpen_SCP)
 fi
 
-repoList+=(rocRAND HcSPARSE hipBLAS hipDNN)
-installDir+=(hiprand hcsparse hipblas hipDNN)
-libList+=(hiprand hipsparse hipblas hipDNN)
-scpLIST+=(rocRAND_SCP HcSPARSE_SCP hipBLAS_SCP hipDNN_SCP)
-headerList+=(hiprand hipsparse hipblas hipDNN)
+repoList+=(rocRAND HcSPARSE hipBLAS hipDNN rocPRIM)
+installDir+=(hiprand hcsparse hipblas hipDNN hipcub)
+libList+=(hiprand hipsparse hipblas hipDNN hipcub)
+scpLIST+=(rocRAND_SCP HcSPARSE_SCP hipBLAS_SCP hipDNN_SCP rocPRIM_SCP)
+headerList+=(hiprand hipsparse hipblas hipDNN hipcub)
 
 echo -e "\n\n"
 
@@ -229,22 +229,24 @@ do
     if [ "$localRepo" == "1" ]; then
         echo -e "$NC $spacef ${repoList[$i]} already installed $spaceb"
         #cd $rocmDir/${libList[$i]}/lib
-        FILE=`find $rocmDir/${installDir[$i]} -iname lib${libList[$i]}.so -print -quit`
-        if [ -n "$FILE" ]; then
-               echo -e "$GREEN Found ${repoList[$i]} libs  \t: $FILE"
-               if [ "${repoList[$i]}" == "MIOpenGEMM" ]; then
-                   HEADER=`find $rocmDir/${installDir[$i]} -iname miogemm.hpp -print -quit`
-               else
-                   HEADER=`find $rocmDir/${installDir[$i]} \( -iname ${headerList[$i]}.h -o -iname ${headerList[$i]}.hpp \) -print -quit`
-               fi
-               if [ -n "$HEADER" ]; then
-                   echo -e "$GREEN Found ${repoList[$i]} header \t: $HEADER"
-                   install=1
-               else
-                   echo -e "$RED Broken library - header files not found. Library will be installed fresh\n"
-               fi
+        if [ "${repoList[$i]}" == "MIOpenGEMM" ]; then
+            HEADER=`find $rocmDir/${installDir[$i]} -iname miogemm.hpp -print -quit`
         else
-               echo -e "$RED Broken library - shared object Not found.Library will be installed fresh\n"
+            HEADER=`find $rocmDir/${installDir[$i]} \( -iname ${headerList[$i]}.h -o -iname ${headerList[$i]}.hpp \) -print -quit`
+        fi
+        if [ -n "$HEADER" ]; then
+            echo -e "$GREEN Found ${repoList[$i]} header \t: $HEADER"
+            if [ "${repoList[$i]}" != rocPRIM ]; then
+                FILE=`find $rocmDir/${installDir[$i]} -iname lib${libList[$i]}.so -print -quit`
+            fi
+            if [ -n "$FILE" ]; then
+                echo -e "$GREEN Found ${repoList[$i]} libs  \t: $FILE"
+                install=1
+            else
+                echo -e "$RED Broken library - shared object Not found.Library will be installed fresh\n"
+            fi
+        else
+            echo -e "$RED Broken library - header files not found. Library will be installed fresh\n"
         fi
     fi
     if [ "$install" == "0" ]; then
@@ -258,7 +260,7 @@ do
             cd ${pathlist["${scpLIST[$i]}"]}
         fi
         echo -e "$NC $spacef INSTALLING ${repoList[$i]} $spaceb"
-        if [ "${repoList[$i]}" != "hipDNN" ] && [ "${repoList[$i]}" != "MIOpen" ]; then
+        if [ "${repoList[$i]}" != "hipDNN" ] && [ "${repoList[$i]}" != "MIOpen" ] && [ "${repoList[$i]}" != "rocPRIM" ]; then
             mkdir $build_dir -p && cd $build_dir
             $cmake_it .. && make -j $(nproc) && sudo make install
         elif [ "${repoList[$i]}" == "MIOpen" ]; then
@@ -268,6 +270,9 @@ do
             cd $rootDir/$externalDir/${repoList[$i]}
             mkdir $build_dir -p && cd $build_dir
             CXX=/opt/rocm/hcc/bin/hcc cmake -DMIOPEN_BACKEND=HIP -DCMAKE_PREFIX_PATH="/opt/rocm/hcc;${HIP_PATH}" -DHALF_INCLUDE_DIR=$HALF_DIRECTORY -DCMAKE_CXX_FLAGS="-isystem /usr/include/x86_64-linux-gnu/" .. && make -j $(nproc) && sudo make install
+        elif [ "${repoList[$i]}" == "rocPRIM" ]; then
+            mkdir $build_dir -p && cd $build_dir
+            cmake -DBUILD_TEST=OFF .. && make && sudo make install
         else
             make -j $(nproc)
         fi
@@ -275,38 +280,20 @@ do
     fi
 done
 
-#cub-hip
-
-check cub-hip
-cubRepo=$?
-install=0
-if [ "$cubRepo" == "1" ]; then
-    echo -e "$NC $spacef CUB-HIP already exists $spaceb"
-    FILE=`find $rocmDir/cub-hip -iname cub.cuh -print -quit`
-    if [ -n "$FILE" ]; then
-        echo -e "$GREEN Found cub header : $FILE \n"
-        install=1
-    else
-        echo -e "$RED Header not found. CUB will be pulled and installed fresh\n"
-    fi
-fi
-
-if [ "$install" == "0" ]; then
-    echo -e "$NC $spacef CLONING CUB-HIP $spaceb"
-    git clone https://github.com/ROCmSoftwarePlatform/cub-hip.git
-    cd cub-hip
-    git checkout hip_port_1.7.4
-    #git checkout 3effedd23f4e80ccec5d0808d8349f7d570e488e
-    sudo cp -r ../cub-hip /opt/rocm/
-    cd $rootDir/$externalDir
-fi
-
 #copying shared objects
 
-repoList+=(hipRAND)
-installDir+=(hiprand hip)
-libList+=(hiprand)
-headerList+=(hiprand)
+repoList+=(hipRAND hipCUB)
+installDir+=(rocrand)
+libList+=(rocrand)
+headerList+=(rocrand)
+
+if [ "$platform" == "hcc" ];then
+    installDir+=(rocprim)
+    headerList+=(rocprim)
+elif [ "$platform" == "nvcc" ];then
+    installDir+=(cub)
+    headerList+=(cub.cuh)
+fi
 
 for DIR in "${!installDir[@]}"
 do
@@ -331,18 +318,22 @@ do
     check ${installDir[$i]}
     localRepo=$?
     if [ "$localRepo" == "1" ]; then
-        FILE=`find $rocmDir/${installDir[$i]} -name lib${libList[$i]}.so -print -quit`
-        if [ -n "$FILE" ]; then
-               HEADER=`find $rocmDir/${installDir[$i]} \( -name ${headerList[$i]}.h -o -name ${headerList[$i]}.hpp \) -print -quit`
-               if [ -n "$HEADER" ]; then
-                   #echo "Found ${repoList[$i]} header \t: $HEADER"
-                   echo -e "\n $GREEN ${repoList[$i]} installed properly"
-                   perfect=1
-               else
-                   echo -e "\n $RED ${repoList[$i]} Broken - header files not found."
-               fi
+        HEADER=`find $rocmDir/${installDir[$i]} \( -name ${headerList[$i]}.h -o -name ${headerList[$i]}.hpp -o -name ${headerList[$i]} \) -print -quit`
+        if [ -n "$HEADER" ]; then
+            #echo -e "Found ${repoList[$i]} header \t: $HEADER"
+            if [ "${repoList[$i]}" != "hipCUB" ] && [ "${repoList[$i]}" != "rocPRIM" ]; then
+                FILE=`find $rocmDir/${installDir[$i]} -name lib${libList[$i]}.so -print -quit`
+            else
+                FILE=0
+            fi
+            if [ -n "$FILE" ]; then
+                echo -e "\n $GREEN ${repoList[$i]} installed properly"
+                perfect=1
+            else
+                echo -e "\n $RED ${repoList[$i]} Broken - shared object Not found."
+            fi
         else
-               echo -e "\n $RED ${repoList[$i]}Broken - shared object Not found."
+            echo -e "\n $RED ${repoList[$i]} Broken - header files not found."
         fi
     fi
 
@@ -359,8 +350,8 @@ while [[ 1 ]]
 do
     read -p "$NC Do you wish to remove the cloned source repos ? [ Yes / No ] " choice
     case $choice in
-        [Yy][eE][sS] | [y] ) rm -rf $rootDir/$externalDir ; echo -e "$GREEN $spacef Repos removed $spaceb $NC" ; break;;
-        [Nn][Oo] | [n] ) echo -e "$GREEN $spacef Repos not removed $spaceb $NC" ; break;;
+        [Yy][eE][sS] | [y] | [Y] ) rm -rf $rootDir/$externalDir ; echo -e "$GREEN $spacef Repos removed $spaceb $NC" ; break;;
+        [Nn][Oo] | [n] | [N] ) echo -e "$GREEN $spacef Repos not removed $spaceb $NC" ; break;;
         * ) echo -e "$RED $spacef Invalid Input - Enter either Yes / No $spaceb $NC" ;;
     esac
 done
