@@ -1227,13 +1227,27 @@ void GPUSparseMatrix<ElemType>::ColumnwiseScaleAndWeightedAdd(ElemType alpha, co
 
     int blocksPerGrid = (int)ceil(1.0 * a.GetNumCols() / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+    ElemType hostAlpha = alpha;
+    ElemType hostBeta = beta;
+    ElemType *hostaData;
+    ElemType *hostvData;
+    ElemType *hostcData;
+    hostaData = a.Data();
+    hostvData = v.Data();
+    hostcData = c.Data();
+    int rows, cols;
+    rows = a.GetNumRows();
+    cols = a.GetNumCols();
+    GPUSPARSE_INDEX_TYPE *hostaSecondaryindex, *hostaMajorindex;
+    hostaSecondaryindex = a.SecondaryIndexLocation();
+    hostaMajorindex =  a.MajorIndexLocation();
     hipLaunchKernelGGL((_columnwiseScaleAndWeightedAdd4CSC<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
-        alpha,
-        a.Data(), a.SecondaryIndexLocation(), a.MajorIndexLocation(),
-        v.Data(),
-        beta,
-        c.Data(),
-        a.GetNumRows(), a.GetNumCols());
+        hostAlpha,
+        hostaData, hostaSecondaryindex, hostaMajorindex,
+        hostvData,
+        hostBeta,
+        hostcData,
+        rows, cols);
 }
 template <class ElemType>
 void GPUSparseMatrix<ElemType>::TensorShuffleScaleAndAdd(ElemType keepWeight, const GPUSparseMatrix<ElemType>& a, size_t D, size_t S, size_t M, size_t K, size_t T,

@@ -3661,7 +3661,18 @@ void GPUMatrix<ElemType>::ColumnwiseScaleAndWeightedAdd(ElemType alpha, const GP
 
     int blocksPerGrid = (int)ceil(1.0 * c.GetNumElements() / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_columnwiseScaleAndWeightedAdd<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream , alpha, a.Data(), v.Data(), beta, c.Data(), a.GetNumRows(), a.GetNumCols());
+    ElemType hostAlpha = alpha;
+    ElemType hostBeta = beta;
+    ElemType *hostaData;
+    ElemType *hostvData;
+    ElemType *hostcData;
+    hostaData = a.Data();
+    hostvData = v.Data();
+    hostcData = c.Data();
+    int rows, cols;
+    rows = a.GetNumRows();
+    cols = a.GetNumCols();
+    hipLaunchKernelGGL((_columnwiseScaleAndWeightedAdd<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream , hostAlpha, hostaData, hostvData, hostBeta, hostcData, rows, cols);
 }
 
 /// <summary>Matrix-scalar multiply with col-major matrices: c = alpha * a + c</summary>
