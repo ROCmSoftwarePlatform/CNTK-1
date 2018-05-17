@@ -1348,33 +1348,18 @@ void GPUMatrix<ElemType>::SetDiagonalValue(const GPUMatrix<ElemType>& vector)
 template <class ElemType>
 void RescaleToRange(const GPUMatrix<ElemType>& matrix, const ElemType low, const ElemType high)
 {
-
-    size_t N = matrix.GetNumElements();
+	size_t N = matrix.GetNumElements();
     size_t blocksPerGrid = (size_t)ceil(N / (double)GridDim::maxThreadsPerBlock);
 
     //Nobody is ever calling SetStream so all work is done one the same stream
     //Therefore we don't need to sync
     //SyncGuard syncGuard;
-#ifdef __HIP_PLATFORM_HCC__
-    const ElemType *low_h, *high_h;
-    ElemType *low_d, *high_d;
-
-    low_h = &low;
-    high_h = &high;
-
-    hipMalloc(&low_d, 1 * sizeof(ElemType));
-    hipMalloc(&high_d, 1 * sizeof(ElemType));
-
-    hipMemcpy(low_d, low_h, 1 * sizeof(ElemType), hipMemcpyHostToDevice);
-    hipMemcpy(high_d, high_h, 1 * sizeof(ElemType), hipMemcpyHostToDevice);
-
-    hipLaunchKernelGGL((_rescaleToRange<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, matrix.Data(), N, low_d, high_d);
-
-    hipFree(&low_d);
-    hipFree(&high_d);
-#elif defined __HIP_PLATFORM_NVCC__
-    hipLaunchKernelGGL((_rescaleToRange<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, matrix.Data(), N, low, high);
-#endif
+    // Copying to local variables to avoid typecast issue
+    ElemType* tempA = matrix.Data();
+    const CUDA_LONG tempN = N;
+    const ElemType tempLow = low;
+    const ElemType tempHigh = high;
+    hipLaunchKernelGGL((_rescaleToRange<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, tempA, tempN, tempLow, tempHigh);
 }
 
 template <class ElemType>
@@ -1568,8 +1553,19 @@ void GPUMatrix<ElemType>::FSAdagrad(GPUMatrix<ElemType>& gradients,
 
     size_t n = gradients.GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    hipLaunchKernelGGL((_fsadagrad<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, n, gradients.Data(), Data(), Data() + n, functionValues.Data(),
-                                                                         learnRatePerSample, momentum, adaWeight, adaMul, unitGainFactor);
+    // Copying to local variables to avoid typecast issue
+    CUDA_LONG tempSize = n;
+    ElemType* tempGrad = gradients.Data();
+    ElemType* tempSmoothAda = Data();
+    ElemType* tempSmoothMom = Data()+n;
+    ElemType* tempVal = functionValues.Data();
+    ElemType tempLr = learnRatePerSample;
+    ElemType tempMom = momentum;
+    ElemType tempAdaWeight = adaWeight;
+    ElemType tempAdaMul = adaMul;
+    ElemType tempTypedUnitGainFactor = unitGainFactor;
+    hipLaunchKernelGGL((_fsadagrad<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, tempSize, tempGrad, tempSmoothAda, tempSmoothMom, tempVal,
+																			 tempLr, tempMom, tempAdaWeight, tempAdaMul, tempTypedUnitGainFactor);
 }
 
 template <class ElemType>
@@ -1628,8 +1624,13 @@ ElemType GPUMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& gradients,
         ElemType* signs = Data() + n;     // sign of previous gradient
         ElemType* steps = Data() + 2 * n; // current step size
         // Data()+3*n is temp memory used to store multipliers, no need to initialize
-
-        hipLaunchKernelGGL((_rmsprop_init<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, avars, signs, steps, gradients.Data(), n);
+        // Copying to local variables to avoid typecast issue
+        ElemType* tempAvars = avars;
+        ElemType* tempSigns = signs;
+        ElemType* tempSteps = steps;
+        ElemType* tempCurrgrad = gradients.Data();
+        const CUDA_LONG tempN = n;
+        hipLaunchKernelGGL((_rmsprop_init<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, tempAvars, tempSigns, tempSteps, tempCurrgrad, tempN);
     }
     assert(GetNumRows() == gradients.GetNumRows() && GetNumCols() == numColsNeeded);
 
@@ -1658,11 +1659,23 @@ ElemType GPUMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& gradients,
         upd_gpu = TracingGPUMemoryAllocator::Allocate<ElemType>(GetComputeDeviceId(), 27);
         CUDA_CALL(hipMemcpy(upd_gpu, upd, sizeof(ElemType) * _countof(upd), hipMemcpyHostToDevice));
     }
-
-    hipLaunchKernelGGL((_rmsprop<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, avars, signs, steps, gradients.Data(), n,
-                                                                       RMS_GAMMA, RMS_WGT_INC, RMS_WGT_MAX, RMS_WGT_DEC, RMS_WGT_MIN,
-                                                                       floor, upd_gpu, multipliers);
-
+    // Copying to local variables to avoid typecast issue
+    ElemType* tempAvars = avars;
+    ElemType* tempSigns = signs;
+    ElemType* tempSteps = steps;
+    ElemType* tempCurrgrad = gradients.Data();
+    const CUDA_LONG tempN = n;
+    ElemType tempRMS_GAMMA = RMS_GAMMA;
+    ElemType tempRMS_WGT_INC = RMS_WGT_INC;
+    ElemType tempRMS_WGT_MAX = RMS_WGT_MAX;
+    ElemType tempRMS_WGT_DEC = RMS_WGT_DEC;
+    ElemType tempRMS_WGT_MIN = RMS_WGT_MIN;
+    ElemType tempFloor = floor;
+    ElemType* tempUpd_gpu = upd_gpu;
+    ElemType* tempMultipliers = multipliers;
+    hipLaunchKernelGGL((_rmsprop<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, tempAvars, tempSigns, tempSteps, tempCurrgrad, tempN,
+                                                                           tempRMS_GAMMA, tempRMS_WGT_INC, tempRMS_WGT_MAX, tempRMS_WGT_DEC, tempRMS_WGT_MIN,
+                                                                           tempFloor, tempUpd_gpu, tempMultipliers);
     if (!needAveMultiplier)
         return 1;
 
@@ -2415,7 +2428,12 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignTruncateBottomOf(const GPUMatrix
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     PrepareDevice();
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_assignTruncateBottom<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, Data(), a.Data(), threshold, N);
+    // Copying to local variables to avoid typecast issue
+    ElemType* tempUs = Data();
+    const ElemType* tempA = a.Data();
+    const ElemType tempThreshold = threshold;
+    const CUDA_LONG tempN = N;
+    hipLaunchKernelGGL((_assignTruncateBottom<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, tempUs, tempA, tempThreshold, tempN);
     return *this;
 }
 
@@ -3741,8 +3759,14 @@ template <class ElemType>
                     printf("buffer valid\n");
             }
 #endif
-
-            hipLaunchKernelGGL((_matrixVectorColumnWiseAddWithThreadPerElem<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a.Data(), c.Data(), c.Data(), alpha, m, n);
+            // Copying to local variables to avoid typecast issue
+            const ElemType* tempA = a.Data();
+	    const ElemType* tempB = c.Data();
+	    ElemType* tempC = c.Data();
+	    ElemType tempAlpha = alpha;
+            const CUDA_LONG tempRows = m;
+            const CUDA_LONG tempCols = n;
+            hipLaunchKernelGGL((_matrixVectorColumnWiseAddWithThreadPerElem<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, tempA, tempB, tempC, tempAlpha, tempRows, tempCols);
         }
         else if (a.GetNumRows() == 1) // row vector, add it to all rows
         {
@@ -4258,7 +4282,13 @@ bool GPUMatrix<ElemType>::AreEqual(const GPUMatrix<ElemType>& a, const GPUMatrix
     CUDA_CALL(hipMemcpy(d_res, res, sizeof(long) * 1, hipMemcpyHostToDevice));
     CUDA_LONG N = (CUDA_LONG) a.GetNumElements();
     int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
-    hipLaunchKernelGGL((_areEqual<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a.Data(), b.Data(), N, threshold, d_res);
+    // Copying to local variables to avoid typecast issue
+    const ElemType* tempA = a.Data();
+    const ElemType* tempB = b.Data();
+    const CUDA_LONG tempN = N;
+    const ElemType tempThreshold = threshold;
+    long* tempD_res = d_res;
+    hipLaunchKernelGGL((_areEqual<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, tempA, tempB, tempN, tempThreshold, tempD_res);
     CUDA_CALL(hipMemcpy(res, d_res, sizeof(long) * 1, hipMemcpyDeviceToHost));
     TracingGPUMemoryAllocator::Free<long>(a.GetComputeDeviceId(), d_res);
     if (res[0] != 0)
@@ -4471,7 +4501,13 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignOneHot(const GPUMatrix<ElemType>
     CUDA_LONG N = (CUDA_LONG)a.GetNumElements();
     int blocksPerGrid = (int)ceil(((double)N) / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_assignOneHot<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, a.Data(), Data(), num_class, item_size, N);
+    // Copying to local variables to avoid typecast issue
+    ElemType *tempIndices = a.Data();
+    ElemType *tempTargetBuffer = Data();
+    size_t tempNum_class = num_class;
+    size_t tempNum_item = item_size;
+    size_t tempNum_element = N;
+    hipLaunchKernelGGL((_assignOneHot<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, tempIndices, tempTargetBuffer, tempNum_class, tempNum_item, tempNum_element);
     return *this;
 }
 

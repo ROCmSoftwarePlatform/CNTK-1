@@ -676,16 +676,25 @@ void GPUSparseMatrix<ElemType>::Reshape(const size_t numRows, const size_t numCo
 
         int blocksPerGrid = (int) ceil(1.0 * numCols / GridDim::maxThreadsPerBlock);
         SyncGuard syncGuard;
-        hipLaunchKernelGGL((_reshape<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
-            GetNumRows(),                // old row count
-            GetNumCols(),                // old col count
-            numRows,                  // new row count
-            numCols,                  // new col count
-            MajorIndexLocation(),     // old row index array
-            SecondaryIndexLocation(), // old column index array
-            majorIndexInNewBuffer,    // new row index array
-            secondaryIndexInNewBuffer // new column index array
-            );
+		// Copying to local variables to avoid typecast issue
+        const int tempOldNumRows = GetNumRows();
+        const int tempOldNumCols = GetNumCols();
+        const int tempNewNumRows = numRows;
+        const int tempNewNumCols = numCols;
+        const GPUSPARSE_INDEX_TYPE* tempOldRowIndex = MajorIndexLocation();
+        const GPUSPARSE_INDEX_TYPE* tempOldColumnIndex = SecondaryIndexLocation();
+        GPUSPARSE_INDEX_TYPE* tempNewRowIndex = majorIndexInNewBuffer;
+        GPUSPARSE_INDEX_TYPE* tempNewColumnIndex = secondaryIndexInNewBuffer;
+        hipLaunchKernelGGL((_reshape<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream,
+                    tempOldNumRows,     // old row count
+                    tempOldNumCols,     // old col count
+                    tempNewNumRows,     // new row count
+                    tempNewNumCols,     // new col count
+                    tempOldRowIndex,     // old row index array
+                    tempOldColumnIndex, // old column index array
+                    tempNewRowIndex,    // new row index array
+                    tempNewColumnIndex // new column index array
+                    );
         TracingGPUMemoryAllocator::Free<ElemType>(GetComputeDeviceId(), Buffer());
     }
 
@@ -1348,13 +1357,21 @@ void GPUSparseMatrix<ElemType>::MultiplyAndAdd(ElemType alpha, const GPUMatrix<E
         CUDA_CALL(hipMemcpy(blockSize, &blockSizePrev, sizeof(size_t), hipMemcpyHostToDevice));
 
         blocksPerGrid = (int) ceil(((double) rhs_nz) / GridDim::maxThreadsPerBlock);
+        // Copying to local variables to avoid typecast issue
+        const GPUSPARSE_INDEX_TYPE* tempRowIndexes = rhs.RowLocation();
+        GPUSPARSE_INDEX_TYPE* tempCol2BlockIds = c.ColOrRow2BlockId();
+        const size_t tempNnz = rhs_nz;
         hipLaunchKernelGGL((_findColsWithValues<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
-            rhs.RowLocation(), c.ColOrRow2BlockId(), rhs_nz);
+                    tempRowIndexes, tempCol2BlockIds, tempNnz);
 
         blocksPerGrid = (int) ceil(((double) n) / GridDim::maxThreadsPerBlock);
-        hipLaunchKernelGGL((_determineBlockIds<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
-            c.BlockId2ColOrRow(), c.ColOrRow2BlockId(), n, blockSize);
-
+        // Copying to local variables to avoid typecast issue
+        GPUSPARSE_INDEX_TYPE* tempBlockId2Col = c.BlockId2ColOrRow();
+        GPUSPARSE_INDEX_TYPE* tempCol2BlockId = c.ColOrRow2BlockId();
+        size_t tempNumCols = n;
+        size_t* tempBlockSize = blockSize;
+        hipLaunchKernelGGL((_determineBlockIds<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream,
+			tempBlockId2Col, tempCol2BlockId, tempNumCols, tempBlockSize);
         size_t blockSizeCurr;
         CUDA_CALL(hipMemcpy(&blockSizeCurr, blockSize, sizeof(size_t), hipMemcpyDeviceToHost));
         TracingGPUMemoryAllocator::Free<size_t>(lhs.GetComputeDeviceId(), blockSize);
@@ -1370,16 +1387,26 @@ void GPUSparseMatrix<ElemType>::MultiplyAndAdd(ElemType alpha, const GPUMatrix<E
 
         LONG64 N = (LONG64) lhs.GetNumElements(); // here we process for each row in lhs and each column in rhs (==columns in lhs)
         blocksPerGrid = (int) ceil(((double) N) / GridDim::maxThreadsPerBlock);
-        hipLaunchKernelGGL((_denseMulSparseCSCTransposeToSparseBlockCol2<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
-            alpha,
-            lhs.Data(),
-            m,
-            l,
-            rhs.Data(),
-            rhs.RowLocation(),
-            rhs.ColLocation(),
-            c.ColOrRow2BlockId(),
-            c.Data());
+        // Copying to local variables to avoid typecast issue
+        const ElemType tempAlpha = alpha;
+        const ElemType* tempLhsValues = lhs.Data();
+        const size_t tempNumRowsLhs = m;
+        const size_t tempNumColsRhs = l;
+        const ElemType* tempRhsNZValues = rhs.Data();
+        const GPUSPARSE_INDEX_TYPE* tempRhsRows = rhs.RowLocation();
+        const GPUSPARSE_INDEX_TYPE* tempRhsCols = rhs.ColLocation();
+        const GPUSPARSE_INDEX_TYPE* tempCol2blockIds = c.ColOrRow2BlockId();
+        ElemType* tempResultValues = c.Data();
+        hipLaunchKernelGGL((_denseMulSparseCSCTransposeToSparseBlockCol2<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream,
+			tempAlpha,
+			tempLhsValues,
+			tempNumRowsLhs,
+			tempNumColsRhs,
+			tempRhsNZValues,
+			tempRhsRows,
+			tempRhsCols,
+			tempCol2blockIds,
+			tempResultValues);
     }
     else if (transposeA && !transposeB)
     {
@@ -1602,10 +1629,23 @@ void GPUSparseMatrix<ElemType>::FSAdagrad(
 
     size_t n = GetNumElements();
     int blocksPerGrid = (n + GridDim::maxThreadsPerBlock - 1) / GridDim::maxThreadsPerBlock;
-    hipLaunchKernelGGL((_fsadagrad4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
-        n, Data(), ColOrRow2BlockId(), GetNumRows(),
-        c.Data(), c.Data() + n, functionValues.Data(),
-        learnRatePerSample, momentum, adaWeight, adaMul, unitGainFactor);
+    // Copying to local variables to avoid typecast issue
+    CUDA_LONG tempSize = n;
+    ElemType* tempGrad_bsc = Data();
+    const GPUSPARSE_INDEX_TYPE* tempColOrRow2blockId = ColOrRow2BlockId();
+    const size_t tempLen = GetNumRows();
+    ElemType* tempSmoothAda = c.Data();
+    ElemType* tempSmoothMom = c.Data() + n;
+    ElemType* tempVal= functionValues.Data();
+    ElemType tempLr = learnRatePerSample;
+    ElemType tempMom = momentum;
+    ElemType tempAdaWeight = adaWeight;
+    ElemType tempAdaMul = adaMul;
+    ElemType tempUnitGainFactor = unitGainFactor;
+    hipLaunchKernelGGL((_fsadagrad4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0,
+           tempSize, tempGrad_bsc, tempColOrRow2blockId, tempLen,
+           tempSmoothAda, tempSmoothMom, tempVal,
+           tempLr, tempMom, tempAdaWeight, tempAdaMul, tempUnitGainFactor);
 }
 
 template <class ElemType>
@@ -1711,12 +1751,28 @@ ElemType GPUSparseMatrix<ElemType>::RmsProp(GPUMatrix<ElemType>& c,
         CUDA_CALL(hipMemcpy(upd_gpu, upd, sizeof(ElemType) * _countof(upd), hipMemcpyHostToDevice));
     }
 
+    // Copying to local variables to avoid typecast issue
+    ElemType* tempAvars = avars;
+    ElemType* tempSigns = signs;
+    ElemType* tempSteps = steps;
+    ElemType* tempGrad_bsc = Data();
+    const GPUSPARSE_INDEX_TYPE* tempColOrRow2blockId = ColOrRow2BlockId();
+    const size_t tempLen = GetNumRows();
+    const CUDA_LONG tempN = n;
+    ElemType tempRMS_GAMMA = RMS_GAMMA;
+    ElemType tempRMS_WGT_INC = RMS_WGT_INC;
+    ElemType tempRMS_WGT_MAX = RMS_WGT_MAX;
+    ElemType tempRMS_WGT_DEC = RMS_WGT_DEC;
+    ElemType tempRMS_WGT_MIN = RMS_WGT_MIN;
+    ElemType tempFloor = floor;
+    ElemType* tempUpd_gpu = upd_gpu;
+    ElemType* tempMultipliers = multipliers;
     hipLaunchKernelGGL((_rmsprop4BlockSparseCol<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, 
-        avars, signs, steps,
-        Data(), ColOrRow2BlockId(), GetNumRows(),
-        n,
-        RMS_GAMMA, RMS_WGT_INC, RMS_WGT_MAX, RMS_WGT_DEC, RMS_WGT_MIN,
-        floor, upd_gpu, multipliers);
+        tempAvars, tempSigns, tempSteps,
+        tempGrad_bsc, tempColOrRow2blockId, tempLen,
+        tempN,
+        tempRMS_GAMMA, tempRMS_WGT_INC, tempRMS_WGT_MAX, tempRMS_WGT_DEC, tempRMS_WGT_MIN,
+        tempFloor, tempUpd_gpu, tempMultipliers);
 
     if (!needAveMultiplier)
         return 1;
@@ -2063,7 +2119,11 @@ void GPUSparseMatrix<ElemType>::Scale(ElemType alpha, GPUSparseMatrix<ElemType>&
     CUDA_LONG N = (CUDA_LONG) a.GetNumNZElements();
     int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_scaleArray<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, alpha, a.NzValues(), N);
+    // Copying to local variables to avoid typecast issue
+    ElemType tempAlpha = alpha;
+    ElemType* tempUs = a.NzValues();
+    CUDA_LONG tempN = N;
+    hipLaunchKernelGGL((_scaleArray<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, tempAlpha, tempUs, tempN);
 }
 
 template <class ElemType>
@@ -2240,7 +2300,14 @@ bool GPUSparseMatrix<ElemType>::IsValid() const
     auto fc_gnnze = GetNumNZElements();
     auto fc_gnr = GetNumRows();
     auto fc_gnc = GetNumCols();
-    hipLaunchKernelGGL((_isValid<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_mail, fc_sil, fc_gnr, fc_gnc, fc_gnnze, d_res);
+    // Copying to local variables to avoid typecast issue
+    const GPUSPARSE_INDEX_TYPE* tempRowIndex = fc_mail;
+    const GPUSPARSE_INDEX_TYPE* tempColCSCIndex = fc_sil;
+    const int tempRows = fc_gnr;
+    const int tempCols = fc_gnc;
+    const int tempNz = fc_gnnze;
+    long* tempD_res = d_res;
+	hipLaunchKernelGGL((_isValid<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, tempRowIndex, tempColCSCIndex, tempRows, tempCols, tempNz, tempD_res);
 
     CUDA_CALL(hipMemcpy(res, d_res, sizeof(long) * 4, hipMemcpyDeviceToHost));
 
@@ -2274,6 +2341,7 @@ template <class ElemType>
     CUDA_CALL(hipMemcpy(d_res, res, sizeof(long) * 3, hipMemcpyHostToDevice));
 
     int blocksPerGrid = (int) ceil(1.0 * a.GetNumNZElements() / GridDim::maxThreadsPerBlock);
+
     hipLaunchKernelGGL((_areEqual<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, a.NzValues(), b.NzValues(), (CUDA_LONG) a.GetNumNZElements(), threshold, d_res);
     hipLaunchKernelGGL((_areEqual<int>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, a.MajorIndexLocation(), b.MajorIndexLocation(), (CUDA_LONG) a.MajorIndexCount(), (int)(comp_t) threshold, d_res + 1);
     blocksPerGrid = (int) ceil((1.0 * a.SecondaryIndexCount()) / GridDim::maxThreadsPerBlock);
@@ -2975,6 +3043,7 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::AssignOneHot(const GPUMatr
     this->RequireSizeAndAllocate(nRows, nCols, a.GetNumElements());
     this->PrepareDevice();
 
+
     ElemType* indices = a.Data();
     GPUSPARSE_INDEX_TYPE* secondaryIndices = SecondaryIndexLocation();
     GPUSPARSE_INDEX_TYPE* majorIndices = MajorIndexLocation();
@@ -2982,13 +3051,21 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::AssignOneHot(const GPUMatr
     CUDA_LONG N = (CUDA_LONG)a.GetNumElements();
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_assignOneHotAsSparse<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, indices,
-                                                                                    secondaryIndices,
-                                                                                    majorIndices,
-                                                                                    targetData,
-                                                                                    num_class,
-                                                                                    item_size,
-                                                                                    N);
+    // Copying to local variables to avoid typecast issue
+    ElemType *tempIndices = indices;
+    GPUSPARSE_INDEX_TYPE *tempSecondaryIndices = secondaryIndices;
+    GPUSPARSE_INDEX_TYPE *tempMajorIndices = majorIndices;
+    ElemType *tempTargetBuffer = targetData;
+    size_t tempNum_class = num_class;
+    int tempNum_item = item_size;
+    size_t tempNum_elements = N;
+    hipLaunchKernelGGL((_assignOneHotAsSparse<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, tempIndices,
+                                                                                    tempSecondaryIndices,
+                                                                                    tempMajorIndices,
+                                                                                    tempTargetBuffer,
+                                                                                    tempNum_class,
+                                                                                    tempNum_item,
+                                                                                    tempNum_elements);
 
     return *this;
 }
