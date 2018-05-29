@@ -813,7 +813,8 @@ static void LaunchTensorOp(ElemType beta, array<ElemType*, N> pointerVector, Ele
     }
     else
     {
-        hipLaunchKernelGGL((_launchTensorOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, beta,  pointers, alpha, op, (ElementWiseOperator)(-1) /* dummy reductionOp */, regularOpStrides, regularStrides,
+        ElementWiseOperator reductionOp = (ElementWiseOperator)(-1);
+        hipLaunchKernelGGL((_launchTensorOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, beta,  pointers, alpha, op, reductionOp , regularOpStrides, regularStrides,
                                                                                                                      grid.m_N, reducingOpDims, reducingStrides,
                                                                                                                      regularOpStrideDivmod, reducingOpDimDivmod);
     }
@@ -998,7 +999,7 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
         //  - Z: reduction chunks
 
         // reduction goes into thread dim X
-        int reductionChunkSize = CeilDiv(reductionDim, numReductionChunks);
+        CUDA_LONG reductionChunkSize = CeilDiv(reductionDim, numReductionChunks);
         int numThreadsX = std::min<int>(reductionChunkSize, GridDim::maxThreadsPerBlock); // any that's over will be done by looping inside the kernel
 
         // --- cases (a1) and (a2)
@@ -1107,7 +1108,6 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ - 1)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, /*beta=*/1, pointers, alpha, op, reductionOp, regularOpStrides, regularStrides, NN, reducingOpDims, reducingStrides, reductionChunkSize, reductionChunkSize,
                                                                    regularOpStrideDivmod, reducingOpDimDivmod);
 
->>>>>>> ff2d86733194062823a24da55578a903ebc75750
         }
 #endif
     }

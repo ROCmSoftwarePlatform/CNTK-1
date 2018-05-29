@@ -1178,7 +1178,10 @@ void GPUMatrix<ElemType>::SetValue(const ElemType* d_v) // d_v is pointer to the
     int blocksPerGrid = (int) ceil(1.0 * N / GridDim::maxThreadsPerBlock);
     PrepareDevice();
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_setValue<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, Data(), d_v, N);
+    ElemType* a = Data();
+    const ElemType* ad_v = d_v;
+    const CUDA_LONG NN = N;
+    hipLaunchKernelGGL((_setValue<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a, ad_v, NN);
 }
 
 template <class ElemType>
@@ -1431,7 +1434,7 @@ void GPUMatrix<ElemType>::SetGumbelRandomValue(RNGHandle& rngHandle, const ElemT
         HIPRAND_CALL(hiprandGenerateUniformHelper(gpuRNGHandle->Generator(), Data(), GetNumElements()));
     }
 
-    size_t N = GetNumElements();
+    CUDA_LONG N = GetNumElements();
     size_t blocksPerGrid = (size_t)ceil(N / (double)GridDim::maxThreadsPerBlock);
 
     {
@@ -1465,7 +1468,7 @@ void GPUMatrix<ElemType>::SetTruncatedNormalRandomValue(const ElemType mean, con
         HIPRAND_CALL(hiprandGenerateUniformHelper(((hiprandGenerator_t*)s_hiprandGenerator)[0], Data(), GetNumElements()));
     }
 
-    size_t N = GetNumElements();
+    CUDA_LONG N = GetNumElements();
     size_t blocksPerGrid = (size_t)ceil(N / (double)GridDim::maxThreadsPerBlock);
 
     {
@@ -1493,10 +1496,11 @@ void GPUMatrix<ElemType>::SetUniformRandomMask(const ElemType maskRate, const El
     CUDA_CALL(hipEventSynchronize(done));
     CUDA_CALL(hipEventDestroy(done));
 
-    size_t N = GetNumElements();
+    CUDA_LONG N = GetNumElements();
     size_t blocksPerGrid = (size_t) ceil(N / (double) GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
-    hipLaunchKernelGGL((_setMaskAndScale<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, Data(), N, maskRate, scaleValue);
+    ElemType* a = Data();
+    hipLaunchKernelGGL((_setMaskAndScale<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a, N, maskRate, scaleValue);
 }
 
 template <class ElemType>
@@ -3085,8 +3089,8 @@ void GPUMatrix<ElemType>::VectorMin(GPUMatrix<ElemType>& minIndexes, GPUMatrix<E
         LogicError("VectorMax: Matrix is empty.");
 
     const GPUMatrix<ElemType>& us = *this;
-    const int m = (int) GetNumRows();
-    const int n = (int) GetNumCols();
+    const CUDA_LONG m = (CUDA_LONG) GetNumRows();
+    const CUDA_LONG n = (CUDA_LONG) GetNumCols();
 
     assert(m > 0 && n > 0); // converting from size_t to int may cause overflow
     PrepareDevice();
@@ -3130,7 +3134,8 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignNumOfDiff(const GPUMatrix<ElemTy
         // int blocksPerGrid=(int)ceil(1.0*a.GetNumElements()/GridDim::maxThreadsPerBlock);
         // hipLaunchKernelGGL((_assignNumOfDiff1024Threads<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a.Data(), b.Data(), Data(), a.GetNumElements());
         // note: kernel has hard-coded dimension of 1024
-        hipLaunchKernelGGL((_assignNumOfDiff1024Threads<ElemType>), dim3(1), dim3(1024), 0, t_stream, a.Data(), b.Data(), Data(), (CUDA_LONG)a.GetNumElements());
+        CUDA_LONG N = a.GetNumElements();
+        hipLaunchKernelGGL((_assignNumOfDiff1024Threads<ElemType>), dim3(1), dim3(1024), 0, t_stream, a.Data(), b.Data(), Data(), N);
     }
     else
     {
