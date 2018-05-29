@@ -161,15 +161,6 @@ struct GridDim
 #if defined( __HIP_ENABLE_ASSERT__ )
         assert(m_blocksPerGrid * m_threadsPerBlock >= N);
 #endif
-        printf("************************************************\n");
-        printf("N : %d\n",N);
-        printf("numProcs : %d\n",numProcs);
-        printf("warpSize : %d\n",warpSize);
-        printf("warpsPerProc : %d\n",warpsPerProc);
-        printf("maxWarpsPerBlock : %d\n",maxWarpsPerBlock);
-        printf("m_threadsPerBlock : %d\n",m_threadsPerBlock);
-        printf("m_blocksPerGrid : %d\n",m_blocksPerGrid);
-        printf("************************************************\n");
     }
 
     static const std::vector<hipDeviceProp_t>& GetCachedDeviceProps()
