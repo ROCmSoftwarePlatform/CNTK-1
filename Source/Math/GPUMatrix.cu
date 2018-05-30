@@ -28,6 +28,10 @@
 #include "CntkBatchNormalization.cuh"
 #include "Convolution.cuh"
 #include "CuDnnRNN.h"
+#include <boost/random/normal_distribution.hpp>
+#pragma warning(pop)
+#include <boost/random/uniform_real_distribution.hpp>
+#include "CPUMatrix.h"
 
 #pragma comment(lib, "cudart.lib") // instruct linker to reference these libs
 #pragma comment(lib, "cublas.lib")
@@ -1369,6 +1373,7 @@ template <class ElemType>
 void GPUMatrix<ElemType>::SetUniformRandomValue(const ElemType low, const ElemType high, unsigned long seed)
 {
     PrepareDevice();
+#ifdef HIPRAND_ENABLE
     CreateCurandObject(seed, __FUNCTION__); // TODO call ResetCurandObject() instead?
 
     {
@@ -1378,6 +1383,34 @@ void GPUMatrix<ElemType>::SetUniformRandomValue(const ElemType low, const ElemTy
         HIPRAND_CALL(hiprandGenerateUniformHelper(((hiprandGenerator_t*) s_hiprandGenerator)[0], Data(), GetNumElements()));
     }
     RescaleToRange(*this, low, high);
+#else  // Fall back to CPU
+    if (IsEmpty())
+        LogicError("SetUniformRandomValue: Matrix is empty.");
+
+    std::mt19937_64 generator;
+    generator.seed(seed == USE_TIME_BASED_SEED ? (unsigned long) time(NULL) : seed);
+    boost::random::uniform_real_distribution<double> r((double)low, (double)high);
+
+    ElemType* bufPtr = CopyToArray();
+    long m = (long) GetNumElements();
+    // four-way unrolling
+    for (long i = 0; i < (m & ~3); i += 4)
+    {
+        bufPtr[i]     = (ElemType)r(generator);
+        bufPtr[i + 1] = (ElemType)r(generator);
+        bufPtr[i + 2] = (ElemType)r(generator);
+        bufPtr[i + 3] = (ElemType)r(generator);
+    }
+    // handle remaining stuffs
+    for (long i = m & ~3; i < m; i++)
+    {
+        bufPtr[i] = (ElemType)r(generator);
+    }
+
+    //Copy Host results to GPU buffer
+    hipMemcpy(Data(), bufPtr, sizeof(ElemType) * m, hipMemcpyHostToDevice);
+
+#endif
 }
 
 template <class ElemType>
@@ -1385,6 +1418,7 @@ void GPUMatrix<ElemType>::SetUniformRandomValue(RNGHandle& rngHandle, const Elem
 {
     PrepareDevice();
 
+#ifdef HIPRAND_ENABLE
     GPURNGHandle* gpuRNGHandle = dynamic_cast<GPURNGHandle*>(&rngHandle);
     assert(gpuRNGHandle != nullptr);
 
@@ -1395,6 +1429,22 @@ void GPUMatrix<ElemType>::SetUniformRandomValue(RNGHandle& rngHandle, const Elem
         HIPRAND_CALL(hiprandGenerateUniformHelper(gpuRNGHandle->Generator(), Data(), GetNumElements()));
     }
     RescaleToRange(*this, low, high);
+#else
+    if (IsEmpty())
+        LogicError("SetUniformRandomValue: Matrix is empty.");
+
+    CPURNGHandle* cpuRNGHandle = dynamic_cast<CPURNGHandle*>(&rngHandle);
+    if (cpuRNGHandle == nullptr)
+        LogicError("rngHandle must be a CPURNGHandle.");
+
+    boost::random::uniform_real_distribution<double> r((double)low, (double)high);
+    ElemType* hData = CopyToArray();
+    std::generate(hData, hData + GetNumElements(), [&cpuRNGHandle, &r]() {return (ElemType)r(cpuRNGHandle->Generator()); });
+
+    //Copy Host results to GPU buffer
+    hipMemcpy(Data(), hData, sizeof(ElemType) * GetNumElements(), hipMemcpyHostToDevice);
+
+#endif
 }
 
 template <class ElemType>
@@ -1485,7 +1535,7 @@ template <class ElemType>
 void GPUMatrix<ElemType>::SetUniformRandomMask(const ElemType maskRate, const ElemType scaleValue, RNGHandle& rngHandle)
 {
     PrepareDevice();
-
+#ifdef HIPRAND_ENABLE
     GPURNGHandle* gpuRNGHandle = dynamic_cast<GPURNGHandle*>(&rngHandle);
     assert(gpuRNGHandle != nullptr);
 
@@ -1496,11 +1546,52 @@ void GPUMatrix<ElemType>::SetUniformRandomMask(const ElemType maskRate, const El
     CUDA_CALL(hipEventSynchronize(done));
     CUDA_CALL(hipEventDestroy(done));
 
+
     CUDA_LONG N = GetNumElements();
     size_t blocksPerGrid = (size_t) ceil(N / (double) GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
     ElemType* a = Data();
     hipLaunchKernelGGL((_setMaskAndScale<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, a, N, maskRate, scaleValue);
+#else
+   std:cout<<"Testing SetUniformRandomMask"<<std::endl;
+   if (IsEmpty())
+        LogicError("SetUniformRandomValue: Matrix is empty.");
+
+    CPURNGHandle* cpuRNGHandle = static_cast<CPURNGHandle*>(&rngHandle);
+    if (cpuRNGHandle == nullptr)
+        LogicError("rngHandle must be a CPURNGHandle.");
+
+    boost::random::uniform_real_distribution<double> r(0, 1);
+    long m = (long) GetNumRows(), n = (long) GetNumCols();
+    CPUMatrix<ElemType> us(m, n);
+    ElemType v;
+    std::mt19937_64 generator;
+    for (long j = 0; j < n; j++)
+    {
+        // four-way unrolling
+        for (long i = 0; i < (m & ~3); i += 4)
+        {
+            v = (ElemType)r(generator);
+            us(i, j) = v <= maskRate ? (ElemType)0 : scaleValue;
+            v = r(generator);
+            us(i + 1, j) = v <= maskRate ? (ElemType)0 : scaleValue;
+            v = r(generator);
+            us(i + 2, j) = v <= maskRate ? (ElemType)0 : scaleValue;
+            v = r(generator);
+            us(i + 3, j) = v <= maskRate ? (ElemType)0 : scaleValue;
+        }
+        // handle remaining stuffs
+        for (long i = m & ~3; i < m; i++)
+        {
+            v = (ElemType)r(generator);
+            us(i, j) = v <= maskRate ? (ElemType)0 : scaleValue;
+        }
+    }
+
+    // copy Back results to GPU
+    hipMemcpy(Data(), us.Data(), sizeof(ElemType) * GetNumElements(), hipMemcpyHostToDevice);
+
+#endif
 }
 
 template <class ElemType>
@@ -2333,9 +2424,24 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignLogSoftmaxOf(const GPUMatrix<Ele
         PrepareDevice();
         CUDA_LONG N = (CUDA_LONG) GetNumCols();
         CUDA_LONG M = (CUDA_LONG) GetNumRows();
+
+
+
         SyncGuard syncGuard;
         // note: kernel uses hard-coded thread dimension
         hipLaunchKernelGGL((_assignColumnwiseLogSoftmaxOf512Threads), dim3(N), dim3(512), 0, t_stream, static_cast<const ElemType*>(a.Data()), static_cast<ElemType*>(Data()), static_cast<const CUDA_LONG>(N), static_cast<const CUDA_LONG>(M));
+         // note: kernel uses hard-coded thread dimension
+//
+//          ElemType* hA = CopyToArray();
+//                std::cout<<"Input to _assignColumnwiseLogSoftmaxOf512Threads kernel with Numrows and Columns: "<< M <<" and " << N <<std::endl;
+//                for(int i =0; i < M; i++) {
+//                    for (int j =0; j < N; j++){
+//                        std::cout<<(float)hA[i * N + j]<<" ";
+//                    }
+//                    std::cout<<std::endl;
+//                }
+//           exit(1);
+
     }
     else
     {
@@ -2600,6 +2706,8 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::ElementMultiplyWith(const GPUMatrix<El
 template <class ElemType>
 GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignElementProductOf(const GPUMatrix<ElemType>& a, const GPUMatrix<ElemType>& b)
 {
+
+#ifdef HIPRAND_ENABLE
     if (a.IsEmpty() || b.IsEmpty())
         LogicError("AssignElementProductOf: Matrix is empty.");
 
@@ -2614,6 +2722,45 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignElementProductOf(const GPUMatrix
     SyncGuard syncGuard;
     hipLaunchKernelGGL((_assignElementProductOf<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, Data(), a.Data(), b.Data(), N);
     return *this;
+#else
+    if (a.IsEmpty() || b.IsEmpty())
+        LogicError("AssignElementProductOf: Matrix is empty.");
+
+    if (!(a.GetNumRows() == b.GetNumRows() && a.GetNumCols() == b.GetNumCols()))
+        InvalidArgument("AssignElementProductOf: The input matrix dimensions do not match.");
+
+    auto& dus = *this;
+
+    RequireSize(a.GetNumRows(), a.GetNumCols());
+    long m = (long) GetNumRows(), n = (long) GetNumCols();
+    CUDA_LONG N = (CUDA_LONG) GetNumElements();
+    CPUMatrix<ElemType> us(m, n);
+    CPUMatrix<ElemType> h_a(a.GetNumRows(), a.GetNumCols());
+    CPUMatrix<ElemType> h_b(b.GetNumRows(), b.GetNumCols());
+//  Device to Host Copy first
+    hipMemcpy(h_a.Data(), a.Data(), sizeof(ElemType) * a.GetNumElements(), hipMemcpyDeviceToHost);
+    hipMemcpy(h_b.Data(), b.Data(), sizeof(ElemType) * b.GetNumElements(), hipMemcpyDeviceToHost);
+#pragma omp parallel for
+    for (long j = 0; j < n; j++)
+    {
+        // four-way unrolling
+        for (long i = 0; i < (m & ~3); i += 4)
+        {
+            us(i, j) = h_a(i, j) * h_b(i, j);
+            us(i + 1, j) = h_a(i + 1, j) * h_b(i + 1, j);
+            us(i + 2, j) = h_a(i + 2, j) * h_b(i + 2, j);
+            us(i + 3, j) = h_a(i + 3, j) * h_b(i + 3, j);
+        }
+        // handle remaining stuffs
+        for (long i = m & ~3; i < m; i++)
+        {
+            us(i, j) = h_a(i, j) * h_b(i, j);
+        }
+    }
+    hipMemcpy(dus.Data(), us.Data(), sizeof(ElemType) * N, hipMemcpyHostToDevice);
+    return dus;
+
+#endif
 }
 
 template <class ElemType>
