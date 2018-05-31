@@ -574,6 +574,10 @@ protected:
                                                                    ptr(in), d_mpRowColData, d_mpRowIwhtData, d_mpRowRunData, 
                                                                    d_mRunsData, ptr(srcGrad), ptr(kernelGrad));
 
+        hipFree(d_mpRowColData);
+        hipFree(d_mpRowIwhtData);
+        hipFree(d_mpRowRunData);
+        hipFree(d_mRunsData);
 #endif
     }
 
