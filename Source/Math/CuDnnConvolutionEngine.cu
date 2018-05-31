@@ -5,7 +5,9 @@
 //
 
 #include "stdafx.h"
+#include "GPUMatrixCUDAKernels.cuh"
 #include "CuDnnFactories.h"
+#include "Convolution.cuh"
 #include "GPUMatrix.h"
 #include <typeinfo>
 #include <typeindex>
@@ -469,6 +471,7 @@ protected:
 
     void BackwardKernelCore(const Mat& srcGrad, const Mat& in, Mat& kernelGrad, bool accumulateGradient, bool /*allowReuse*/, Mat& workspace) override
     {
+#ifdef HIPDNN_ENABLE
         size_t batchSize = in.GetNumCols();
         // Find best algo and allocate temp buffer, if needed.
         auto finder = [&,this](int& calgo, hipdnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
@@ -551,6 +554,27 @@ protected:
         //m_backFiltAlgo.selectedAlgo =  HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_0;
         std::cout<<"Invoking hipdnnconvolution Backward filter"<<std::endl;
         HIPDNN_CALL(hipdnnConvolutionBackwardFilter(*m_cudnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
+#else
+        // Use Native reference BackwardKernel
+        const int BlockSize = 128;
+        int* d_mpRowColData, *d_mpRowIwhtData, *d_mpRowRunData, *d_mRunsData;
+        hipMalloc((void**)&d_mpRowColData, sizeof(int) * m_geometry->MpRowCol().size());
+        hipMalloc((void**)&d_mpRowIwhtData, sizeof(int) * m_geometry->MpRowIwht().size());
+        hipMalloc((void**)&d_mpRowRunData, sizeof(int) * m_geometry->MpRowRun().size());
+        hipMalloc((void**)&d_mRunsData, sizeof(int) * m_geometry->Runs().size());
+
+        hipMemcpy(d_mpRowColData, m_geometry->MpRowCol().data(), sizeof(int) * m_geometry->MpRowCol().size(), hipMemcpyHostToDevice);
+        hipMemcpy(d_mpRowIwhtData, m_geometry->MpRowIwht().data(), sizeof(int) * m_geometry->MpRowIwht().size(), hipMemcpyHostToDevice);
+        hipMemcpy(d_mpRowRunData, m_geometry->MpRowRun().data(), sizeof(int) * m_geometry->MpRowRun().size(), hipMemcpyHostToDevice);
+        hipMemcpy(d_mRunsData, m_geometry->Runs().data(), sizeof(int) * m_geometry->Runs().size(), hipMemcpyHostToDevice);
+        
+        auto gdim = dim3((srcGrad.GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)srcGrad.GetNumCols(), 65535));
+        SyncGuard syncGuard;
+        hipLaunchKernelGGL((kConvolutionBackwardKernel<ElemType>), dim3(gdim), dim3(BlockSize), 0, 0, (int)srcGrad.GetNumCols(), (int)in.GetNumRows(), (int)srcGrad.GetNumRows(),
+                                                                   ptr(in), d_mpRowColData, d_mpRowIwhtData, d_mpRowRunData, 
+                                                                   d_mRunsData, ptr(srcGrad), ptr(kernelGrad));
+
+#endif
     }
 
     void EnsurePoolingInitialized() override
