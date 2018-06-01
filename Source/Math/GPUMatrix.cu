@@ -1566,7 +1566,6 @@ void GPUMatrix<ElemType>::SetUniformRandomMask(const ElemType maskRate, const El
     CPUMatrix<ElemType> us(m, n);
     ElemType v;
     std::mt19937_64 generator;
-    generator.seed(time(NULL));
     for (long j = 0; j < n; j++)
     {
         // four-way unrolling
@@ -2419,7 +2418,6 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::InplaceLogSoftmax(const bool isColWise
 template <class ElemType>
 GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignLogSoftmaxOf(const GPUMatrix<ElemType>& a, const bool isColWise)
 {
-#ifdef HIPRAND_ENABLE
     RequireSize(a.GetNumRows(), a.GetNumCols());
     if (isColWise)
     {
@@ -2432,67 +2430,25 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignLogSoftmaxOf(const GPUMatrix<Ele
         SyncGuard syncGuard;
         // note: kernel uses hard-coded thread dimension
         hipLaunchKernelGGL((_assignColumnwiseLogSoftmaxOf512Threads), dim3(N), dim3(512), 0, t_stream, static_cast<const ElemType*>(a.Data()), static_cast<ElemType*>(Data()), static_cast<const CUDA_LONG>(N), static_cast<const CUDA_LONG>(M));
+         // note: kernel uses hard-coded thread dimension
+//
+//          ElemType* hA = CopyToArray();
+//                std::cout<<"Input to _assignColumnwiseLogSoftmaxOf512Threads kernel with Numrows and Columns: "<< M <<" and " << N <<std::endl;
+//                for(int i =0; i < M; i++) {
+//                    for (int j =0; j < N; j++){
+//                        std::cout<<(float)hA[i * N + j]<<" ";
+//                    }
+//                    std::cout<<std::endl;
+//                }
+//           exit(1);
+
     }
     else
     {
         NOT_IMPLEMENTED;
     }
 
-
-#else
-    if (a.IsEmpty())
-        LogicError("AssignLogSoftmaxOf: Matrix a is empty.");
-
-    CPUMatrix<ElemType> us(GetNumRows(), GetNumCols());
-    CPUMatrix<ElemType> h_a(a.GetNumRows(), a.GetNumCols());
-
-   // Copy stuffs to the host Array 
-   hipMemcpy(h_a.Data(), a.Data(), sizeof(ElemType) * a.GetNumElements(), hipMemcpyDeviceToHost);  
-
-    if (this != &a)
-        RequireSize(a.GetNumRows(), a.GetNumCols());
-
-    if (isColWise)
-    {
-#pragma omp parallel for
-        foreach_column (j, h_a)
-        {
-            // we need to extract max before applying exp to avoid overflow
-            ElemType maxV = h_a(0, j);
-            foreach_row (i,h_a)
-                maxV = std::max(maxV, h_a(i, j));
-
-            ElemType sum = 0;
-            foreach_row (i, h_a)
-                sum += exp(us(i, j) = h_a(i, j) - maxV);
-            sum = log(sum);
-            foreach_row (i, us)
-                us(i, j) -= sum;
-        }
-    }
-    else
-    {
-#pragma omp parallel for
-        foreach_row (i, h_a)
-        {
-            // we need to extract max before applying exp to avoid overflow
-            ElemType maxV = h_a(i, 0);
-            foreach_column (j, h_a)
-                maxV = std::max(maxV, h_a(i, j));
-
-            ElemType sum = 0;
-            foreach_column (j, a)
-                sum += exp(us(i, j) = h_a(i, j) - maxV);
-            sum = log(sum);
-            foreach_column (j, us)
-                us(i, j) -= sum;
-        }
-    }
-    // Copy Results back device
-    hipMemcpy(Data(), us.Data(), sizeof(ElemType) * us.GetNumElements(), hipMemcpyHostToDevice);
- 
-#endif
-        return *this;
+    return *this;
 }
 
 template <class ElemType>
@@ -3142,8 +3098,6 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AddSignOf(const GPUMatrix<ElemType>& a
 template <class ElemType>
 void GPUMatrix<ElemType>::VectorMax(GPUMatrix<ElemType>& maxIndexes, GPUMatrix<ElemType>& maxValues, const bool isColWise) const
 {
-
-#ifdef HIPRAND_ENABLE
     if (IsEmpty())
         LogicError("VectorMax: Matrix is empty.");
 
@@ -3173,77 +3127,6 @@ void GPUMatrix<ElemType>::VectorMax(GPUMatrix<ElemType>& maxIndexes, GPUMatrix<E
         int blocksPerGrid = (int) ceil(1.0 * m / GridDim::maxThreadsPerBlock);
         hipLaunchKernelGGL((_vectorMax<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, us.Data(), maxIndexes.Data(), maxValues.Data(), m, n, isColWise);
     }
-#else
-    if (IsEmpty())
-        LogicError("VectorMax: Matrix is empty.");
-
-    const int m = (int) GetNumRows();
-    const int n = (int) GetNumCols();
-    CPUMatrix<ElemType> us(m, n);
-    CPUMatrix<ElemType> h_maxValues(maxValues.GetNumRows(), maxValues.GetNumCols());
-    CPUMatrix<ElemType> h_maxIndexes(maxIndexes.GetNumRows(), maxIndexes.GetNumCols());
- 
-    // Copy From Device To Host context
-    hipMemcpy(us.Data(), Data(), sizeof(ElemType) * GetNumElements(), hipMemcpyDeviceToHost); 
-
-
-    assert(m > 0 && n > 0); // converting from size_t to int may cause overflow
-
-    if (isColWise) // col-wise
-    {
-        maxValues.RequireSize(1, n);
-        maxIndexes.RequireSize(1, n);
-        h_maxValues.RequireSize(1, n);
-        h_maxIndexes.RequireSize(1, n);
-
-#pragma omp parallel for
-	for (int j = 0; j < n; j++)
-	{
-		ElemType v = us(0, j);
-		size_t index = 0;
-		foreach_row (i, us)
-		{
-			if (v < us(i, j))
-			{
-				index = i;
-				v = us(i, j);
-			}
-		}
-		h_maxValues(0, j) = v;
-		h_maxIndexes(0, j) = (ElemType) index;
-	}
-    }
-    else
-    {
-
-        maxValues.RequireSize(m, 1);
-        maxIndexes.RequireSize(m, 1);
-        h_maxValues.RequireSize(m, 1);
-        h_maxIndexes.RequireSize(m, 1);
-
-#pragma omp parallel for
-        for (int i = 0; i < m; i++)
-        {
-            ElemType v = us(i, 0);
-            size_t index = 0;
-            foreach_column (j, us)
-            {
-                if (v < us(i, j))
-                {
-                    index = j;
-                    v = us(i, j);
-                }
-            }
-            h_maxValues(i, 0) = v;
-            h_maxIndexes(i, 0) = (ElemType) index;
-        }
-    }
-
-    //Copy Results Back to GPUs
-    hipMemcpy(maxValues.Data(), h_maxValues.Data(), sizeof(ElemType) * maxValues.GetNumElements(), hipMemcpyHostToDevice);
-    hipMemcpy(maxIndexes.Data(), h_maxIndexes.Data(), sizeof(ElemType) * maxIndexes.GetNumElements(), hipMemcpyHostToDevice);
-
-#endif
 }
 
 __global__ void _initIndicesForSort(uint64_t* indexes, CUDA_LONG crow, CUDA_LONG ccol)
