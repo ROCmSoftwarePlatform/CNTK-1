@@ -255,12 +255,12 @@ __global__ void kMaxPoolingBackward(int batchSize, const ElemType* out, const El
     }
 }
 
-__device__ float round_(float a)
+inline __device__ float round_(float a)
 {
     return roundf(a);
 }
 
-__device__ double round_(double a)
+inline __device__ double round_(double a)
 {
     return round(a);
 }
