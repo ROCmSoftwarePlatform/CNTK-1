@@ -61,6 +61,7 @@ static __inline__ __device__ double atomicAdd(double* address, double val)
   do {
       new_x = old_x + val;
   } while (!hc::atomic_compare_exchange(address_as_ull, reinterpret_cast<uint64_t*>(&old_x), *reinterpret_cast<uint64_t*>(&new_x)));
+  return __longlong_as_double(old_x);
 }
 #endif
 #ifdef __HIP_ENABLE_HALF__
