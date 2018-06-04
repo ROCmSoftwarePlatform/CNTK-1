@@ -251,9 +251,12 @@ struct TensorOps
     }
     static __device__ comp_t Compute(const FixedArray<ElemType*, 4>& pointers, ElementWiseOperator op)
     {
+        comp_t a = *(pointers[0]);
+        comp_t b = *(pointers[1]);
+        comp_t c = *(pointers[2]);
 #define CaseTernaryTensorOp(oper)       \
     case ElementWiseOperator::op##oper:                             \
-        return Op##oper((comp_t)*(pointers[0]), (comp_t)*(pointers[1]), (comp_t)*(pointers[2])) // reading each time, which saves mem accesses for OpCond
+        return Op##oper(a, b, c)
         switch (op)
         {
             ForAllTernaryOps(CaseTernaryTensorOp);
