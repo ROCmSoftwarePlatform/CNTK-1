@@ -226,6 +226,11 @@ public:
                            size_t maxTempMemSizeInSamples, PoolKind poolKind, bool forceDeterministicAlgorithms,
                            bool poolIncludePad, bool inputHasFreeDimension)
         : Base(geometry, deviceId, imageLayout, maxTempMemSizeInSamples, poolKind, poolIncludePad),
+          m_isConvGeometryComputed(geometry->ComputeConvGeometryExplicit()),
+          m_mpRowCol(geometry->MpRowCol().size(), 1, (float*)const_cast<int*>(geometry->MpRowCol().data()),deviceId,  IsGpu(deviceId) ? matrixFlagNormal : matrixFlagDontOwnBuffer), 
+          m_mpRowIwht(geometry->MpRowIwht().size(), 1, (float*)const_cast<int*>(geometry->MpRowIwht().data()),deviceId,  IsGpu(deviceId) ? matrixFlagNormal : matrixFlagDontOwnBuffer), 
+          m_mpRowRun(geometry->MpRowRun().size(), 1, (float*)const_cast<int*>(geometry->MpRowRun().data()),deviceId,  IsGpu(deviceId) ? matrixFlagNormal : matrixFlagDontOwnBuffer), 
+          m_runs(geometry->Runs().size(), 1, (float*)const_cast<int*>(geometry->Runs().data()),deviceId,  IsGpu(deviceId) ? matrixFlagNormal : matrixFlagDontOwnBuffer), 
           m_cudnn(CuDnn::Instance()),
           m_dataType(CuDnnTensor::GetDataType<ElemType>()),
           m_forceDeterministicAlgorithms(forceDeterministicAlgorithms),
@@ -471,7 +476,7 @@ protected:
 
     void BackwardKernelCore(const Mat& srcGrad, const Mat& in, Mat& kernelGrad, bool accumulateGradient, bool /*allowReuse*/, Mat& workspace) override
     {
-#ifdef HIPDNN_ENABLE
+#if HIPDNN_ENABLE
         size_t batchSize = in.GetNumCols();
         // Find best algo and allocate temp buffer, if needed.
         auto finder = [&,this](int& calgo, hipdnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
@@ -556,17 +561,17 @@ protected:
         HIPDNN_CALL(hipdnnConvolutionBackwardFilter(*m_cudnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
 #else
         // Use Native reference BackwardKernel
-        const int BlockSize = 128;
+        const int BlockSize = 256;
         int* d_mpRowColData, *d_mpRowIwhtData, *d_mpRowRunData, *d_mRunsData;
-        hipMalloc((void**)&d_mpRowColData, sizeof(int) * m_geometry->MpRowCol().size());
-        hipMalloc((void**)&d_mpRowIwhtData, sizeof(int) * m_geometry->MpRowIwht().size());
-        hipMalloc((void**)&d_mpRowRunData, sizeof(int) * m_geometry->MpRowRun().size());
-        hipMalloc((void**)&d_mRunsData, sizeof(int) * m_geometry->Runs().size());
+        hipMalloc((void**)&d_mpRowColData, sizeof(int) * m_mpRowCol.GetAllocatedSize());
+        hipMalloc((void**)&d_mpRowIwhtData, sizeof(int) * m_mpRowIwht.GetAllocatedSize());
+        hipMalloc((void**)&d_mpRowRunData, sizeof(int) * m_mpRowRun.GetAllocatedSize());
+        hipMalloc((void**)&d_mRunsData, sizeof(int) * m_runs.GetAllocatedSize());
 
-        hipMemcpy(d_mpRowColData, m_geometry->MpRowCol().data(), sizeof(int) * m_geometry->MpRowCol().size(), hipMemcpyHostToDevice);
-        hipMemcpy(d_mpRowIwhtData, m_geometry->MpRowIwht().data(), sizeof(int) * m_geometry->MpRowIwht().size(), hipMemcpyHostToDevice);
-        hipMemcpy(d_mpRowRunData, m_geometry->MpRowRun().data(), sizeof(int) * m_geometry->MpRowRun().size(), hipMemcpyHostToDevice);
-        hipMemcpy(d_mRunsData, m_geometry->Runs().data(), sizeof(int) * m_geometry->Runs().size(), hipMemcpyHostToDevice);
+        hipMemcpy(d_mpRowColData, m_mpRowCol.Data(), sizeof(int) * m_mpRowCol.GetAllocatedSize(), hipMemcpyHostToDevice);
+        hipMemcpy(d_mpRowIwhtData, m_mpRowIwht.Data(), sizeof(int) *  m_mpRowIwht.GetAllocatedSize(), hipMemcpyHostToDevice);
+        hipMemcpy(d_mpRowRunData, m_mpRowRun.Data(), sizeof(int) * m_mpRowRun.GetAllocatedSize(), hipMemcpyHostToDevice);
+        hipMemcpy(d_mRunsData, m_runs.Data(), sizeof(int) * m_runs.GetAllocatedSize(), hipMemcpyHostToDevice);
         
         auto gdim = dim3((srcGrad.GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)srcGrad.GetNumCols(), 65535));
         SyncGuard syncGuard;
@@ -904,6 +909,18 @@ private:
         }
     };
 
+    // IMP NOTE: Make sure that in the declaration below m_isConvGeometryComputed is declared
+    // before m_mpRowCol. This ordering is required to ensure the right order of initialization
+    // in the initializer list in the ctor (above) of this class.
+    bool m_isConvGeometryComputed;
+
+
+    Matrix<float> m_mpRowCol;   
+    // Convolution-specific maps.
+    Matrix<float> m_mpRowIwht;
+    Matrix<float> m_mpRowRun;
+    Matrix<float> m_runs;
+ 
     CuDnn::ptr_t m_cudnn;
     hipdnnDataType_t m_dataType;
     CuDnnTensor m_inT;
