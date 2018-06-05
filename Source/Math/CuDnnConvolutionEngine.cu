@@ -476,7 +476,7 @@ protected:
 
     void BackwardKernelCore(const Mat& srcGrad, const Mat& in, Mat& kernelGrad, bool accumulateGradient, bool /*allowReuse*/, Mat& workspace) override
     {
-#if HIPDNN_ENABLE
+#if 1
         size_t batchSize = in.GetNumCols();
         // Find best algo and allocate temp buffer, if needed.
         auto finder = [&,this](int& calgo, hipdnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
@@ -575,9 +575,9 @@ protected:
         
         auto gdim = dim3((srcGrad.GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)srcGrad.GetNumCols(), 65535));
         SyncGuard syncGuard;
-        hipLaunchKernelGGL((kConvolutionBackwardKernel<ElemType>), dim3(gdim), dim3(BlockSize), 0, 0, (int)srcGrad.GetNumCols(), (int)in.GetNumRows(), (int)srcGrad.GetNumRows(),
+        hipLaunchKernelGGL((kConvolutionBackwardKernelAcc<ElemType>), dim3(gdim), dim3(BlockSize), 0, 0, (int)srcGrad.GetNumCols(), (int)in.GetNumRows(), (int)srcGrad.GetNumRows(),
                                                                    ptr(in), d_mpRowColData, d_mpRowIwhtData, d_mpRowRunData, 
-                                                                   d_mRunsData, ptr(srcGrad), ptr(kernelGrad));
+                                                                   d_mRunsData, ptr(srcGrad), ptr(kernelGrad), accumulateGradient);
 
         hipFree(d_mpRowColData);
         hipFree(d_mpRowIwhtData);
