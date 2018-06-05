@@ -246,15 +246,32 @@ inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const ha
     hipMalloc(&df_y, n * sizeof(float));
 
     int blocks = ((n-1)/256)+1;
-    
+#ifdef __HIP_ENABLE_ORG__    
     hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, df_x, x, n);
     hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, df_y, y, n);
-
+#else
+    float * hostDf_x = df_x;
+    const half *hostHx = x;
+    float * hostDf_y = df_y;
+    const half *hostHy = y;
+    const int hostN = n;
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, hostDf_x, hostHx, hostN);
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, hostDf_y, hostHy, hostN);
+#endif
     hipblasStatus_t status;
     status = hipblasSaxpy(handle, n, (const float*)&tmp_alpha, (const float*)df_x, incx, df_y, incy);
 
     if(status == HIPBLAS_STATUS_SUCCESS)
+    {
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, y, df_y, n);
+#else
+        half *hostH = y;
+        const float *hostF = df_y;
+        const int hostN = n;
+        hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, hostH, hostF, hostN);
+#endif
+    }
 
     return status;
     //return hipblasAxpyEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, CUDA_R_32F); TODO:PRAS_2.4
@@ -269,14 +286,33 @@ inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const ha
 
     int blocks = ((n-1)/256)+1;
 
+#ifdef __HIP_ENABLE_ORG__    
     hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, df_x, x, num_x);
     hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, df_y, y, num_y);
+#else
+    float * hostDf_x = df_x;
+    const half *hostHx = x;
+    float * hostDf_y = df_y;
+    const half *hostHy = y;
+    const int hostNx= num_x;
+    const int hostNy= num_y;
 
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, hostDf_x, hostHx, hostNx);
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, hostDf_y, hostHy, hostNy);
+#endif
     hipblasStatus_t status;
     status = hipblasSaxpy(handle, n, (const float*)&tmp_alpha, (const float*)df_x, incx, df_y, incy);
 
     if(status == HIPBLAS_STATUS_SUCCESS)
+    {
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((helperCopyFloat2Half), dim3(1024), dim3(256), 0, 0, y, df_y, num_y);
+#else
+        half *hostH = y;
+        const float *hostF = df_y;
+        const int hostN = num_y;
+        hipLaunchKernelGGL((helperCopyFloat2Half), dim3(1024), dim3(256), 0, 0, hostH, hostF, hostN);
+#endif
 
     return status;
 }
@@ -298,8 +334,15 @@ inline hipblasStatus_t hipblasTransposeHelper(hipblasHandle_t, hipblasOperation_
     {
         dim3 dimGrid((n+TRANS_TILE_DIM-1)/TRANS_TILE_DIM, (m+TRANS_TILE_DIM-1)/TRANS_TILE_DIM, 1);
         dim3 dimBlock(TRANS_TILE_DIM, BLOCK_ROWS, 1);
-
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((transposeNoOverlap), dim3(dimGrid), dim3(dimBlock), 0, 0, C, A, n, m);
+#else
+        half *hostOdata = C;
+        const half *hostIdata = A;
+        const int hostM = n;
+        const int hostN = m;
+        hipLaunchKernelGGL((transposeNoOverlap), dim3(dimGrid), dim3(dimBlock), 0, 0, hostOdata, hostIdata, hostM, hostN);
+#endif
     }
     else
         RuntimeError("In place transpose(half) not supported."); // hipblas do not support this either. There might be bug if this actually get called.
@@ -465,13 +508,29 @@ inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t handle, int n, const ha
     hipMalloc(&float_x, n * sizeof(float));
 
     int blocks = ((n-1)/256) + 1;
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, float_x, x, n);
+#else
+    float *hostF = float_x;
+    const half *hostH = x;
+    const int hostN = n;
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, hostF, hostH, hostN);
+#endif
 
     hipblasStatus_t status;
     status = hipblasSscal(handle, n, (const float*)&tmp_alpha, float_x, incx);
 
     if(status == HIPBLAS_STATUS_SUCCESS)
+    {
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, x, float_x, n);
+#else
+        half *hostH = x;
+        const float *hostF = float_x;
+        const int hostN = n;
+        hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, hostH, hostF, hostN );
+#endif
+    }
 
     return status;
 
@@ -507,14 +566,30 @@ inline hipblasStatus_t hipblasdotHelper(hipblasHandle_t handle, int n, const hal
 
     int blocks = ((n-1)/256) + 1;
 
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, float_x, x, n);
     hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, float_y, y, n);
-
+#else
+    float * hostDf_x = float_x;
+    const half *hostHx = x;
+    float * hostDf_y = float_y;
+    const half *hostHy = y;
+    const int hostN = n;
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, hostDf_x, hostHx, hostN);
+    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(blocks), dim3(256), 0, 0, hostDf_y, hostHy, hostN);
+#endif
     hipblasStatus_t status;
     status = hipblasSdot(handle, n, float_x, incx, float_y, incy, float_result);
     if(status == HIPBLAS_STATUS_SUCCESS)
+    {
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, result, float_result, n);
-
+#else
+        half *hostH = result;
+        const float *hostF = float_result;
+        const int hostN = n;
+        hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, hostH, hostF, hostN);
+#endif
     return status;
 
     //return hipblasDotEx(handle, n, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, (void*)result, CUDA_R_16F, CUDA_R_32F); TODO:PRAS_2.4
@@ -534,11 +609,24 @@ inline hiprandStatus_t hiprandGenerateUniformHelper(hiprandGenerator_t, half *ou
 {
     hiprandState *devStates;
     hipMalloc((void **)&devStates, sizeof(hiprandState));
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((setup_state), dim3(1), dim3(1), 0, 0, devStates, time(NULL)); // What does hiprandGenerateUniform actually doing? should also pass in state here
+#else
+    hiprandState *hostState = devStates;
+    unsigned long long hostSeed = time(NULL);
+    hipLaunchKernelGGL((setup_state), dim3(1), dim3(1), 0, 0, hostState, hostSeed); // What does hiprandGenerateUniform actually doing? should also pass in state here
+#endif
 
     dim3 dimGrid((unsigned int)(num+COPY_BLOCK_DIM-1)/COPY_BLOCK_DIM, 1, 1);
     dim3 dimBlock(COPY_BLOCK_DIM, 1, 1);
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((GenerateUniformHalf), dim3(dimGrid), dim3(dimBlock), 0, 0, devStates, outputPtr, (int)num);
+#else
+    hiprandState *hostState = devStates;
+    half *hostResult = outputPtr;
+    int hostN = num;
+    hipLaunchKernelGGL((GenerateUniformHalf), dim3(dimGrid), dim3(dimBlock), 0, 0, hostState, hostResult, hostN);
+#endif
 
     return (hiprandStatus_t) 0;
 }
@@ -558,12 +646,26 @@ inline hiprandStatus_t hiprandGenerateNormalHelper(hiprandGenerator_t, half *out
 {
     hiprandState *devStates;
     hipMalloc((void **)&devStates, sizeof(hiprandState));
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((setup_state), dim3(1), dim3(1), 0, 0, devStates, time(NULL)); // What does hiprandGenerateUniform actually doing? should also pass in state here
+#else
+    hiprandState *hostState = devStates;
+    unsigned long long hostSeed = time(NULL);
+    hipLaunchKernelGGL((setup_state), dim3(1), dim3(1), 0, 0, hostState, hostSeed); // What does hiprandGenerateUniform actually doing? should also pass in state here
+#endif
 
     dim3 dimGrid((unsigned int)(n+COPY_BLOCK_DIM-1)/COPY_BLOCK_DIM, 1, 1);
     dim3 dimBlock(COPY_BLOCK_DIM, 1, 1);
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((GenerateNormalHalf), dim3(dimGrid), dim3(dimBlock), 0, 0, devStates, outputPtr, (int)n, mean, stddev);
-
+#else
+    hiprandState *hostState = devStates;
+    half *hostResult = outputPtr;
+    int hostN = n;
+    half hostMean = mean;
+    half hostStddev = stddev;
+    hipLaunchKernelGGL((GenerateNormalHalf), dim3(dimGrid), dim3(dimBlock), 0, 0, hostState, hostResult, hostN, hostMean, hostStddev);
+#endif
     return (hiprandStatus_t) 0;
 }
 #endif /*__HIP_ENABLE_HALF__*/

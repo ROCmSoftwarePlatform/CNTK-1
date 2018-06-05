@@ -235,11 +235,31 @@ void _QuantizeMatrix(
 
     if (zeroThresholdFor1Bit)
     {
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((_ComputeQuantiStatParj<ElemType, true>), dim3(mvgriddim), dim3(mvblockdim), 0, stream, us, curResidual, M, N, ldNbits, qPackage);
+#else
+        const ElemType* hostUs = us;
+        const ElemType* hostInResidual = curResidual;
+        long hostM = M;
+        long hostN = N;
+        size_t hostLdNbits = ldNbits;
+        char* hostQpackage = qpackage;
+        hipLaunchKernelGGL((_ComputeQuantiStatParj<ElemType, true>), dim3(mvgriddim), dim3(mvblockdim), 0, stream, hostUs, hostInResidual, hostM, hostN, hostLdNbits, hostQPackage);
+#endif
     }
     else
     {
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((_ComputeQuantiStatParj<ElemType, false>), dim3(mvgriddim), dim3(mvblockdim), 0, stream, us, curResidual, M, N, ldNbits, qPackage);
+#else
+        const ElemType* hostUs = us;
+        const ElemType* hostInResidual = curResidual;
+        long hostM = M;
+        long hostN = N;
+        size_t hostLdNbits = ldNbits;
+        char* hostQpackage = qpackage;
+        hipLaunchKernelGGL((_ComputeQuantiStatParj<ElemType, false>), dim3(mvgriddim), dim3(mvblockdim), 0, stream, hostUs, hostInResidual, hostM, hostN, hostLdNbits, hostQPackage);
+#endif
     }
 
     // quantize data (also computing the residual at once)
@@ -263,11 +283,37 @@ void _QuantizeMatrix(
     ParallelizeOverRangeDim(totalQWords, griddim, blockdim, 256);
     if (zeroThresholdFor1Bit)
     {
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((_QuantizeStripjOneQWord<ElemType, true>), dim3(griddim), dim3(blockdim), 0, stream, us, curResidual, M, N, qPackage, colsizebyte, numQWordsPerCol, ldNbits, newResidual);
+#else
+        const ElemType* hostUs = us;
+        ElemType* hostCurResidual = curResidual;
+        long hostM = M;
+        long hostN = N;
+        char* hostQMat = qPackage;
+        size_t hostQColSize = colsizebyte;
+        size_t hostNumQWordsPerCol = numQWordsPerCol;
+        size_t hostLdNbits = ldNbits;
+        ElemType* hostNewResidual = newResidual;
+        hipLaunchKernelGGL((_QuantizeStripjOneQWord<ElemType, true>), dim3(griddim), dim3(blockdim), 0, stream, hostUs, hostCurResidual, hostM, hostN, hostQMat, hostQColSize, hostNumQWordsPerCol, hostLdNbits, hostNewResidual);
+#endif
     }
     else
     {
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((_QuantizeStripjOneQWord<ElemType, false>), dim3(griddim), dim3(blockdim), 0, stream, us, curResidual, M, N, qPackage, colsizebyte, numQWordsPerCol, ldNbits, newResidual);
+#else
+        const ElemType* hostUs = us;
+        ElemType* hostCurResidual = curResidual;
+        long hostM = M;
+        long hostN = N;
+        char* hostQMat = qPackage;
+        size_t hostQColSize = colsizebyte;
+        size_t hostNumQWordsPerCol = numQWordsPerCol;
+        size_t hostLdNbits = ldNbits;
+        ElemType* hostNewResidual = newResidual;
+        hipLaunchKernelGGL((_QuantizeStripjOneQWord<ElemType, false>), dim3(griddim), dim3(blockdim), 0, stream, hostUs, hostCurResidual, hostM, hostN, hostQMat, hostQColSize, hostNumQWordsPerCol, hostLdNbits, hostNewResidual);
+#endif
     }
 }
 
@@ -300,7 +346,19 @@ void _UnquantizeMatrix(const char* gpuBuffer, size_t gpuBufferSize,
 
     dim3 griddim, blockdim;
     ParallelizeOverRangeDim(totalQWords, griddim, blockdim, 256);
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((UnquantizeStripejOneQWord), dim3(griddim), dim3(blockdim), 0, stream, us, M, N, gpuBuffer, colsize, numQWordsPerCol, ldNbits, add);
+#else
+    ElemType* hostUs = us;
+    const long hostM = M;
+    const long hostN = N;
+    const char* hostQpackage = gpuBuffer;
+    size_t hostColsize = colsize;
+    size_t hostNumQWordsPerCol = numQWordsPerCol;
+    size_t hostLdNbits = ldNbits;
+    bool hostAdd = add;
+    hipLaunchKernelGGL((UnquantizeStripejOneQWord), dim3(griddim), dim3(blockdim), 0, stream, hostUs, hostM, hostN, hostQpackage, hostColsize, hostNumQWordsPerCol, hostLdNbits, hostAdd);
+#endif
 }
 }
 }

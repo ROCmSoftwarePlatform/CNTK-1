@@ -1032,7 +1032,7 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignRepeatOf(const GPUMatrix<ElemTyp
     ElemType* hostSrc = a.Data();
     const CUDA_LONG hostN = N;
     const CUDA_LONG hostSrcRows = m;
-    const CUDA_LONG hostSrcCols = m;
+    const CUDA_LONG hostSrcCols = n;
     const CUDA_LONG hostDestRows = GetNumRows();
 #ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((_assignRepeatOf<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, Data(), a.Data(), N, m, n, (CUDA_LONG) GetNumRows());
@@ -3377,11 +3377,10 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AddColumnReshapeProductOf(const GPUMat
     ElemType* hostUs = Data();
     const ElemType* hostA = a.Data();
     const ElemType* hostB = b.Data();
-    const CUDA_LONG hostRowsA = rowsA;
-    const CUDA_LONG hostRowsB = rowsB;
+    const CUDA_LONG hostRowsA = rowsB;
+    const CUDA_LONG hostRowsB = rowsC;
     const CUDA_LONG hostCols = cols;
     const bool hostTransposeAColumn = transposeAColumn;
-    //hipLaunchKernelGGL((_addColumnReshapeProductOf<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, Data(), a.Data(), b.Data(), rowsB, rowsC, cols, transposeAColumn);
     hipLaunchKernelGGL((_addColumnReshapeProductOf<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, hostUs, hostA, hostB, hostRowsA, hostRowsB, hostCols, hostTransposeAColumn);
     return *this;
 }
@@ -5308,6 +5307,7 @@ void GPUMatrix<ElemType>::BatchMatMul(ElemType beta, const GPUMatrix<ElemType>& 
 template <class ElemType>
 bool GPUMatrix<ElemType>::AreEqual(const GPUMatrix<ElemType>& a, const GPUMatrix<ElemType>& b, const ElemType threshold /*= 1e-8*/)
 {
+    std::cout<<"Coming to AreEqual in GPUMatrix.cu"<<std::endl;
     if (a.IsEmpty() || b.IsEmpty())
         LogicError("AreEqual: one of the input matrices is empty.");
 
@@ -5812,19 +5812,66 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignCTCScore(const GPUMatrix<ElemTyp
 
         for (long t = maxFrameNum - 1; t >= 0; t--)
         {
+#ifdef __HIP_ENABLE_ORG__
             hipLaunchKernelGGL((_assignBetaScore), dim3(block_tail), dim3(thread_tail), 0, t_stream, static_cast<const ElemType*>(prob.Data()), static_cast<ElemType*>(beta.Data()), static_cast<ElemType*>(phoneSeq.Data()), static_cast<ElemType*>(phoneBoundary.Data()), static_cast<const size_t*>(gpuUttToChanInd),
                 static_cast<const size_t*>(gpuFrameNum), static_cast<const size_t*>(gpuBeginFrame), static_cast<const size_t*>(gpuPhoneNum), static_cast<const size_t>(numParallelSequences), static_cast<const size_t>(uttNum), static_cast<const size_t>(t), static_cast<const size_t>(maxPhoneNum), static_cast<const size_t>(totalPhoneNum), static_cast<const size_t>(blankTokenId), static_cast<const int>(delayConstraint));
+#else
+            const ElemType *hostProb = prob.Data();
+            ElemType *hostBetaScore = beta.Data();
+            ElemType *hostPhoneSeq = phoneSeq.Data();
+            ElemType *hostPhoneBound = phoneBoundary.Data();
+            const size_t *hostUttToChanInd = gpuUttToChanInd;
+            const size_t *hostUttFrameNum = gpuFrameNum;
+            const size_t *hostUttBeginFrame = gpuBeginFrame;
+            const size_t *hostUttPhoneNum = gpuPhoneNum;
+            const size_t hostNumChannels = numParallelSequences;
+            const size_t hostUttNum = uttNum;
+            const size_t  hostT = t;
+            const size_t hostMaxPhoneNum = maxPhoneNum;
+            const size_t hostTotalPhoneNum = totalPhoneNum;
+            const size_t hostBlankTokenId = blankTokenId;
+            const int hostDelayConstraint = delayConstraint;
+            hipLaunchKernelGGL((_assignBetaScore), dim3(block_tail), dim3(thread_tail), 0, t_stream, hostProb, hostBetaScore, hostPhoneSeq, hostPhoneBound, hostUttToChanInd,
+                hostUttFrameNum, hostUttBeginFrame, hostUttPhoneNum, hostNumChannels, hostUttNum, hostT, hostMaxPhoneNum, hostTotalPhoneNum, hostBlankTokenId, hostDelayConstraint);
+#endif
         }
 
         ElemType zerVar = 0.0;
         totalScore.SetColumn(&zerVar, 0);
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((_assignTotalScore), dim3(uttNum), dim3(1), 0, t_stream, static_cast<ElemType*>(beta.Data()), static_cast<ElemType*>(totalScore.Data()), static_cast<const size_t>(uttNum), static_cast<const size_t*>(gpuUttToChanInd), static_cast<const size_t*>(gpuBeginFrame), static_cast<const size_t>(numParallelSequences), static_cast<const size_t>(maxPhoneNum));
-
+#else
+        ElemType *hostBetaScore = beta.Data();
+        ElemType *hostTotalScore = totalScore.Data();
+        const size_t hostUttNum = uttNum;
+        const size_t *hostUttToChanInd = gpuUttToChanInd;
+        const size_t *hostUttBeginFrame = gpuBeginFrame;
+        const size_t hostNumChannels = numParallelSequences;
+        const size_t hostMaxPhoneNum = maxPhoneNum;
+        hipLaunchKernelGGL((_assignTotalScore), dim3(uttNum), dim3(1), 0, t_stream, hostBetaScore, hostTotalScore, hostUttNum, hostUttToChanInd, hostUttBeginFrame, hostNumChannels, hostMaxPhoneNum);
+#endif
         dim3 block_tail_2((uttNum + DEFAULT_THREAD_PER_DIM - 1) / DEFAULT_THREAD_PER_DIM, (maxFrameNum + DEFAULT_THREAD_PER_DIM - 1) / DEFAULT_THREAD_PER_DIM);
 
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((_assignCTCScore), dim3(block_tail_2), dim3(thread_tail), 0, t_stream, static_cast<ElemType*>(Data()), static_cast<ElemType*>(prob.Data()), static_cast<ElemType*>(alpha.Data()), static_cast<ElemType*>(beta.Data()), static_cast<ElemType*>(phoneSeq.Data()), static_cast<const size_t>(uttNum), static_cast<const size_t*>(gpuUttToChanInd),
             static_cast<const size_t*>(gpuBeginFrame), static_cast<const size_t*>(gpuPhoneNum), static_cast<const size_t*>(gpuFrameNum), static_cast<const long>(numParallelSequences), static_cast<const long>(maxPhoneNum), static_cast<const long>(totalPhoneNum));
-
+#else
+        ElemType *hostCTCscore = Data();
+        ElemType *hostProb = prob.Data();
+        ElemType *hostAlphaScore = alpha.Data();
+        ElemType *hostBetaScore1 = beta.Data();
+        ElemType *hostPhoneSeq = phoneSeq.Data();
+        const size_t hostUttNum1 = uttNum;
+        const size_t *hostUttToChanInd1 = gpuUttToChanInd;
+        const size_t *hostUttBeginFrame1 = gpuBeginFrame;
+        const size_t *hostUttPhoneNum = gpuPhoneNum;
+        const size_t *hostUttFrameNum = gpuFrameNum;
+        const long hostNumChannels1 = numParallelSequences;
+        const long hostMaxPhoneNum1 = maxPhoneNum;
+        const long hostTotalPhoneNum = totalPhoneNum;
+        hipLaunchKernelGGL((_assignCTCScore), dim3(block_tail_2), dim3(thread_tail), 0, t_stream, hostCTCscore, hostProb, hostAlphaScore, hostBetaScore1, hostPhoneSeq, hostUttNum1, hostUttToChanInd1,
+            hostUttBeginFrame1, hostUttPhoneNum, hostUttFrameNum, hostNumChannels1, hostMaxPhoneNum1, hostTotalPhoneNum);
+#endif
         CUDA_CALL(hipFree(gpuFrameNum));
         CUDA_CALL(hipFree(gpuPhoneNum));
         CUDA_CALL(hipFree(gpuBeginFrame));

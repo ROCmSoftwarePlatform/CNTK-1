@@ -806,17 +806,51 @@ static void LaunchTensorOp(ElemType beta, array<ElemType*, N> pointerVector, Ele
     if ((reductionOp == ElementWiseOperator::opArgmax) ||
         (reductionOp == ElementWiseOperator::opArgmin))
     {
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((_launchTensorArgOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream,  pointers, reductionOp,
                                                                                                                         regularOpStrides, regularStrides, grid.m_N,
                                                                                                                         reducingOpDims, reducingStrides,
                                                                                                                         regularOpStrideDivmod, reducingOpDimDivmod);
+#else
+        FixedArray<ElemType*, N> hostPointers = pointers;
+        ElementWiseOperator hostReductionOp = reductionOp;
+        FixedArray<C_unsigned_int, K> hostRegularOpStrides = regularOpStrides;
+        FixedMatrix<C_int, N, K> hostRegularStrides = regularStrides;
+        CUDA_LONG hostNumElements = grid.m_N;
+        FixedArray<C_unsigned_int, 0> hostReducingOpDims = reducingOpDims;
+        FixedMatrix<C_int, N, 0> hostReducingStrides = reducingStrides;
+        FixedArray<fast_divmod, K> hostRegularOpStrideDivmod = regularOpStrideDivmod;
+        FixedArray<fast_divmod, 0> hostReducingOpDimDivmod = reducingOpDimDivmod;
+        hipLaunchKernelGGL((_launchTensorArgOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream,  hostPointers, hostReductionOp,
+                                                                                                                        hostRegularOpStrides, hostRegularStrides, hostNumElements,
+                                                                                                                        hostReducingOpDims, hostReducingStrides,
+                                                                                                                        hostRegularOpStrideDivmod, hostReducingOpDimDivmod);
+#endif
     }
     else
     {
         ElementWiseOperator reductionOp = (ElementWiseOperator)(-1);
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((_launchTensorOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, beta,  pointers, alpha, op, reductionOp , regularOpStrides, regularStrides,
                                                                                                                      grid.m_N, reducingOpDims, reducingStrides,
                                                                                                                      regularOpStrideDivmod, reducingOpDimDivmod);
+#else
+        ElemType hostBeta = beta;
+        FixedArray<ElemType*, N> hostPointers = pointers;
+        ElemType hostAlpha = alpha;
+        ElementWiseOperator hostOp = op;
+        ElementWiseOperator hostReductionOp = reductionOp;
+        FixedArray<C_unsigned_int, K> hostRegularOpStrides = regularOpStrides;
+        FixedMatrix<C_int, N, K> hostRegularStrides = regularStrides;
+        CUDA_LONG hostNumElements = grid.m_N;
+        FixedArray<C_unsigned_int, 0> hostReducingOpDims = reducingOpDims;
+        FixedMatrix<C_int, N, 0> hostReducingStrides = reducingStrides;
+        FixedArray<fast_divmod, K> hostRegularOpStrideDivmod = regularOpStrideDivmod;
+        FixedArray<fast_divmod, 0> hostReducingOpDimDivmod = reducingOpDimDivmod;
+        hipLaunchKernelGGL((_launchTensorOp<ElemType, N, /*M=*/0, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, hostBeta,  hostPointers, hostAlpha, hostOp, hostReductionOp , hostRegularOpStrides, hostRegularStrides,
+                                                                                                                     hostNumElements, hostReducingOpDims, hostReducingStrides,
+                                                                                                                     hostRegularOpStrideDivmod, hostReducingOpDimDivmod);
+#endif
     }
 }
 
@@ -938,11 +972,28 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
     if ((reductionOp == ElementWiseOperator::opArgmax) ||
         (reductionOp == ElementWiseOperator::opArgmin))
     {
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((_launchTensorArgOp<ElemType, N, M, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, 
             pointers, reductionOp,
             regularOpStrides, regularStrides, grid.m_N,
             reducingOpDims, reducingStrides,
             regularOpStrideDivmod, reducingOpDimDivmod);
+#else
+        FixedArray<ElemType*, N> hostPointers = pointers;
+        ElementWiseOperator hostReductionOp = reductionOp;
+        FixedArray<C_unsigned_int, K> hostRegularOpStrides = regularOpStrides;
+        FixedMatrix<C_int, N, K> hostRegularStrides = regularStrides;
+        CUDA_LONG hostNumElements = grid.m_N;
+        FixedArray<C_unsigned_int, M> hostReducingOpDims = reducingOpDims;
+        FixedMatrix<C_int, N, M> hostReducingStrides = reducingStrides;
+        FixedArray<fast_divmod, K> hostRegularOpStrideDivmod = regularOpStrideDivmod;
+        FixedArray<fast_divmod, M> hostReducingOpDimDivmod = reducingOpDimDivmod;
+        hipLaunchKernelGGL((_launchTensorArgOp<ElemType, N, M, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, 
+            hostPointers, hostReductionOp,
+            hostRegularOpStrides, hostRegularStrides, hostNumElements,
+            hostReducingOpDims, hostReducingStrides,
+            hostRegularOpStrideDivmod, hostReducingOpDimDivmod);
+#endif
     }
     // === simple case: NN large, one thread per output element
     else if (reductionDim == 1 ||                                     // no reduction
@@ -952,11 +1003,31 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
              reductionDim * numElements <= props.multiProcessorCount) // recursive call from reduction below
     {
         // we got enough elements to generate: do one element per thread, and reduction inside
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((_launchTensorOp<ElemType, N, M, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, 
             beta, pointers, alpha, op, reductionOp,
             regularOpStrides, regularStrides, grid.m_N,
             reducingOpDims, reducingStrides,
             regularOpStrideDivmod, reducingOpDimDivmod);
+#else
+        ElemType hostBeta = beta;
+        FixedArray<ElemType*, N> hostPointers = pointers;
+        ElemType hostAlpha = alpha;
+        ElementWiseOperator hostOp = op;
+        ElementWiseOperator hostReductionOp = reductionOp;
+        FixedArray<C_unsigned_int, K> hostRegularOpStrides = regularOpStrides;
+        FixedMatrix<C_int, N, K> hostRegularStrides = regularStrides;
+        CUDA_LONG hostNumElements = grid.m_N;
+        FixedArray<C_unsigned_int, M> hostReducingOpDims = reducingOpDims;
+        FixedMatrix<C_int, N, M> hostReducingStrides = reducingStrides;
+        FixedArray<fast_divmod, K> hostRegularOpStrideDivmod = regularOpStrideDivmod;
+        FixedArray<fast_divmod, M> hostReducingOpDimDivmod = reducingOpDimDivmod;
+        hipLaunchKernelGGL((_launchTensorOp<ElemType, N, M, K>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, 
+            hostBeta, hostPointers, hostAlpha, hostOp, hostReductionOp,
+            hostRegularOpStrides, hostRegularStrides, hostNumElements,
+            hostReducingOpDims, hostReducingStrides,
+            hostRegularOpStrideDivmod, hostReducingOpDimDivmod);
+#endif
     }
     // === optimization: simple case would not use all multiprocs
     else
@@ -1006,11 +1077,33 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
         // This involves no reduction across blocks.
         if (numReductionChunks == 1)
         {
+#ifdef __HIP_ENABLE_ORG__
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, 
                 beta, pointers, alpha, op, reductionOp,
                 regularOpStrides, regularStrides, NN,
                 reducingOpDims, reducingStrides, /*reductionBegin*/ 0, reductionChunkSize,
                 regularOpStrideDivmod, reducingOpDimDivmod);
+#else
+            ElemType hostBeta = beta;
+            FixedArray<ElemType*, N> hostPointers = pointers;
+            ElemType hostAlpha = alpha;
+            ElementWiseOperator hostOp = op;
+            ElementWiseOperator hostReductionOp = reductionOp;
+            FixedArray<C_unsigned_int, K> hostRegularOpStrides = regularOpStrides;
+            FixedMatrix<C_int, N, K> hostRegularStrides = regularStrides;
+            CUDA_LONG hostNumElements = NN;
+            FixedArray<C_unsigned_int, M> hostReducingOpDims = reducingOpDims;
+            FixedMatrix<C_int, N, M> hostReducingStrides = reducingStrides;
+            CUDA_LONG hostReductionBegin = 0;
+            CUDA_LONG hostReductionChunkSize = reductionChunkSize;
+            FixedArray<fast_divmod, K> hostRegularOpStrideDivmod = regularOpStrideDivmod;
+            FixedArray<fast_divmod, M> hostReducingOpDimDivmod = reducingOpDimDivmod;
+            hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, 
+               hostBeta, hostPointers, hostAlpha, hostOp, hostReductionOp,
+                hostRegularOpStrides, hostRegularStrides, hostNumElements,
+                hostReducingOpDims, hostReducingStrides, hostReductionBegin, hostReductionChunkSize,
+                hostRegularOpStrideDivmod, hostReducingOpDimDivmod);
+#endif
         }
         // --- case (b)
         // Reduction across blocks. This is the difficult one.
@@ -1044,12 +1137,34 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
             FixedMatrix<C_int, N, K> regularStrides1(regularStrideVectors1);
             ElemType beta1  = 0;
             ElemType alpha1 = 1;
+#ifdef __HIP_ENABLE_ORG__
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, 
                 beta1, pointers1, alpha1, op, reductionOp,
                 regularOpStrides, regularStrides1, NN,
                 reducingOpDims, reducingStrides, /*reductionBegin*/0, reductionChunkSize,
                 regularOpStrideDivmod, reducingOpDimDivmod);
 
+#else
+            ElemType hostBeta = beta1;
+            FixedArray<ElemType*, N> hostPointers = pointers1;
+            ElemType hostAlpha = alpha1;
+            ElementWiseOperator hostOp = op;
+            ElementWiseOperator hostReductionOp = reductionOp;
+            FixedArray<C_unsigned_int, K> hostRegularOpStrides = regularOpStrides;
+            FixedMatrix<C_int, N, K> hostRegularStrides = regularStrides1;
+            CUDA_LONG hostNumElements = NN;
+            FixedArray<C_unsigned_int, M> hostReducingOpDims = reducingOpDims;
+            FixedMatrix<C_int, N, M> hostReducingStrides = reducingStrides;
+            CUDA_LONG hostReductionBegin = 0;
+            CUDA_LONG hostReductionChunkSize = reductionChunkSize;
+            FixedArray<fast_divmod, K> hostRegularOpStrideDivmod = regularOpStrideDivmod;
+            FixedArray<fast_divmod, M> hostReducingOpDimDivmod = reducingOpDimDivmod;
+            hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, 
+                hostBeta, hostPointers, hostAlpha, hostOp, hostReductionOp,
+                hostRegularOpStrides, hostRegularStrides, hostNumElements,
+                hostReducingOpDims, hostReducingStrides, hostReductionBegin, hostReductionChunkSize,
+                hostRegularOpStrideDivmod, hostReducingOpDimDivmod);
+#endif
 #if 1
             // now reduce and redistribute
             // Create a new tensor task, and execute it recursively:
@@ -1093,13 +1208,36 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
         else if (beta == 1)
         {
             // no need to pre-scale; just add (common for gradients)
+#ifdef __HIP_ENABLE_ORG__
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, beta, pointers, alpha, op, reductionOp, regularOpStrides,
                                                                    regularStrides, NN, reducingOpDims, reducingStrides, 0, reductionChunkSize,
                                                                    regularOpStrideDivmod, reducingOpDimDivmod);
+#else
+            ElemType hostBeta = beta;
+            FixedArray<ElemType*, N> hostPointers = pointers;
+            ElemType hostAlpha = alpha;
+            ElementWiseOperator hostOp = op;
+            ElementWiseOperator hostReductionOp = reductionOp;
+            FixedArray<C_unsigned_int, K> hostRegularOpStrides = regularOpStrides;
+            FixedMatrix<C_int, N, K> hostRegularStrides = regularStrides;
+            CUDA_LONG hostNumElements = NN;
+            FixedArray<C_unsigned_int, M> hostReducingOpDims = reducingOpDims;
+            FixedMatrix<C_int, N, M> hostReducingStrides = reducingStrides;
+            CUDA_LONG hostReductionBegin = 0;
+            CUDA_LONG hostReductionChunkSize = reductionChunkSize;
+            FixedArray<fast_divmod, K> hostRegularOpStrideDivmod = regularOpStrideDivmod;
+            FixedArray<fast_divmod, M> hostReducingOpDimDivmod = reducingOpDimDivmod;
+            hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, 
+                hostBeta, hostPointers, hostAlpha, hostOp, hostReductionOp,
+                hostRegularOpStrides, hostRegularStrides, hostNumElements,
+                hostReducingOpDims, hostReducingStrides, hostReductionBegin, hostReductionChunkSize,
+                hostRegularOpStrideDivmod, hostReducingOpDimDivmod);
+#endif
             return;
         }
         else
         {
+#ifdef __HIP_ENABLE_ORG__
             // We need more than one chunk, we will use atomicAdd().
             // First reset/pre-multiply input; then do the remaining chunks using atomicAdd().
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, 1)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, beta, pointers, alpha, op, reductionOp, regularOpStrides, regularStrides, NN, reducingOpDims, reducingStrides, 0, reductionChunkSize,
@@ -1108,6 +1246,37 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
             hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ - 1)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, /*beta=*/1, pointers, alpha, op, reductionOp, regularOpStrides, regularStrides, NN, reducingOpDims, reducingStrides, reductionChunkSize, reductionChunkSize,
                                                                    regularOpStrideDivmod, reducingOpDimDivmod);
 
+#else
+            ElemType hostBeta = beta;
+            ElemType hostBeta1 = 1;
+            FixedArray<ElemType*, N> hostPointers = pointers;
+            ElemType hostAlpha = alpha;
+            ElementWiseOperator hostOp = op;
+            ElementWiseOperator hostReductionOp = reductionOp;
+            FixedArray<C_unsigned_int, K> hostRegularOpStrides = regularOpStrides;
+            FixedMatrix<C_int, N, K> hostRegularStrides = regularStrides;
+            CUDA_LONG hostNumElements = NN;
+            FixedArray<C_unsigned_int, M> hostReducingOpDims = reducingOpDims;
+            FixedMatrix<C_int, N, M> hostReducingStrides = reducingStrides;
+            CUDA_LONG hostReductionBegin = 0;
+            CUDA_LONG hostReductionBegin1 = reductionChunkSize;
+            CUDA_LONG hostReductionChunkSize = reductionChunkSize;
+            FixedArray<fast_divmod, K> hostRegularOpStrideDivmod = regularOpStrideDivmod;
+            FixedArray<fast_divmod, M> hostReducingOpDimDivmod = reducingOpDimDivmod;
+            // We need more than one chunk, we will use atomicAdd().
+            // First reset/pre-multiply input; then do the remaining chunks using atomicAdd().
+            hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, 1)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, 
+                hostBeta, hostPointers, hostAlpha, hostOp, hostReductionOp,
+                hostRegularOpStrides, hostRegularStrides, hostNumElements,
+                hostReducingOpDims, hostReducingStrides, hostReductionBegin, hostReductionChunkSize,
+                hostRegularOpStrideDivmod, hostReducingOpDimDivmod);
+            // We will leave it like this for a while, but eventually need to revisit using temporary memory.
+            hipLaunchKernelGGL((_launchTensorOpWithReduction<ElemType, N, M, K>), dim3(dim3(numBlocksX, numBlocksY, numBlocksZ - 1)), dim3(numThreadsX), numThreadsX * sizeof(ReduceElemType), t_stream, 
+                hostBeta1, hostPointers, hostAlpha, hostOp, hostReductionOp,
+                hostRegularOpStrides, hostRegularStrides, hostNumElements,
+                hostReducingOpDims, hostReducingStrides, hostReductionBegin1, hostReductionChunkSize,
+                hostRegularOpStrideDivmod, hostReducingOpDimDivmod);
+#endif
         }
 #endif
     }
@@ -1163,7 +1332,7 @@ template <class ElemType>
 void LaunchUnaryTensorOp(ElemType beta, const ElemType* pa, ElemType* pb, ElemType alpha, ElementWiseOperator op, size_t regularOpDim)
 {
     CUDA_LONG NN = (CUDA_LONG) regularOpDim;
-
+#ifdef __HIP_ENABLE_ORG__
 #define CaseLaunchUnaryTensorOp(oper)                                                                                                        \
     case ElementWiseOperator::op##oper:                                                                                                      \
         if (beta == 0 && alpha == 1)                                                                                                         \
@@ -1171,7 +1340,27 @@ void LaunchUnaryTensorOp(ElemType beta, const ElemType* pa, ElemType* pb, ElemTy
         else                                                                                                                                 \
             hipLaunchKernelGGL((_launchUnaryTensorOp<ElemType, Functor##oper>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, beta, pa, pb, alpha, NN);\
         break;
-
+#else
+#define CaseLaunchUnaryTensorOp(oper)                                                                                                        \
+    case ElementWiseOperator::op##oper:                                                                                                      \
+        if (beta == 0 && alpha == 1)                                                                                                         \
+        {                                                                                                                                    \
+            const ElemType* hostPa = pa;                                                                                                     \
+            ElemType* hostPb = pb;                                                                                                           \
+            CUDA_LONG hostNumElements = NN;                                                                                                  \
+            hipLaunchKernelGGL((_launchUnaryTensorOp<ElemType, Functor##oper>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, hostPa, hostPb, hostNumElements); \
+        }                                                                                                                                    \
+        else                                                                                                                                 \
+        {                                                                                                                                    \
+            ElemType hostBeta = beta;                                                                                                        \
+            const ElemType* hostPa = pa;                                                                                                     \
+            ElemType* hostPb = pb;                                                                                                           \
+            ElemType hostAlpha = alpha;                                                                                                      \
+            CUDA_LONG hostNumElements = NN;                                                                                                  \
+            hipLaunchKernelGGL((_launchUnaryTensorOp<ElemType, Functor##oper>), dim3(grid.m_blocksPerGrid), dim3(grid.m_threadsPerBlock), 0, t_stream, hostBeta, hostPa, hostPb, hostAlpha, hostNumElements);\
+        }                                                                                                                                    \
+        break;
+#endif
 
     SyncGuard syncGuard;
     GridDim grid(NN);

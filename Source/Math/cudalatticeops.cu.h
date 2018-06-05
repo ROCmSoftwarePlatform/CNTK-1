@@ -106,7 +106,24 @@ void latticefunctionsops::edgealignment(const vectorref<lrhmmdef> &hmms, const v
     dim3 b((unsigned int) ((numedges + tpb - 1) / tpb));
     // cudaarrayref<float> logLLsarray;        // TODO: pass this in, of course
     // passtextureref texref (logLLstex, logLLsarray);    // use the same name as that global texref one, so it will match the name inside the kernel
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((edgealignmentj), dim3(b), dim3(t), 0, /*GetCurrentStream()*/ hipStreamDefault, hmms, transPs, spalignunitid, silalignunitid, logLLs, nodes, edges, aligns, alignoffsets, backptrstorage, backptroffsets, alignresult, edgeacscores);
+#else
+    const vectorref<lrhmmdef> hostHmms = hmms;
+    const vectorref<lr3transP> hostTransPs = transPs;
+    const size_t hostSpalignunitid = spalignunitid;
+    const size_t hostSilalignunitid = silalignunitid;
+    const matrixref<float> hostLogLLs = logLLs;
+    const vectorref<msra::lattices::nodeinfo> hostNodes = nodes;
+    const vectorref<msra::lattices::edgeinfowithscores> hostEdges = edges;
+    const vectorref<msra::lattices::aligninfo> hostAligns = aligns;
+    const vectorref<unsigned int> hostAlignoffsets = alignoffsets;
+    vectorref<unsigned short> hostBackptrstorage = backptrstorage;
+    const vectorref<size_t> hostBackptroffsets = backptroffsets;
+    vectorref<unsigned short> hostAlignresult = alignresult;
+    vectorref<float> hostEdgeacscores = edgeacscores;
+    hipLaunchKernelGGL((edgealignmentj), dim3(b), dim3(t), 0, /*GetCurrentStream()*/ hipStreamDefault, hostHmms, hostTransPs, hostSpalignunitid, hostSilalignunitid, hostLogLLs, hostNodes, hostEdges, hostAligns, hostAlignoffsets, hostBackptrstorage, hostBackptroffsets, hostAlignresult, hostEdgeacscores);
+#endif
     checklaunch("edgealignment");
 }
 
@@ -252,16 +269,43 @@ void latticefunctionsops::forwardbackwardlattice(const size_t *batchsizeforward,
     dim3 b((unsigned int) ((logalphas.size() + tpb - 1) / tpb));
 
     // TODO: is this really efficient? One thread per value?
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), logalphas, LOGZERO, logalphas.size());
+#else
+    vectorref<double> hostArraytoset = logalphas;
+    double hostValue = LOGZERO;
+    size_t hostNelem = logalphas.size();
+    hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), hostArraytoset, hostValue, hostNelem);
+#endif
     checklaunch("setvaluej");
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), logbetas, LOGZERO, logalphas.size());
+#else
+    vectorref<double> hostArraytoset1 = logbetas;
+    double hostValue1 = LOGZERO;
+    size_t hostNelem1 = logalphas.size();
+    hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), hostArraytoset1, hostValue1, hostNelem1);
+#endif
     checklaunch("setvaluej");
     if (returnEframescorrect)
     {
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), logaccalphas, LOGZERO, logalphas.size());
         checklaunch("setvaluej");
         hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), logaccbetas, LOGZERO, logalphas.size());
         checklaunch("setvaluej");
+#else
+        vectorref<double> hostArraytoset = logaccalphas;
+        double hostValue = LOGZERO;
+        size_t hostNelem = logalphas.size();
+        vectorref<double> hostArraytoset1 = logaccbetas;
+        double hostValue1 = LOGZERO;
+        size_t hostNelem1 = logalphas.size();
+        hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), hostArraytoset, hostValue, hostNelem);
+        checklaunch("setvaluej");
+        hipLaunchKernelGGL((setvaluej), dim3(b), dim3(t), 0, GetCurrentStream(), hostArraytoset1, hostValue1, hostNelem1);
+        checklaunch("setvaluej");
+#endif
     }
     // set initial tokens to probability 1 (0 in log)
     double log1 = 0.0;
@@ -273,11 +317,39 @@ void latticefunctionsops::forwardbackwardlattice(const size_t *batchsizeforward,
     for (size_t i = 0; i < numlaunchforward; i++)
     {
         dim3 b2((unsigned int) ((batchsizeforward[i] + tpb - 1) / tpb));
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((forwardlatticej), dim3(b2), dim3(t), 0, GetCurrentStream(), batchsizeforward[i], startindex, edgeacscores,
                                                          spalignunitid, silalignunitid, edges, nodes, aligns,
                                                          alignments, aligmentoffsets, logalphas, lmf, wp, amf,
                                                          boostingfactor, uids, senone2classmap, returnEframescorrect,
                                                          logframescorrectedge, logaccalphas);
+#else
+        const size_t hostBatchsize = batchsizeforward[i];
+        const size_t hostStartindex = startindex;
+        const vectorref<float> hostEdgeacscores = edgeacscores;
+        const size_t hostSpalignunitid = spalignunitid;
+        const size_t hostSilalignunitid = silalignunitid;
+        vectorref<msra::lattices::edgeinfowithscores> hostEdges = edges;
+        vectorref<msra::lattices::nodeinfo> hostNodes = nodes;
+        const vectorref<msra::lattices::aligninfo> hostAligns = aligns;
+        vectorref<unsigned short> hostAlignments = alignments;
+        vectorref<unsigned int> hostAlignmentoffsets = aligmentoffsets;
+        vectorref<double> hostLogalphas = logalphas;
+        float hostLmf = lmf;
+        float hostWp = wp;
+        float hostAmf = amf;
+        const float hostBoostingfactor = boostingfactor;
+        const vectorref<unsigned short> hostUids = uids;
+        const vectorref<unsigned short> hostSenone2classmap = senone2classmap;
+        const bool hostReturnEframescorrect = returnEframescorrect;
+        vectorref<double> hostLogframescorrectedge = logframescorrectedge;
+        vectorref<double> hostLogaccalphas = logaccalphas;
+        hipLaunchKernelGGL((forwardlatticej), dim3(b2), dim3(t), 0, GetCurrentStream(), hostBatchsize, hostStartindex, hostEdgeacscores,
+                                                         hostSpalignunitid, hostSilalignunitid, hostEdges, hostNodes, hostAligns,
+                                                         hostAlignments, hostAlignmentoffsets, hostLogalphas, hostLmf, hostWp, hostAmf,
+                                                         hostBoostingfactor, hostUids, hostSenone2classmap, hostReturnEframescorrect,
+                                                         hostLogframescorrectedge, hostLogaccalphas);
+#endif
         checklaunch("edgealignment");
         startindex += batchsizeforward[i];
     }
@@ -294,11 +366,40 @@ void latticefunctionsops::forwardbackwardlattice(const size_t *batchsizeforward,
     for (size_t i = 0; i < numlaunchbackward; i++)
     {
         dim3 b2((unsigned int) ((batchsizebackward[i] + tpb - 1) / tpb));
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((backwardlatticej), dim3(b2), dim3(t), 0, GetCurrentStream(), batchsizebackward[i], startindex - batchsizebackward[i],
                                                           edgeacscores, spalignunitid, silalignunitid, edges, nodes, aligns,
                                                           totalfwscore, logpps, logalphas, logbetas,
                                                           lmf, wp, amf, boostingfactor, returnEframescorrect, logframescorrectedge,
                                                           logaccalphas, logEframescorrect, logaccbetas);
+#else
+        const size_t hostBatchsize = batchsizebackward[i];
+        const size_t hostStartindex = startindex - batchsizebackward[i];
+        const vectorref<float> hostEdgeacscores = edgeacscores;
+        const size_t hostSpalignunitid = spalignunitid;
+        const size_t hostSilalignunitid = silalignunitid;
+        vectorref<msra::lattices::edgeinfowithscores> hostEdges = edges;
+        vectorref<msra::lattices::nodeinfo> hostNodes = nodes;
+        vectorref<msra::lattices::aligninfo> hostAligns = aligns;
+        const double hostTotalfwscore = totalfwscore;
+        vectorref<double> hostLogpps = logpps;
+        vectorref<double> hostLogalphas = logalphas;
+        vectorref<double> hostLogbetas = logbetas;
+        float hostLmf = lmf;
+        float hostWp = wp;
+        float hostAmf = amf;
+        const float hostBoostingfactor = boostingfactor;
+        const bool hostReturnEframescorrect = returnEframescorrect;
+        vectorref<double> hostLogframescorrectedge = logframescorrectedge;
+        vectorref<double> hostLogaccalphas = logaccalphas;
+        vectorref<double> hostLogEframescorrect = logEframescorrect;
+        vectorref<double> hostLogaccbetas = logaccbetas;
+        hipLaunchKernelGGL((backwardlatticej), dim3(b2), dim3(t), 0, GetCurrentStream(), hostBatchsize, hostStartindex,
+                                                          hostEdgeacscores, hostSpalignunitid, hostSilalignunitid, hostEdges, hostNodes, hostAligns,
+                                                          hostTotalfwscore, hostLogpps, hostLogalphas, hostLogbetas,
+                                                          hostLmf, hostWp, hostAmf, hostBoostingfactor, hostReturnEframescorrect, hostLogframescorrectedge,
+                                                          hostLogaccalphas, hostLogEframescorrect, hostLogaccbetas);
+ #endif
         checklaunch("edgealignment");
         startindex -= batchsizebackward[i];
     }
@@ -382,11 +483,26 @@ void latticefunctionsops::stateposteriors(const vectorref<unsigned short> &align
     dim3 t(32, 8);
     const size_t tpb = t.x * t.y;
     dim3 b((unsigned int) ((numedges + tpb - 1) / tpb));
-
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) logacc.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), logacc, LOGZERO);
+#else
+    matrixref<float> hostUs = logacc;
+    float hostValue = LOGZERO;
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) logacc.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), hostUs, hostValue);
+#endif
     checklaunch("setvaluei");
 
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((stateposteriorsj), dim3(b), dim3(t), 0, GetCurrentStream(), alignstateids, alignoffsets, edges, nodes, logqs, logacc);
+#else
+    const vectorref<unsigned short> hostAlignstateids = alignstateids;
+    const vectorref<unsigned int> hostAlignoffsets = alignoffsets;
+    const vectorref<msra::lattices::edgeinfowithscores> hostEdges = edges;
+    const vectorref<msra::lattices::nodeinfo> hostNodes = nodes;
+    const vectorref<double> hostLogqs = logqs;
+    matrixref<float> hostLogacc = logacc;
+    hipLaunchKernelGGL((stateposteriorsj), dim3(b), dim3(t), 0, GetCurrentStream(), hostAlignstateids, hostAlignoffsets, hostEdges, hostNodes, hostLogqs, hostLogacc);
+#endif
     checklaunch("stateposteriors");
 }
 
@@ -403,33 +519,114 @@ void latticefunctionsops::sMBRerrorsignal(const vectorref<unsigned short> &align
     dim3 b((unsigned int) ((numedges + tpb - 1) / tpb));
 
 #ifdef DIRECT_MODE // compute Eframescorrect in a more direct way, proven to get same result as below
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal, LOGZERO);
+#else
+    matrixref<float> hostUs = errorsignal;
+    float hostValue = LOGZERO;
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), hostUs, hostValue);
+#endif
     checklaunch("setvaluei");
 
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((sMBRerrorsignalj), dim3(b), dim3(t), 0, GetCurrentStream(), alignstateids, alignoffsets, edges, nodes, logpps, amf, logEframescorrect, logEframescorrecttotal, errorsignal, errorsignalauxbuf);
+#else
+    const vectorref<unsigned short> hostAlignstateids = alignstateids;
+    const vectorref<unsigned int> hostAlignoffsets = alignoffsets;
+    const vectorref<msra::lattices::edgeinfowithscores> hostEdges = edges;
+    const vectorref<msra::lattices::nodeinfo> hostNodes = nodes;
+    const vectorref<double> hostLogpps = lopps;
+    const float hostAmf = amf;
+    const vectorref<double> hostLogEframescorrect = logEframescorrect;
+    const double hostLogEframescorrecttotal = logEframescorrecttotal;
+    matrixref<float> hostErrorsignal = errorsignal;
+    matrixref<float> hostErrorsignalneg = errorsignalauxbuf;
+    hipLaunchKernelGGL((sMBRerrorsignalj), dim3(b), dim3(t), 0, GetCurrentStream(), hostAlignstateids, hostAlignoffsets, hostEdges, hostNodes, hostLogpps, hostAmf, hostLogEframescorrect, hostLogEframescorrecttotal, hostErrorsignal, hostErrorsignalauxbuf);
+#endif
     checklaunch("sMBRerrorsignal"); // now we get state based logEframescorrect
 
     matrixref<float> &loggammas = errorsignalauxbuf;
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignalauxbuf.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignalauxbuf, LOGZERO);
+#else
+    matrixref<float> hostUs1 = errorsignalauxbuf;
+    float hostValue1 = LOGZERO;
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignalauxbuf.rows()) + 31) / 32)), dim3(32), 0, GetCurrenthostUs1, hostValue1);
+#endif
     checklaunch("setvaluei");
 
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((stateposteriorsj), dim3(b), dim3(t), 0, GetCurrentStream(), alignstateids, alignoffsets, edges, nodes, logpps, loggammas);
+#else
+    const vectorref<unsigned short> hostAlignstateids = alignstateids;
+    const vectorref<unsigned int> hostAlignoffsets = alignoffsets;
+    const vectorref<msra::lattices::edgeinfowithscores> hostEdges = edges;
+    const vectorref<msra::lattices::nodeinfo> hostNodes = nodes;
+    const vectorref<double> hostLogqs = logpps;
+    matrixref<float> hostLogacc = loggammas;
+    hipLaunchKernelGGL((stateposteriorsj), dim3(b), dim3(t), 0, GetCurrentStream(), hostAlignstateids, hostAlignoffsets, hostEdges, hostNodes, hostLogqs, hostLogacc);
+#endif
     checklaunch("stateposteriorsj"); // now we get state based loggammas
 
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((directerrorcomputationi), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal, errorsignalauxbuf, logEframescorrecttotal, amf);
+#else
+    matrixref<float> hostErrorsignal = errorsignal;
+    matrixref<float> hostErrorsignalauxbuf = errorsignalauxbuf;
+    float hostLogEframescorrecttotal = logEframescorrecttotal;
+    float hostAmf = amf;
+    hipLaunchKernelGGL((directerrorcomputationi), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), hostErrorsignal, hostErrorsignalauxbuf, hostLogEframescorrecttotal, hostAmf);
+#endif
     checklaunch("errorcomputationj");
 #else // this saves some computation compared with DIRECT_MODE
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal, LOGZERO);
     checklaunch("setvaluei");
     hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignalauxbuf.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignalauxbuf, LOGZERO);
     checklaunch("setvaluei");
+#else
+    matrixref<float> hostUs2 = errorsignal;
+    float hostValue2 = LOGZERO;
+    matrixref<float> hostUs3 = errorsignalauxbuf;
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), hostUs2, hostValue2);
+    checklaunch("setvaluei");
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) errorsignalauxbuf.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), hostUs3, hostValue2);
+    checklaunch("setvaluei");
+#endif
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((sMBRerrorsignalj), dim3(b), dim3(t), 0, GetCurrentStream(), alignstateids, alignoffsets, edges, nodes, logpps, amf, logEframescorrect, logEframescorrecttotal, errorsignal, errorsignalauxbuf);
+#else
+    const vectorref<unsigned short> hostAlignstateids = alignstateids;
+    const vectorref<unsigned int> hostAlignoffsets = alignoffsets;
+    const vectorref<msra::lattices::edgeinfowithscores> hostEdges = edges;
+    const vectorref<msra::lattices::nodeinfo> hostNodes = nodes;
+    const vectorref<double> hostLogpps = logpps;
+    const float hostAmf = amf;
+    const vectorref<double> hostLogEframescorrect = logEframescorrect;
+    const double hostLogEframescorrecttotal = logEframescorrecttotal;
+    matrixref<float> hostErrorsignal = errorsignal;
+    matrixref<float> hostErrorsignalneg = errorsignalauxbuf;
+    hipLaunchKernelGGL((sMBRerrorsignalj), dim3(b), dim3(t), 0, GetCurrentStream(), hostAlignstateids, hostAlignoffsets, hostEdges, hostNodes, hostLogpps, hostAmf, hostLogEframescorrect, hostLogEframescorrecttotal, hostErrorsignal, hostErrorsignalneg);
+#endif
     checklaunch("sMBRerrorsignal");
 
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((setunseeni), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal, errorsignalauxbuf);
+#else
+    matrixref<float> hostErrorsignal1 = errorsignal;
+    matrixref<float> hostErrorsignalauxbuf1 = errorsignalauxbuf;
+    hipLaunchKernelGGL((setunseeni), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), hostErrorsignal1, hostErrorsignalauxbuf1);
+#endif
     checklaunch("setunseenj");
 
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((errorcomputationi), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal, errorsignalauxbuf, amf);
+#else
+    matrixref<float> hostErrorsignal2 = errorsignal;
+    matrixref<float> hostErrorsignalauxbuf = errorsignalauxbuf;
+    float hostAmf1 = amf;
+    hipLaunchKernelGGL((errorcomputationi), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), hostErrorsignal2, hostErrorsignalauxbuf, hostAmf1);
+#endif
     checklaunch("errorcomputationj");
 
 #endif
@@ -445,12 +642,33 @@ void latticefunctionsops::mmierrorsignal(const vectorref<unsigned short> &aligns
     dim3 b((unsigned int) ((numedges + tpb - 1) / tpb));
 
     matrixref<float> &loggammas = errorsignal; // remember--this is an alias to 'errorsignal'
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) loggammas.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), loggammas, LOGZERO);
+#else
+    matrixref<float> hostUs = loggammas;
+    float hostValue = LOGZERO;
+    hipLaunchKernelGGL((setvaluei), dim3(dim3((((unsigned int) loggammas.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), hostUs, hostValue);
+#endif
     checklaunch("setvaluei");
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((stateposteriorsj), dim3(b), dim3(t), 0, GetCurrentStream(), alignstateids, alignoffsets, edges, nodes, logpps, loggammas);
+#else
+    const vectorref<unsigned short> hostAlignstateids = alignstateids;
+    const vectorref<unsigned int> hostAlignoffsets = alignoffsets;
+    const vectorref<msra::lattices::edgeinfowithscores> hostEdges = edges;
+    const vectorref<msra::lattices::nodeinfo> hostNodes = nodes;
+    const vectorref<double> hostLogqs = logpps;
+    matrixref<float> hostLogacc = loggammas;
+    hipLaunchKernelGGL((stateposteriorsj), dim3(b), dim3(t), 0, GetCurrentStream(), hostAlignstateids, hostAlignoffsets, hostEdges, hostNodes, hostLogqs, hostLogacc);
+#endif
     checklaunch("stateposteriorsj");
 
+#ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((expfi), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), errorsignal);
+#else
+    matrixref<float> hostMata = errorsignal;
+    hipLaunchKernelGGL((expfi), dim3(dim3((((unsigned int) errorsignal.rows()) + 31) / 32)), dim3(32), 0, GetCurrentStream(), hostMata);
+#endif
     checklaunch("expfi");
 }
 };

@@ -639,9 +639,25 @@ struct ComputeBatchMeanAndInvStdDev
         auto bdim = dim3(BlockDimX, BlockDimY);
         // Create grid with only one block in y(batch)-dimension as kernel uses striding.
         auto gdim = dim3(static_cast<unsigned int>(RoundUpToMultiple(vectorSize, BlockDimX * U)));
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((kComputeBatchMeanAndInvStdDev<BlockDimX, BlockDimY, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream,
             static_cast<int>(vectorSize), static_cast<int>(batchSize),
             x, expAvgFactor, blendFactor, runMean, runVariance, epsilon, xMean, xInvStdDev);
+#else
+        int hostVectorSize = vectorSize;
+        int hostBatchSize = batchSize;
+        const ElemType* hostX = x;
+        double hostExpAvgFactor = expAvgFactor;
+        double hostBlendFactor = blendFactor;
+        StatType* hostRunMean = runMean;
+        StatType* hostRunVariance = runVariance;
+        double hostEpsilon = epsilon;
+        StatType* hostXMean = xMean;
+        StatType* hostXInvStdDev = xInvStdDev;
+        hipLaunchKernelGGL((kComputeBatchMeanAndInvStdDev<BlockDimX, BlockDimY, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream,
+            hostVectorSize, hostBatchSize,
+            hostX, hostExpAvgFactor, hostBlendFactor, hostRunMean, hostRunVariance, hostEpsilon, hostXMean, hostXInvStdDev);
+#endif
     }
 };
 
@@ -663,9 +679,26 @@ struct ComputeSpatialBatchMeanAndInvStdDev
         // Create grid with only one block in y(batch)-dimension as kernel uses striding.
         // Each thread block processes a single whole feature map independently (i.e. reduces over W, H and N dimensions).
         auto gdim = dim3(static_cast<unsigned int>(vectorSize / spatialSize));
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((kComputeSpatialBatchMeanAndInvStdDev<BlockDimX, BlockDimY, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream,
             static_cast<int>(vectorSize), static_cast<int>(spatialSize), static_cast<int>(batchSize),
             x, expAvgFactor, blendFactor, runMean, runVariance, epsilon, xMean, xInvStdDev);
+#else
+        int hostVectorSize = vectorSize;
+        int hostSpatialSize = spatialSize;
+        int hostBatchSize = batchSize;
+        const ElemType* hostX = x;
+        double hostExpAvgFactor = expAvgFactor;
+        double hostBlendFactor = blendFactor;
+        StatType* hostRunMean = runMean;
+        StatType* hostRunVariance = runVariance;
+        double hostEpsilon = epsilon;
+        StatType* hostXMean = xMean;
+        StatType* hostXInvStdDev = xInvStdDev;
+        hipLaunchKernelGGL((kComputeSpatialBatchMeanAndInvStdDev<BlockDimX, BlockDimY, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream,
+            hostVectorSize, hostSpatialSize, hostBatchSize,
+            hostX, hostExpAvgFactor, hostBlendFactor, hostRunMean, hostRunVariance, hostEpsilon, hostXMean, hostXInvStdDev);
+#endif
     }
 };
 //--------------------------------------------------------------------
@@ -793,39 +826,95 @@ struct NormalizeBatchTraining
         auto bdim = dim3(BlockDimX, BlockDimY);
         // Create a grid that has uses striding in y-dimension to cover whole minibatch.
         auto gdim = dim3((unsigned int)RoundUpToMultiple(vectorSize, BlockDimX * U));
+        int hostVectorSize = vectorSize;
+        int hostSpatialSize = spatialSize;
+        int hostBatchSize = batchSize;
+        double hostEpsilon = epsilon;
+        const ElemType* hostX = x;
+        ElemType* hostY = y;
+        const StatType* hostBnScale = bnScale;
+        const StatType* hostBnBias = bnBias;
+        const StatType* hostRunningMean = runningMean;
+        const StatType* hostRunningVariance = runningVariance;
+        const StatType* hostBatchMean = batchMean;
+        StatType* hostBatchInvStdDev = batchInvStdDev;
         if (spatial)
         {
             if (normalizeRunningStats)
+            {
+#ifdef __HIP_ENABLE_ORG__
                 hipLaunchKernelGGL((kNormalizeBatchTraining<BlockDimX, BlockDimY, true, true, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
                     (int)vectorSize, (int)spatialSize, (int)batchSize,
                     epsilon,
                     x, y, bnScale, bnBias,
                     runningMean, runningVariance,
                     batchMean, batchInvStdDev);
+#else
+                hipLaunchKernelGGL((kNormalizeBatchTraining<BlockDimX, BlockDimY, true, true, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
+                    hostVectorSize, hostSpatialSize, hostBatchSize,
+                    hostEpsilon,
+                    hostX, hostY, hostBnScale, hostBnBias,
+                    hostRunningMean, hostRunningVariance,
+                    hostBatchMean, hostBatchInvStdDev);
+#endif
+            }
             else
+            {
+#ifdef __HIP_ENABLE_ORG__
                 hipLaunchKernelGGL((kNormalizeBatchTraining<BlockDimX, BlockDimY, true, false, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
                     (int)vectorSize, (int)spatialSize, (int)batchSize,
                     epsilon,
                     x, y, bnScale, bnBias,
                     runningMean, runningVariance,
                     batchMean, batchInvStdDev);
+#else
+                hipLaunchKernelGGL((kNormalizeBatchTraining<BlockDimX, BlockDimY, true, false, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
+                    hostVectorSize, hostSpatialSize, hostBatchSize,
+                    hostEpsilon,
+                    hostX, hostY, hostBnScale, hostBnBias,
+                    hostRunningMean, hostRunningVariance,
+                    hostBatchMean, hostBatchInvStdDev);
+#endif
+            }
         }
         else
         {
             if (normalizeRunningStats)
+            {
+#ifdef __HIP_ENABLE_ORG__
                 hipLaunchKernelGGL((kNormalizeBatchTraining<BlockDimX, BlockDimY, false, true, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
                     (int)vectorSize, (int)spatialSize, (int)batchSize,
                     epsilon,
                     x, y, bnScale, bnBias,
                     runningMean, runningVariance,
                     batchMean, batchInvStdDev);
+#else
+                hipLaunchKernelGGL((kNormalizeBatchTraining<BlockDimX, BlockDimY, false, true, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
+                    hostVectorSize, hostSpatialSize, hostBatchSize,
+                    hostEpsilon,
+                    hostX, hostY, hostBnScale, hostBnBias,
+                    hostRunningMean, hostRunningVariance,
+                    hostBatchMean, hostBatchInvStdDev);
+#endif
+            }
             else
+            {
+#ifdef __HIP_ENABLE_ORG__
                 hipLaunchKernelGGL((kNormalizeBatchTraining<BlockDimX, BlockDimY, false, false, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
                     (int)vectorSize, (int)spatialSize, (int)batchSize,
                     epsilon,
                     x, y, bnScale, bnBias,
                     runningMean, runningVariance,
                     batchMean, batchInvStdDev);
+#else
+                hipLaunchKernelGGL((kNormalizeBatchTraining<BlockDimX, BlockDimY, false, false, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
+                    hostVectorSize, hostSpatialSize, hostBatchSize,
+                    hostEpsilon,
+                    hostX, hostY, hostBnScale, hostBnBias,
+                    hostRunningMean, hostRunningVariance,
+                    hostBatchMean, hostBatchInvStdDev);
+#endif
+            }
 
         }
     }
@@ -1063,8 +1152,21 @@ struct ComputeScaleAndBiasGradients
         auto bdim = dim3(BlockDimX, BlockDimY);
         // Create a grid that has uses striding in y-dimension to cover whole minibatch.
         auto gdim = dim3(static_cast<unsigned int>(RoundUpToMultiple(vectorSize, BlockDimX * U)));
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((kComputeScaleAndBiasGradients<BlockDimX, BlockDimY, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
             static_cast<int>(vectorSize), static_cast<int>(batchSize), x, dy, dScale, dBias, savedMean, savedInvStdDev);
+#else
+        int hostVectorSize = vectorSize;
+        int hostBatchSize = batchSize;
+        const ElemType* hostX = x;
+        const ElemType* hostDy = dy;
+        StatType* hostDScale = dScale;
+        StatType* hostDBias = dBias;
+        const StatType* hostSavedMean = savedMean;
+        const StatType* hostSavedInvStdDev = savedInvStdDev;
+        hipLaunchKernelGGL((kComputeScaleAndBiasGradients<BlockDimX, BlockDimY, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
+            hostVectorSize, hostBatchSize, hostX, hostDy, hostDScale, hostDBias, hostSavedMean, hostSavedInvStdDev);
+#endif
     }
 };
 
@@ -1086,8 +1188,22 @@ struct ComputeSpatialScaleAndBiasGradients
         auto bdim = dim3(BlockDimX, BlockDimY);
         // Create a grid that has uses striding in y-dimension to cover whole minibatch.
         auto gdim = dim3(static_cast<unsigned int>(vectorSize / spatialSize));
+#ifdef __HIP_ENABLE_ORG__
         hipLaunchKernelGGL((kComputeSpatialScaleAndBiasGradients<BlockDimX, BlockDimY, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
             static_cast<int>(vectorSize), static_cast<int>(spatialSize), static_cast<int>(batchSize), x, dy, dScale, dBias, savedMean, savedInvStdDev);
+#else
+        int hostVectorSize = vectorSize;
+        int hostSpatialSize = spatialSize;
+        int hostBatchSize = batchSize;
+        const ElemType* hostX = x;
+        const ElemType* hostDy = dy;
+        StatType* hostDScale = dScale;
+        StatType* hostDBias = dBias;
+        const StatType* hostSavedMean = savedMean;
+        const StatType* hostSavedInvStdDev = savedInvStdDev;
+        hipLaunchKernelGGL((kComputeSpatialScaleAndBiasGradients<BlockDimX, BlockDimY, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
+            hostVectorSize, hostSpatialSize, hostBatchSize, hostX, hostDy, hostDScale, hostDBias, hostSavedMean, hostSavedInvStdDev);
+#endif
     }
 };
 
@@ -1209,15 +1325,37 @@ struct BackpropagateBatchNormGradients
         auto bdim = dim3(BlockDimX, BlockDimY);
         auto gdim = dim3(static_cast<unsigned int>(RoundUpToMultiple(vectorSize, BlockDimX * U)),
                          static_cast<unsigned int>(RoundUpToMultiple(batchSize,  BlockDimY)));
+        int hostVectorSize = vectorSize;
+        int hostSpatialSize = spatialSize;
+        int hostBatchSize = batchSize;
+        const ElemType* hostX = x;
+        const ElemType* hostDy = dy;
+        ElemType* hostDx = dx;
+        const StatType* hostBnScale = bnScale;
+        StatType hostMbStatsWeight = mbStatsWeight;
+        const StatType* hostDScale = dScale;
+        const StatType* hostDBias = dBias;
+        const StatType* hostSavedMean = savedMean;
+        const StatType* hostSavedInvStdDev = savedInvStdDev;
         if (spatial)
         {
+#ifdef __HIP_ENABLE_ORG__
             hipLaunchKernelGGL((kBackpropagateBatchNormGradients<BlockDimX, BlockDimY, true/*spatial*/, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
                 static_cast<int>(vectorSize), static_cast<int>(spatialSize), static_cast<int>(batchSize), x, dy, dx, bnScale, mbStatsWeight, dScale, dBias, savedMean, savedInvStdDev);
+#else
+            hipLaunchKernelGGL((kBackpropagateBatchNormGradients<BlockDimX, BlockDimY, true/*spatial*/, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
+                static_cast<int>(vectorSize), hostSpatialSize, hostBatchSize, hostX, hostDy, hostDx, hostBnScale, hostMbStatsWeight, hostDScale, hostDBias, hostSavedMean, hostSavedInvStdDev);
+#endif
         }
         else
         {
+#ifdef __HIP_ENABLE_ORG__
             hipLaunchKernelGGL((kBackpropagateBatchNormGradients<BlockDimX, BlockDimY, false/*not spatial*/, U>), dim3(gdim), dim3(bdim), 0, stream, 
                 static_cast<int>(vectorSize), static_cast<int>(spatialSize), static_cast<int>(batchSize), x, dy, dx, bnScale, mbStatsWeight, dScale, dBias, savedMean, savedInvStdDev);
+#else
+            hipLaunchKernelGGL((kBackpropagateBatchNormGradients<BlockDimX, BlockDimY, false/*not spatial*/, U>), dim3(gdim), dim3(bdim), 0, stream, 
+                static_cast<int>(vectorSize), static_cast<int>(spatialSize), static_cast<int>(batchSize), x, dy, dx, bnScale, mbStatsWeight, dScale, dBias, savedMean, savedInvStdDev);
+#endif
         }
     }
 };
