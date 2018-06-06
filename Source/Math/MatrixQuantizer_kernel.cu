@@ -243,7 +243,7 @@ void _QuantizeMatrix(
         long hostM = M;
         long hostN = N;
         size_t hostLdNbits = ldNbits;
-        char* hostQpackage = qpackage;
+        char* hostQPackage = qPackage;
         hipLaunchKernelGGL((_ComputeQuantiStatParj<ElemType, true>), dim3(mvgriddim), dim3(mvblockdim), 0, stream, hostUs, hostInResidual, hostM, hostN, hostLdNbits, hostQPackage);
 #endif
     }
@@ -257,7 +257,7 @@ void _QuantizeMatrix(
         long hostM = M;
         long hostN = N;
         size_t hostLdNbits = ldNbits;
-        char* hostQpackage = qpackage;
+        char* hostQPackage = qPackage;
         hipLaunchKernelGGL((_ComputeQuantiStatParj<ElemType, false>), dim3(mvgriddim), dim3(mvblockdim), 0, stream, hostUs, hostInResidual, hostM, hostN, hostLdNbits, hostQPackage);
 #endif
     }

@@ -5307,7 +5307,6 @@ void GPUMatrix<ElemType>::BatchMatMul(ElemType beta, const GPUMatrix<ElemType>& 
 template <class ElemType>
 bool GPUMatrix<ElemType>::AreEqual(const GPUMatrix<ElemType>& a, const GPUMatrix<ElemType>& b, const ElemType threshold /*= 1e-8*/)
 {
-    std::cout<<"Coming to AreEqual in GPUMatrix.cu"<<std::endl;
     if (a.IsEmpty() || b.IsEmpty())
         LogicError("AreEqual: one of the input matrices is empty.");
 

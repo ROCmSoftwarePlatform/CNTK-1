@@ -313,7 +313,7 @@ inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const ha
         const int hostN = num_y;
         hipLaunchKernelGGL((helperCopyFloat2Half), dim3(1024), dim3(256), 0, 0, hostH, hostF, hostN);
 #endif
-
+    }
     return status;
 }
 
@@ -590,6 +590,7 @@ inline hipblasStatus_t hipblasdotHelper(hipblasHandle_t handle, int n, const hal
         const int hostN = n;
         hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, hostH, hostF, hostN);
 #endif
+    }
     return status;
 
     //return hipblasDotEx(handle, n, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, (void*)result, CUDA_R_16F, CUDA_R_32F); TODO:PRAS_2.4
@@ -622,10 +623,10 @@ inline hiprandStatus_t hiprandGenerateUniformHelper(hiprandGenerator_t, half *ou
 #ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((GenerateUniformHalf), dim3(dimGrid), dim3(dimBlock), 0, 0, devStates, outputPtr, (int)num);
 #else
-    hiprandState *hostState = devStates;
-    half *hostResult = outputPtr;
-    int hostN = num;
-    hipLaunchKernelGGL((GenerateUniformHalf), dim3(dimGrid), dim3(dimBlock), 0, 0, hostState, hostResult, hostN);
+    hiprandState *hostState1 = devStates;
+    half *hostResult1 = outputPtr;
+    int hostN1 = num;
+    hipLaunchKernelGGL((GenerateUniformHalf), dim3(dimGrid), dim3(dimBlock), 0, 0, hostState1, hostResult1, hostN1);
 #endif
 
     return (hiprandStatus_t) 0;
@@ -649,9 +650,9 @@ inline hiprandStatus_t hiprandGenerateNormalHelper(hiprandGenerator_t, half *out
 #ifdef __HIP_ENABLE_ORG__
     hipLaunchKernelGGL((setup_state), dim3(1), dim3(1), 0, 0, devStates, time(NULL)); // What does hiprandGenerateUniform actually doing? should also pass in state here
 #else
-    hiprandState *hostState = devStates;
-    unsigned long long hostSeed = time(NULL);
-    hipLaunchKernelGGL((setup_state), dim3(1), dim3(1), 0, 0, hostState, hostSeed); // What does hiprandGenerateUniform actually doing? should also pass in state here
+    hiprandState *hostState1 = devStates;
+    unsigned long long hostSeed1 = time(NULL);
+    hipLaunchKernelGGL((setup_state), dim3(1), dim3(1), 0, 0, hostState1, hostSeed1); // What does hiprandGenerateUniform actually doing? should also pass in state here
 #endif
 
     dim3 dimGrid((unsigned int)(n+COPY_BLOCK_DIM-1)/COPY_BLOCK_DIM, 1, 1);
