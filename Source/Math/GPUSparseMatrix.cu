@@ -129,11 +129,14 @@ void GPUSparseMatrix<ElemType>::DeepCast(const GPUSparseMatrix<ElemType2>& deepC
         CUDA_LONG N = (CUDA_LONG)deepCopy.NzSize();
         int blocksPerGrid = (int)ceil(1.0 * N / GridDim::maxThreadsPerBlock);
         SyncGuard syncGuard;
+#ifdef __HIP_ENABLE_ORG__
+        hipLaunchKernelGGL((_castValue<ElemType, ElemType2>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, deepCopy.NzValues(), Data(), N);
+#else
         const ElemType2* hostA = deepCopy.NzValues();
         ElemType* hostC = Data();
         const CUDA_LONG hostN = N;
-        //hipLaunchKernelGGL((_castValue<ElemType, ElemType2>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, deepCopy.NzValues(), Data(), N);
         hipLaunchKernelGGL((_castValue<ElemType, ElemType2>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, hostA, hostC, hostN);
+#endif
     }
 
     CUDA_CALL(hipMemcpy(MajorIndexLocation(), deepCopy.MajorIndexLocationWithSliceViewOffset(), deepCopy.MajorIndexSize(), hipMemcpyDeviceToDevice));
@@ -1335,6 +1338,15 @@ void GPUSparseMatrix<ElemType>::ColumnwiseScaleAndWeightedAdd(ElemType alpha, co
 
     int blocksPerGrid = (int)ceil(1.0 * a.GetNumCols() / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef __HIP_ENABLE_ORG__
+    hipLaunchKernelGGL((_columnwiseScaleAndWeightedAdd4CSC<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, 
+        alpha,
+        a.Data(), a.SecondaryIndexLocation(), a.MajorIndexLocation(),
+        v.Data(),
+        beta,
+        c.Data(),
+        a.GetNumRows(), a.GetNumCols());
+#else
     ElemType hostAlpha = alpha;
     ElemType hostBeta = beta;
     ElemType *hostaData;
@@ -1356,6 +1368,7 @@ void GPUSparseMatrix<ElemType>::ColumnwiseScaleAndWeightedAdd(ElemType alpha, co
         hostBeta,
         hostcData,
         rows, cols);
+#endif
 }
 template <class ElemType>
 void GPUSparseMatrix<ElemType>::TensorShuffleScaleAndAdd(ElemType keepWeight, const GPUSparseMatrix<ElemType>& a, size_t D, size_t S, size_t M, size_t K, size_t T,
@@ -1634,12 +1647,15 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::InplaceTruncate(const Elem
 
     CUDA_LONG blocksPerGrid = (CUDA_LONG) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef __HIP_ENABLE_ORG__
+    hipLaunchKernelGGL((_inplaceTruncate<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, values, threshold, N);
+#else
     ElemType* values = NzValues();
     ElemType* hostA = values;
     const ElemType hostThreshold = threshold;
     const CUDA_LONG hostN = N;
-    //hipLaunchKernelGGL((_inplaceTruncate<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, values, threshold, N);
     hipLaunchKernelGGL((_inplaceTruncate<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostA, hostThreshold, hostN);
+#endif
     return *this;
 }
 
@@ -1652,12 +1668,15 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::InplaceSoftThreshold(const
 
     CUDA_LONG blocksPerGrid = (CUDA_LONG) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef __HIP_ENABLE_ORG__
+    hipLaunchKernelGGL((_inplaceSoftThreshold<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, values, threshold, N);
+#else
     ElemType* values = NzValues();
     ElemType* hostA = values;
     const ElemType hostThreshold = threshold;
     const CUDA_LONG hostN = N;
-    //hipLaunchKernelGGL((_inplaceSoftThreshold<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, values, threshold, N);
     hipLaunchKernelGGL((_inplaceSoftThreshold<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostA, hostThreshold, hostN);
+#endif
     return *this;
 }
 
@@ -3366,13 +3385,16 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::InplaceTruncateTop(const E
     CUDA_LONG N = (CUDA_LONG) GetNumNZElements();
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef __HIP_ENABLE_ORG__
+    //hipLaunchKernelGGL((_assignTruncateTop<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_nzv, fc_nzv, threshold, N);
+#else
     auto fc_nzv = NzValues(); //TODO: __remove__
     ElemType* hostUs = fc_nzv;
     const ElemType* hostA = fc_nzv;
     const ElemType hostThreshold = threshold;
     const CUDA_LONG hostN = N;
-    //hipLaunchKernelGGL((_assignTruncateTop<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_nzv, fc_nzv, threshold, N);
     hipLaunchKernelGGL((_assignTruncateTop<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostUs, hostA, hostThreshold, hostN);
+#endif
     return *this;
 }
 
@@ -3445,13 +3467,16 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::AssignTruncateTopOf(const 
     CUDA_LONG N = (CUDA_LONG) GetNumNZElements();
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef __HIP_ENABLE_ORG__
+    hipLaunchKernelGGL((_assignTruncateTop<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_nzv, a.NzValues(), threshold, N);
+#else
     auto fc_nzv = NzValues(); //TODO: __remove__
     ElemType* hostUs = fc_nzv;
     const ElemType* hostA = a.NzValues();
     const ElemType hostThreshold = threshold;
     const CUDA_LONG hostN = N;
-    //hipLaunchKernelGGL((_assignTruncateTop<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_nzv, a.NzValues(), threshold, N);
     hipLaunchKernelGGL((_assignTruncateTop<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostUs, hostA, hostThreshold, hostN);
+#endif
     return *this;
 }
 
@@ -3465,12 +3490,15 @@ GPUSparseMatrix<ElemType>& GPUSparseMatrix<ElemType>::SetToZeroIfAbsLessThan(con
     CUDA_LONG N = (CUDA_LONG) GetNumNZElements();
     int blocksPerGrid = (int) ceil(N * 1.0 / GridDim::maxThreadsPerBlock);
     SyncGuard syncGuard;
+#ifdef __HIP_ENABLE_ORG__
+    hipLaunchKernelGGL((_setToZeroIfAbsLessThan<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_nzv, threshold, N);
+#else
     auto fc_nzv = NzValues(); //TODO: __remove__
     ElemType* hostA = fc_nzv;
     const ElemType hostThreshold = threshold;
     const CUDA_LONG hostN = N;
-    //hipLaunchKernelGGL((_setToZeroIfAbsLessThan<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, fc_nzv, threshold, N);
     hipLaunchKernelGGL((_setToZeroIfAbsLessThan<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostA, hostThreshold, hostN);
+#endif
     return *this;
 }
 
@@ -3525,32 +3553,53 @@ void GPUSparseMatrix<ElemType>::performElementWiseFunction(ElementWiseOperator k
     switch (kind)
     {
     case ElementWiseOperator::opSigmoid:
-        //hipLaunchKernelGGL((_elementWiseSigmoidOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#ifdef __HIP_ENABLE_ORG__
+        hipLaunchKernelGGL((_elementWiseSigmoidOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#else
         hipLaunchKernelGGL((_elementWiseSigmoidOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostA, hostRes, hostN);
+#endif
 	return ;
     case ElementWiseOperator::opTanh:
-        //hipLaunchKernelGGL((_elementWiseTanhOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#ifdef __HIP_ENABLE_ORG__
+        hipLaunchKernelGGL((_elementWiseTanhOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#else
         hipLaunchKernelGGL((_elementWiseTanhOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostA, hostRes, hostN);
+#endif
 	return ;
     case ElementWiseOperator::opSqrt:
-        //hipLaunchKernelGGL((_elementWiseSqrtOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#ifdef __HIP_ENABLE_ORG__
+        hipLaunchKernelGGL((_elementWiseSqrtOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#else
         hipLaunchKernelGGL((_elementWiseSqrtOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostA, hostRes, hostN);
+#endif
 	return ;
     case ElementWiseOperator::opExp:
-        //hipLaunchKernelGGL((_elementWiseExpOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#ifdef __HIP_ENABLE_ORG__
+        hipLaunchKernelGGL((_elementWiseExpOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#else
         hipLaunchKernelGGL((_elementWiseExpOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostA, hostRes, hostN);
+#endif
 	return ;
     case ElementWiseOperator::opLog:
-        //hipLaunchKernelGGL((_elementWiseLogOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#ifdef __HIP_ENABLE_ORG__
+        hipLaunchKernelGGL((_elementWiseLogOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#else
         hipLaunchKernelGGL((_elementWiseLogOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostA, hostRes, hostN);
+#endif
 	return ;
     case ElementWiseOperator::opAbs:
-        //hipLaunchKernelGGL((_elementWiseAbsOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#ifdef __HIP_ENABLE_ORG__
+        hipLaunchKernelGGL((_elementWiseAbsOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#else
         hipLaunchKernelGGL((_elementWiseAbsOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostA, hostRes, hostN);
+#endif
 	return ;
     case ElementWiseOperator::opLinearRectifierDerivative:
-        //hipLaunchKernelGGL((_elementWiseLinRectDerivativeOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#ifdef __HIP_ENABLE_ORG__
+        hipLaunchKernelGGL((_elementWiseLinRectDerivativeOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, src.NzValues(), fc_nzv, N);
+#else
         hipLaunchKernelGGL((_elementWiseLinRectDerivativeOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, 0, hostA, hostRes, hostN);
+#endif
 	return ;
     default:
         NOT_IMPLEMENTED;
