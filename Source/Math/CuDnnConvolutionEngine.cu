@@ -35,6 +35,8 @@ const char* CudaErrString<hipdnnStatus_t>(hipdnnStatus_t x)
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+
+
 class CuDnnKernel
 {
 public:
@@ -282,6 +284,23 @@ protected:
         }
     }
 
+
+    void PrintMatrixInfo(const Mat& in, const char* string) {
+        ElemType* hData = in.CopyToArray();
+        ElemType* dData = in.Data();
+        std::cout<<"Address of Device Data: "<<dData<<std::endl;
+        int row = in.GetNumRows();
+        int col = in.GetNumCols();
+        std::cout<<"Matrix Dimensions of "<<string<<" is rowXcol = "<<row<<"X"<<col<<std::endl;
+        for(int i =0; i < row; i++) {
+            for(int j =0; j < col; j++) {
+                std::cout<<hData[i * col + j]<<" ";
+            }
+            std::cout<<std::endl;
+        }
+       // exit(1);
+    }
+
     void ForwardCore(const Mat& in, const Mat& kernel, Mat& out, Mat& workspace) override
     {
         size_t batchSize = in.GetNumCols();
@@ -392,6 +411,7 @@ protected:
 
     void BackwardDataCore(const Mat& srcGrad, const Mat& kernel, Mat& grad, bool accumulateGradient, Mat& workspace) override
     {
+#if HIPDNN_ENABLE
         size_t batchSize = srcGrad.GetNumCols();
         // Find best algo and allocate temp buffer, if needed.
         auto finder = [&,this](int& calgo, hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
@@ -471,8 +491,47 @@ protected:
 
         std::cout<<"CNTK: SelectedAlgo"<<m_backDataAlgo.selectedAlgo<<std::endl;
         std::cout<<"accumulateGradient"<<accumulateGradient<<std::endl;
-        HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_cudnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, ptr(grad)));
-    }
+        hipDeviceSynchronize();
+        ElemType* gradCPU = (ElemType*) malloc(sizeof(ElemType) * grad.GetNumElements());
+        for(int i=0; i < grad.GetNumElements(); i++) {
+            gradCPU[i] = 2.0;
+        }
+        //memset(gradCPU, 2, sizeof(ElemType) * grad.GetNumElements());
+        hipMemcpy(grad.Data(), gradCPU, sizeof(ElemType) * grad.GetNumElements(), hipMemcpyHostToDevice);
+        PrintMatrixInfo((grad), "BackwardData grad_Mat Before hipdnnConvolutionBackwardData");
+        std::cout<<"Pointer getting updated in CNTK is"<<ptr(grad)<<std::endl;
+        HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_cudnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, grad.Data()));
+
+
+#if 1
+        PrintMatrixInfo(srcGrad, "BackwardData srcGrad_Mat");
+        PrintMatrixInfo(kernel, "BackwardData kernel_Mat");
+        PrintMatrixInfo((grad), "BackwardData grad_Mat");
+        exit(1);
+#endif
+#else // HIPDNN_ENABLE
+      // Use Native reference BackwardData
+        const int BlockSize = 256;
+        int* d_mpRowColData, *d_mpRowIwhtData, *d_mpRowRunData, *d_mRunsData;
+        hipMalloc((void**)&d_mpRowColData, sizeof(int) * m_mpRowCol.GetAllocatedSize());
+        hipMalloc((void**)&d_mpRowIwhtData, sizeof(int) * m_mpRowIwht.GetAllocatedSize());
+        hipMalloc((void**)&d_mpRowRunData, sizeof(int) * m_mpRowRun.GetAllocatedSize());
+        hipMalloc((void**)&d_mRunsData, sizeof(int) * m_runs.GetAllocatedSize());
+
+        hipMemcpy(d_mpRowColData, m_mpRowCol.Data(), sizeof(int) * m_mpRowCol.GetAllocatedSize(), hipMemcpyHostToDevice);
+        hipMemcpy(d_mpRowIwhtData, m_mpRowIwht.Data(), sizeof(int) *  m_mpRowIwht.GetAllocatedSize(), hipMemcpyHostToDevice);
+        hipMemcpy(d_mpRowRunData, m_mpRowRun.Data(), sizeof(int) * m_mpRowRun.GetAllocatedSize(), hipMemcpyHostToDevice);
+        hipMemcpy(d_mRunsData, m_runs.Data(), sizeof(int) * m_runs.GetAllocatedSize(), hipMemcpyHostToDevice);
+
+        auto gdim = dim3((srcGrad.GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)srcGrad.GetNumCols(), 65535));
+        SyncGuard syncGuard;
+        hipLaunchKernelGGL((kConvolutionBackwardDataAcc<ElemType>), dim3(gdim), dim3(BlockSize), 0, 0, (int)srcGrad.GetNumCols(), ptr(kernel), d_mpRowColData, d_mpRowIwhtData, d_mpRowRunData,
+d_mRunsData, ptr(srcGrad), (int)srcGrad.GetNumRows(), ptr(grad), (int)grad.GetNumRows(), accumulateGradient);
+
+#endif
+     }
+
+
 
     void BackwardKernelCore(const Mat& srcGrad, const Mat& in, Mat& kernelGrad, bool accumulateGradient, bool /*allowReuse*/, Mat& workspace) override
     {
@@ -557,8 +616,19 @@ protected:
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
 #endif
         //m_backFiltAlgo.selectedAlgo =  HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_0;
+        static int BackwardFilterCounter = 0;
         std::cout<<"Invoking hipdnnconvolution Backward filter"<<std::endl;
         HIPDNN_CALL(hipdnnConvolutionBackwardFilter(*m_cudnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
+        BackwardFilterCounter++;
+#if 1
+//        if(BackwardFilterCounter == 3) {
+//            PrintMatrixInfo(in, "BackwardDataKernelCore in_Mat");
+//            PrintMatrixInfo(srcGrad, "BackwardDataKernelCore srcGrad_Mat");
+//            PrintMatrixInfo(kernelGrad, "BackwardDataKernelCore kernelGrad_Mat");
+//            exit(1);
+//        }
+
+#endif
 #else
         // Use Native reference BackwardKernel
         const int BlockSize = 256;
@@ -607,6 +677,13 @@ protected:
         m_outT.UpdateBatchSize(batchSize);
         HIPDNN_CALL(hipdnnPoolingBackward(*m_cudnn, *(m_pool), &C::One, m_outT, ptr(out), m_outT, ptr(srcGrad),
                                           m_inT, ptr(in), accumulateGradient ? &C::One : &C::Zero, m_inT, ptr(grad)));
+//#if 1
+//        PrintMatrixInfo(out, "BackwardPoolingCore: out_Mat");
+//        PrintMatrixInfo(srcGrad, "BackwardPoolingCore: srcGrad_Mat");
+//        PrintMatrixInfo(in, "BackwardPoolingCore: in_Mat");
+//        PrintMatrixInfo(grad, "BackwardPoolingCore: grad_Mat");
+//        exit(1);
+//#endif
     }
 
     void MaxUnpoolingCore(const Mat& out, const Mat& poolIn, Mat& in) override
