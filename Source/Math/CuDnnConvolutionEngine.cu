@@ -513,21 +513,26 @@ protected:
       // Use Native reference BackwardData
         const int BlockSize = 256;
         int* d_mpRowColData, *d_mpRowIwhtData, *d_mpRowRunData, *d_mRunsData;
-        hipMalloc((void**)&d_mpRowColData, sizeof(int) * m_mpRowCol.GetAllocatedSize());
-        hipMalloc((void**)&d_mpRowIwhtData, sizeof(int) * m_mpRowIwht.GetAllocatedSize());
-        hipMalloc((void**)&d_mpRowRunData, sizeof(int) * m_mpRowRun.GetAllocatedSize());
-        hipMalloc((void**)&d_mRunsData, sizeof(int) * m_runs.GetAllocatedSize());
+        CUDA_CALL(hipMalloc((void**)&d_mpRowColData, sizeof(int) * m_mpRowCol.GetAllocatedSize()));
+        CUDA_CALL(hipMalloc((void**)&d_mpRowIwhtData, sizeof(int) * m_mpRowIwht.GetAllocatedSize()));
+        CUDA_CALL(hipMalloc((void**)&d_mpRowRunData, sizeof(int) * m_mpRowRun.GetAllocatedSize()));
+        CUDA_CALL(hipMalloc((void**)&d_mRunsData, sizeof(int) * m_runs.GetAllocatedSize()));
 
-        hipMemcpy(d_mpRowColData, m_mpRowCol.Data(), sizeof(int) * m_mpRowCol.GetAllocatedSize(), hipMemcpyHostToDevice);
-        hipMemcpy(d_mpRowIwhtData, m_mpRowIwht.Data(), sizeof(int) *  m_mpRowIwht.GetAllocatedSize(), hipMemcpyHostToDevice);
-        hipMemcpy(d_mpRowRunData, m_mpRowRun.Data(), sizeof(int) * m_mpRowRun.GetAllocatedSize(), hipMemcpyHostToDevice);
-        hipMemcpy(d_mRunsData, m_runs.Data(), sizeof(int) * m_runs.GetAllocatedSize(), hipMemcpyHostToDevice);
+        CUDA_CALL(hipMemcpy(d_mpRowColData, m_mpRowCol.Data(), sizeof(int) * m_mpRowCol.GetAllocatedSize(), hipMemcpyHostToDevice));
+        CUDA_CALL(hipMemcpy(d_mpRowIwhtData, m_mpRowIwht.Data(), sizeof(int) *  m_mpRowIwht.GetAllocatedSize(), hipMemcpyHostToDevice));
+        CUDA_CALL(hipMemcpy(d_mpRowRunData, m_mpRowRun.Data(), sizeof(int) * m_mpRowRun.GetAllocatedSize(), hipMemcpyHostToDevice));
+        CUDA_CALL(hipMemcpy(d_mRunsData, m_runs.Data(), sizeof(int) * m_runs.GetAllocatedSize(), hipMemcpyHostToDevice));
 
         auto gdim = dim3((srcGrad.GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)srcGrad.GetNumCols(), 65535));
         SyncGuard syncGuard;
         hipLaunchKernelGGL((kConvolutionBackwardDataAcc<ElemType>), dim3(gdim), dim3(BlockSize), 0, 0, (int)srcGrad.GetNumCols(), ptr(kernel), d_mpRowColData, d_mpRowIwhtData, d_mpRowRunData,
 d_mRunsData, ptr(srcGrad), (int)srcGrad.GetNumRows(), ptr(grad), (int)grad.GetNumRows(), accumulateGradient);
 
+        // free up resources
+        CUDA_CALL(hipFree(d_mpRowColData));
+        CUDA_CALL(hipFree(d_mpRowIwhtData));
+        CUDA_CALL(hipFree(d_mpRowRunData));
+        CUDA_CALL(hipFree(d_mRunsData));
 #endif
      }
 
