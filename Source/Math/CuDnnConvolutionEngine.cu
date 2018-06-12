@@ -411,7 +411,6 @@ protected:
 
     void BackwardDataCore(const Mat& srcGrad, const Mat& kernel, Mat& grad, bool accumulateGradient, Mat& workspace) override
     {
-#if HIPDNN_ENABLE
         size_t batchSize = srcGrad.GetNumCols();
         // Find best algo and allocate temp buffer, if needed.
         auto finder = [&,this](int& calgo, hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
@@ -436,14 +435,13 @@ protected:
             if(!noMem)
                 return hipdnnGetConvolutionBackwardDataAlgorithm(*m_cudnn, *m_kernelT, m_outT, *m_conv, m_inT, HIPDNN_CONVOLUTION_BWD_DATA_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
             return hipdnnGetConvolutionBackwardDataAlgorithm(*m_cudnn, *m_kernelT, m_outT, *m_conv, m_inT, HIPDNN_CONVOLUTION_BWD_DATA_NO_WORKSPACE, 0, &algo);
-#elif defined (__HIP_PLATFORM_HCC__)
+#else
             int calgo;
             hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount];
             hipdnnStatus_t retVal = finder(calgo, algoPerf);
             algo = algoPerf[0].algo;
             return retVal;
 #endif
-
         };
         // find deterministic algorithm 
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
@@ -488,59 +486,16 @@ protected:
 #if !defined(__HIP_PLATFORM_HCC__)
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
 #endif
-
         std::cout<<"CNTK: SelectedAlgo"<<m_backDataAlgo.selectedAlgo<<std::endl;
         std::cout<<"accumulateGradient"<<accumulateGradient<<std::endl;
-        hipDeviceSynchronize();
-        ElemType* gradCPU = (ElemType*) malloc(sizeof(ElemType) * grad.GetNumElements());
-        for(int i=0; i < grad.GetNumElements(); i++) {
-            gradCPU[i] = 2.0;
-        }
-        //memset(gradCPU, 2, sizeof(ElemType) * grad.GetNumElements());
-        hipMemcpy(grad.Data(), gradCPU, sizeof(ElemType) * grad.GetNumElements(), hipMemcpyHostToDevice);
-        PrintMatrixInfo((grad), "BackwardData grad_Mat Before hipdnnConvolutionBackwardData");
-        std::cout<<"Pointer getting updated in CNTK is"<<ptr(grad)<<std::endl;
+
         HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_cudnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, grad.Data()));
-
-
-#if 1
-        PrintMatrixInfo(srcGrad, "BackwardData srcGrad_Mat");
-        PrintMatrixInfo(kernel, "BackwardData kernel_Mat");
-        PrintMatrixInfo((grad), "BackwardData grad_Mat");
-        exit(1);
-#endif
-#else // HIPDNN_ENABLE
-      // Use Native reference BackwardData
-        const int BlockSize = 256;
-        int* d_mpRowColData, *d_mpRowIwhtData, *d_mpRowRunData, *d_mRunsData;
-        CUDA_CALL(hipMalloc((void**)&d_mpRowColData, sizeof(int) * m_mpRowCol.GetAllocatedSize()));
-        CUDA_CALL(hipMalloc((void**)&d_mpRowIwhtData, sizeof(int) * m_mpRowIwht.GetAllocatedSize()));
-        CUDA_CALL(hipMalloc((void**)&d_mpRowRunData, sizeof(int) * m_mpRowRun.GetAllocatedSize()));
-        CUDA_CALL(hipMalloc((void**)&d_mRunsData, sizeof(int) * m_runs.GetAllocatedSize()));
-
-        CUDA_CALL(hipMemcpy(d_mpRowColData, m_mpRowCol.Data(), sizeof(int) * m_mpRowCol.GetAllocatedSize(), hipMemcpyHostToDevice));
-        CUDA_CALL(hipMemcpy(d_mpRowIwhtData, m_mpRowIwht.Data(), sizeof(int) *  m_mpRowIwht.GetAllocatedSize(), hipMemcpyHostToDevice));
-        CUDA_CALL(hipMemcpy(d_mpRowRunData, m_mpRowRun.Data(), sizeof(int) * m_mpRowRun.GetAllocatedSize(), hipMemcpyHostToDevice));
-        CUDA_CALL(hipMemcpy(d_mRunsData, m_runs.Data(), sizeof(int) * m_runs.GetAllocatedSize(), hipMemcpyHostToDevice));
-
-        auto gdim = dim3((srcGrad.GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)srcGrad.GetNumCols(), 65535));
-        SyncGuard syncGuard;
-        hipLaunchKernelGGL((kConvolutionBackwardDataAcc<ElemType>), dim3(gdim), dim3(BlockSize), 0, 0, (int)srcGrad.GetNumCols(), ptr(kernel), d_mpRowColData, d_mpRowIwhtData, d_mpRowRunData,
-d_mRunsData, ptr(srcGrad), (int)srcGrad.GetNumRows(), ptr(grad), (int)grad.GetNumRows(), accumulateGradient);
-
-        // free up resources
-        CUDA_CALL(hipFree(d_mpRowColData));
-        CUDA_CALL(hipFree(d_mpRowIwhtData));
-        CUDA_CALL(hipFree(d_mpRowRunData));
-        CUDA_CALL(hipFree(d_mRunsData));
-#endif
      }
 
 
 
     void BackwardKernelCore(const Mat& srcGrad, const Mat& in, Mat& kernelGrad, bool accumulateGradient, bool /*allowReuse*/, Mat& workspace) override
     {
-#if 1
         size_t batchSize = in.GetNumCols();
         // Find best algo and allocate temp buffer, if needed.
         auto finder = [&,this](int& calgo, hipdnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
@@ -620,45 +575,8 @@ d_mRunsData, ptr(srcGrad), (int)srcGrad.GetNumRows(), ptr(grad), (int)grad.GetNu
 #if !defined(__HIP_PLATFORM_HCC__)
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
 #endif
-        //m_backFiltAlgo.selectedAlgo =  HIPDNN_CONVOLUTION_BWD_FILTER_ALGO_0;
-        static int BackwardFilterCounter = 0;
         std::cout<<"Invoking hipdnnconvolution Backward filter"<<std::endl;
         HIPDNN_CALL(hipdnnConvolutionBackwardFilter(*m_cudnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
-        BackwardFilterCounter++;
-#if 1
-//        if(BackwardFilterCounter == 3) {
-//            PrintMatrixInfo(in, "BackwardDataKernelCore in_Mat");
-//            PrintMatrixInfo(srcGrad, "BackwardDataKernelCore srcGrad_Mat");
-//            PrintMatrixInfo(kernelGrad, "BackwardDataKernelCore kernelGrad_Mat");
-//            exit(1);
-//        }
-
-#endif
-#else
-        // Use Native reference BackwardKernel
-        const int BlockSize = 256;
-        int* d_mpRowColData, *d_mpRowIwhtData, *d_mpRowRunData, *d_mRunsData;
-        hipMalloc((void**)&d_mpRowColData, sizeof(int) * m_mpRowCol.GetAllocatedSize());
-        hipMalloc((void**)&d_mpRowIwhtData, sizeof(int) * m_mpRowIwht.GetAllocatedSize());
-        hipMalloc((void**)&d_mpRowRunData, sizeof(int) * m_mpRowRun.GetAllocatedSize());
-        hipMalloc((void**)&d_mRunsData, sizeof(int) * m_runs.GetAllocatedSize());
-
-        hipMemcpy(d_mpRowColData, m_mpRowCol.Data(), sizeof(int) * m_mpRowCol.GetAllocatedSize(), hipMemcpyHostToDevice);
-        hipMemcpy(d_mpRowIwhtData, m_mpRowIwht.Data(), sizeof(int) *  m_mpRowIwht.GetAllocatedSize(), hipMemcpyHostToDevice);
-        hipMemcpy(d_mpRowRunData, m_mpRowRun.Data(), sizeof(int) * m_mpRowRun.GetAllocatedSize(), hipMemcpyHostToDevice);
-        hipMemcpy(d_mRunsData, m_runs.Data(), sizeof(int) * m_runs.GetAllocatedSize(), hipMemcpyHostToDevice);
-        
-        auto gdim = dim3((srcGrad.GetNumRows() + BlockSize - 1)/ BlockSize, std::min((int)srcGrad.GetNumCols(), 65535));
-        SyncGuard syncGuard;
-        hipLaunchKernelGGL((kConvolutionBackwardKernelAcc<ElemType>), dim3(gdim), dim3(BlockSize), 0, 0, (int)srcGrad.GetNumCols(), (int)in.GetNumRows(), (int)srcGrad.GetNumRows(),
-                                                                   ptr(in), d_mpRowColData, d_mpRowIwhtData, d_mpRowRunData, 
-                                                                   d_mRunsData, ptr(srcGrad), ptr(kernelGrad), accumulateGradient);
-
-        hipFree(d_mpRowColData);
-        hipFree(d_mpRowIwhtData);
-        hipFree(d_mpRowRunData);
-        hipFree(d_mRunsData);
-#endif
     }
 
     void EnsurePoolingInitialized() override
