@@ -10,9 +10,7 @@
 #pragma once
 
 #include "../CNTKv2LibraryDll/API/HalfConverter.hpp"
-#ifdef __HIP_PLATFORM_HCC__
-#include "hip/hip_runtime.h"
-#endif
+#include "hip/hip_runtime_api.h"
 
 #if !defined(CPUONLY) && __has_include("cuda_fp16.h")
 #include <cuda_fp16.h> // ASSUME CUDA9
@@ -26,24 +24,17 @@ protected:
 
 #if defined(__HIPCC__)
 #define __CUDA_HOSTDEVICE__ __host__ __device__
-#ifdef __HIP_PLATFORM_HCC__
-#define __INLINE__ __forceinline__ inline
-#elif defined __HIP_PLATFORM_NVCC__
-#define __INLINE__ __forceinline__
-#endif
+#define __INLINE__ inline
 #else
 #define __CUDA_HOSTDEVICE__
 #define __INLINE__ inline
 #endif
 
-#define __FP16_DECL__  __INLINE__ __CUDA_HOSTDEVICE__
+#define __FP16_DECL__  inline  __CUDA_HOSTDEVICE__
 
 class alignas(2) half : public __half {
 public:
-#ifdef __HIP_PLATFORM_HCC__
-    __FP16__DECL__
-#endif
-    half() = default;
+     half() = default;
     __FP16_DECL__ half(const half& other) { __x = other.__x; }
     __FP16_DECL__ half& operator=(const half& other) { __x = other.__x; return *this; }
     __FP16_DECL__ half(half&& other) { *this = std::move(other); }
