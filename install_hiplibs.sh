@@ -100,6 +100,11 @@ if [ "$install" == "0" ]; then
         rm -rf HIP
         git clone https://github.com/ROCm-Developer-Tools/HIP.git
         cd HIP
+        if [ "$FREEZE_COMMIT" == "1" ]; then
+            hipcommit="0e44ca7"
+            git reset --hard $hipcommit
+            echo "commit id $hipcommit"
+        fi
     else
         echo -e "$NC $spacef Installing the available Source Code $spaceb"
         cd $HIP_SCP
@@ -139,6 +144,7 @@ done
 
 if [ "$platform" == "hcc" ]; then
     repoList+=(rocBLAS MIOpenGEMM MIOpen)
+    commitList+=(cb738e830f4239a14b6b73f9a58fdf943d914030 9547fb9e8499a5a9f16da83b1e6b749de82dd9fb 08114baa029a519ea12b52c5274c0bd8f4ad0d26)
     installDir+=(rocblas miopengemm miopen)
     libList+=(rocblas miopengemm MIOpen)
     headerList+=(rocblas miogemm miopen)
@@ -146,6 +152,7 @@ if [ "$platform" == "hcc" ]; then
 fi
 
 repoList+=(rocRAND HcSPARSE hipBLAS hipDNN rocPRIM)
+commitList+=(1890bb31675a6cbaa7766e947c8e35c4d1010ad6 907a505c27bac57a6d1f372154b744dd14ced943 193e50ed975a02d5efad566239107e3d7c768712 898b9d9ae7ed58a46beecc0fb0b785716da204f9 caef132d64b29a7d857eb68af5323fc302d26766)
 installDir+=(hiprand hcsparse hipblas hipDNN hipcub)
 libList+=(hiprand hipsparse hipblas hipDNN hipcub)
 scpLIST+=(rocRAND_SCP HcSPARSE_SCP hipBLAS_SCP hipDNN_SCP rocPRIM_SCP)
@@ -255,6 +262,10 @@ do
             rm -rf ${repoList[$i]}
             $clone/${repoList[$i]}.git
             cd ${repoList[$i]}
+            if [ "$FREEZE_COMMIT" == "1" ]; then
+                git reset --hard ${commitList[$i]}
+                echo ${commitList[$i]}
+            fi
         else
             echo -e "$NC $spacef Installing the available Source Code $spaceb"
             cd ${pathlist["${scpLIST[$i]}"]}
@@ -264,6 +275,8 @@ do
             mkdir $build_dir -p && cd $build_dir
             $cmake_it .. && make -j $(nproc) && sudo make install
         elif [ "${repoList[$i]}" == "MIOpen" ]; then
+            export LD_LIBRARY_PATH=/usr/local/boost-1.60.0/lib:$LD_LIBRARY_PATH
+            export PATH=/usr/local/boost-1.60.0/:$PATH
 	        #export miopengemm_DIR=$rootDir/$externalDir/miopengemm/lib/cmake/miopengemm
             wget -O half.zip https://sourceforge.net/projects/half/files/half/1.12.0/half-1.12.0.zip/download && unzip half.zip -d half && cd half/include 
             HALF_DIRECTORY=$(pwd)
