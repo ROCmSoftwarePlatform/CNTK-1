@@ -123,11 +123,14 @@ std::vector<std::tuple<ConvolutionEngineKind, DEVICEID_TYPE, size_t>> GetTestEng
     return res;
 }
 
-static void GenConvConfig(std::vector<ConvolveGeometryPtr>& res, size_t kernelWidth, size_t kernelHeight, size_t strideVal) {
 
-    for (size_t kW : {kernelWidth})
+std::vector<ConvolveGeometryPtr> GenerateConvTestConfigs()
+{
+    std::vector<ConvolveGeometryPtr> res;
+    // REVIEW alexeyk: add test cases with even dimensions of a kernel. There are some corner cases which cuDNN does not support (which essentially require negative padding).
+    for (size_t kW : {3})
     {
-        for (size_t kH : {kernelHeight})
+        for (size_t kH : {3})
         {
             for (size_t inW : {kW, 2 * kW, 2 * kW - 1})
             {
@@ -135,7 +138,7 @@ static void GenConvConfig(std::vector<ConvolveGeometryPtr>& res, size_t kernelWi
                 {
                     for (size_t mapCount : {1, 5})
                     {
-                        for (size_t stride : {1, min((int)kW, min((int)kH, 2)), (int)strideVal})
+                        for (size_t stride : {1, min((int)kW, min((int)kH, 2))})
                         {
                             // Note: must use sharing=false in channel dimension otherwise geometry will not be cuDNN compatible but cuDNN won't fail.
                             res.push_back(std::make_shared<ConvolveGeometry>(TensorShape(inW, max(kH, inW) + 1, inC),
@@ -149,18 +152,6 @@ static void GenConvConfig(std::vector<ConvolveGeometryPtr>& res, size_t kernelWi
             }
         }
     }
-}
-
-
-std::vector<ConvolveGeometryPtr> GenerateConvTestConfigs()
-{
-    std::vector<ConvolveGeometryPtr> res;
-    // REVIEW alexeyk: add test cases with even dimensions of a kernel. There are some corner cases which cuDNN does not support (which essentially require negative padding).
-    
-    GenConvConfig(res, 3, 3, 4); // Tests 3 X 3 Kernel with stride 1, 2 and 4
-    GenConvConfig(res, 5, 5, 4); // Tests 5 X 5 Kernel with stride 1, 2 and 4
-    GenConvConfig(res, 11, 11, 1); // Tests 11 X 11 Kernel with stride 1, 2 and 1
-
     // For debugging.
     res.push_back(std::make_shared<ConvolveGeometry>(TensorShape(3, 3, 1),
         TensorShape(3, 3, 1), TensorShape(2), TensorShape(1, 1, 1),
