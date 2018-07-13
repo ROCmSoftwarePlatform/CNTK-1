@@ -249,6 +249,13 @@ do
             if [ -n "$FILE" ]; then
                 echo -e "$GREEN Found ${repoList[$i]} libs  \t: $FILE"
                 install=1
+                if [ "${repoList[$i]}" == "MIOpen" ]; then
+                    miopen_hip_status=`grep "MIOPEN_BACKEND_HIP" $rocmDir/${installDir[$i]}/include/miopen/config.h `
+                    if [ "$(echo $miopen_hip_status | cut -d ' ' -f 3-)" == "0" ]; then
+                            echo "MIopen with opencl backend has been installed. It will be overwritten by MIopen with hip background"
+                            install=0
+                    fi
+                fi
             else
                 echo -e "$RED Broken library - shared object Not found.Library will be installed fresh\n"
             fi
