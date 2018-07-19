@@ -57,6 +57,7 @@ public:
     using Base::Buffer;
     using Base::GetNumRows;
     using Base::GetNumCols;
+    using Base::GetDiagSize;
     using Base::GetNumElements;
     using Base::OwnBuffer;
     using Base::GetFormat;
@@ -265,11 +266,17 @@ public:
     CPUMatrix<ElemType>& InplaceNegativeSine();
     CPUMatrix<ElemType>& AssignNegativeSineOf(const CPUMatrix<ElemType>& a);
 
+    CPUMatrix<ElemType>& InplaceTan();
+    CPUMatrix<ElemType>& AssignTanOf(const CPUMatrix<ElemType>& a);
+
     CPUMatrix<ElemType>& InplaceAcos();
     CPUMatrix<ElemType>& AssignAcosOf(const CPUMatrix<ElemType>& a);
 
     CPUMatrix<ElemType>& InplaceAsin();
     CPUMatrix<ElemType>& AssignAsinOf(const CPUMatrix<ElemType>& a);
+
+    CPUMatrix<ElemType>& InplaceAtan();
+    CPUMatrix<ElemType>& AssignAtanOf(const CPUMatrix<ElemType>& a);
 
     CPUMatrix<ElemType>& InplaceCosh();
     CPUMatrix<ElemType>& AssignCoshOf(const CPUMatrix<ElemType>& a);
@@ -298,7 +305,7 @@ public:
 
     CPUMatrix<ElemType>& AssignOneHot(const CPUMatrix<ElemType>& a, vector<size_t>& shape, size_t axis);
     CPUMatrix<ElemType>& GatherFromTarget(const CPUMatrix<ElemType>& indices, const CPUMatrix<ElemType>& target, size_t row_elements);
-    CPUMatrix<ElemType>& ScatterToIndices(const CPUMatrix<ElemType>& values, const CPUMatrix<ElemType>& indices, size_t row_elements);
+    CPUMatrix<ElemType>& ScatterToIndices(const CPUMatrix<ElemType>& values, const CPUMatrix<ElemType>& indices, size_t row_elements, const CPUMatrix<char>* mask = nullptr);
 
     bool IsEqualTo(const CPUMatrix<ElemType>& a, const ElemType threshold = 1e-8) const;
 
@@ -434,6 +441,13 @@ public:
     // This functions do not depend on <ElemType>, i.e. you can call them on any <ElemType>
     static int SetNumThreads(int numThreads);
     static int GetMaxNumThreads();
+
+    enum OptimizationFlag
+    {
+        OPT_EVAL_WITH_MKL = 1, // using Intel MKL functions for evaluation performance
+    };
+    static void SetOptimizationFlags(int flags);
+    static int  GetOptimizationFlags();
 
     static void SetCompatibleMode();
 
@@ -581,6 +595,10 @@ private:
     void Clear();
 
     void ScatterValues(ElemType* indices, ElemType* value, ElemType* data, ElemType alpha, size_t num_indices, size_t rows, size_t cols, size_t indices_step = 1);
+    void ScatterValues(ElemType* indices, ElemType* value, ElemType* data, ElemType alpha, size_t num_indices, size_t rows, size_t cols, char* mask, size_t numElemsPerMaskEntry, size_t indices_step = 1);
+
+private:
+    static int m_optimizationFlags;
 };
 
 typedef CPUMatrix<float> CPUSingleMatrix;

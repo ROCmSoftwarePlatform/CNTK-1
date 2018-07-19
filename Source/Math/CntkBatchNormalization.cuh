@@ -754,10 +754,10 @@ __global__ void kNormalizeBatchTraining(int vectorSize, int spatialSize, int bat
     LoadValues<U>(biasS + offs, bias);
 
     int icol = hipBlockIdx_y * BlockDimY + hipThreadIdx_y;
-    size_t stride = static_cast<size_t>(hipGridDim_y * BlockDimY) * vectorSize;
     size_t startOffs = static_cast<size_t>(icol) * vectorSize + irowBase;
     const ElemType* psrc = x + startOffs;
     ElemType* pdst = y + startOffs;
+    size_t stride = static_cast<size_t>(hipGridDim_y * BlockDimY) * vectorSize;
     for (; icol < batchSize; icol += hipGridDim_y * BlockDimY, psrc += stride, pdst += stride)
     {
         comp_t val[U];

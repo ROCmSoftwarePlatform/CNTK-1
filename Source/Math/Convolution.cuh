@@ -117,55 +117,6 @@ __global__ void kConvolutionBackwardData(int batchSize, const ElemType* __restri
     }
 }
 
-template <typename ElemType>
-__global__ void kConvolutionBackwardDataAcc(int batchSize, const ElemType* __restrict__ kernel,
-                                         const int* mpRowCol, const int* mpRowIwht,
-                                         const int* mpRowRun, const int* __restrict__ runs,
-                                         const ElemType* __restrict__ srcGrad, int srcVecSize,
-                                         ElemType* grad, int dstVecSize, bool accumulateGradients)
-{
-    typedef typename TypeSelector<ElemType>::comp_t comp_t;
-    int row = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
-    if (row >= srcVecSize)
-        return;
-
-    srcGrad += hipBlockIdx_y * srcVecSize;
-    grad += hipBlockIdx_y * dstVecSize;
-    for (int sample = hipBlockIdx_y; sample < batchSize; sample += hipGridDim_y)
-    {
-        int colBase = mpRowCol[row];
-        int ivBase = mpRowIwht[row];
-
-#if defined( __HIP_ENABLE_ASSERT__ )
-        assert(0 <= colBase && colBase < dstVecSize);
-#endif
-
-        comp_t g = srcGrad[row];
-        int i0 = mpRowRun[row];
-        int skip = runs[i0++];
-        int size = runs[i0++];
-        int imask = i0 + size;
-        for (int i = 0; i < size; i++)
-        {
-            if (runs[imask + i] == 0)
-                continue;
-            int dcol = runs[i0 + i];
-
-#if defined( __HIP_ENABLE_ASSERT__ )
-            assert(0 <= colBase + dcol && colBase + dcol < dstVecSize);
-#endif
-       	    if (accumulateGradients) {
-                atomicAdd(&grad[colBase + dcol], (ElemType)((comp_t)g * (comp_t)kernel[ivBase + skip + i]));
-            }
-	    else{
-                grad[colBase + dcol] = 0;
-                atomicAdd(&grad[colBase + dcol], (ElemType)((comp_t)g * (comp_t)kernel[ivBase + skip + i]));
-            }
-        }
-        srcGrad += hipBlockDim_y * srcVecSize;
-        grad += hipBlockDim_y * dstVecSize;
-    }
-}
 
 template <typename ElemType>
 __global__ void kConvolutionBackwardKernel(int batchSize, int inVecSize, int outVecSize,

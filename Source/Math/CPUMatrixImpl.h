@@ -928,11 +928,8 @@ void CPUMatrix<ElemType>::SetValue(const size_t numRows, const size_t numCols, E
 template <class ElemType>
 void CPUMatrix<ElemType>::SetDiagonalValue(const ElemType v)
 {
-    if (GetNumRows() != GetNumCols())
-        LogicError("SetDiagonalValue: NumRows and NumCols do not agree.");
-
     auto& us = *this;
-    long m = (long) GetNumRows();
+    long m = static_cast<long>(GetDiagSize());
 #pragma omp parallel for
     // four-way unrolling
     for (long i = 0; i < (m & ~3); i += 4)
@@ -955,21 +952,18 @@ void CPUMatrix<ElemType>::SetDiagonalValue(const CPUMatrix<ElemType>& vector)
     if (IsEmpty() || vector.IsEmpty())
         LogicError("SetDiagonalValue: Matrix is empty.");
 
-    if (GetNumRows() != GetNumCols())
-        LogicError("SetDiagonalValue: NumRows and NumCols do not agree.");
-
     if (vector.GetNumRows() != 1 && vector.GetNumCols() != 1)
         LogicError("SetDiagonalValue: input vector must be a vector.");
 
     if (vector.GetNumElements() == 1) // reduce to simple form
         SetDiagonalValue(vector(0, 0));
-    else if (vector.GetNumRows() != GetNumRows() && vector.GetNumCols() != GetNumRows())
+    else if (vector.GetNumRows() != GetDiagSize() && vector.GetNumCols() != GetDiagSize())
         LogicError("SetDiagonalValue: input vector's dimension does not agree with [this].");
     else
     {
         auto& us = *this;
 
-        long m = (long) GetNumRows();
+        long m = (long) GetDiagSize();
         if (vector.GetNumRows() == 1) // row vector
         {
 #pragma omp parallel for
@@ -2509,9 +2503,13 @@ CPUMatrix<ElemType>& CPUMatrix<ElemType>::AssignHardmaxOf(const CPUMatrix<ElemTy
     if (this != &a)
         RequireSize(a.GetNumRows(), a.GetNumCols());
 
+    bool isInplace = (us.Data() == a.Data());
+
+    if (!isInplace)
+        memset(us.Data(), 0, a.GetNumElements() * sizeof(ElemType));
+
     if (isColWise)
     {
-#pragma omp parallel for
         foreach_column (j, a)
         {
             // we need to extract max
@@ -2526,13 +2524,14 @@ CPUMatrix<ElemType>& CPUMatrix<ElemType>::AssignHardmaxOf(const CPUMatrix<ElemTy
                 }
             }
 
-            foreach_row (i, us)
-                us(i, j) = (i == maxI) ? 1.0f : 0.0f;
+            if (isInplace)
+                memset(us.Data() + j * a.GetNumRows(), 0, a.GetNumRows() * sizeof(ElemType));
+
+            us(maxI, j) = 1.0f;
         }
     }
     else
     {
-#pragma omp parallel for
         foreach_row (i, a)
         {
             // we need to extract max
@@ -2547,8 +2546,13 @@ CPUMatrix<ElemType>& CPUMatrix<ElemType>::AssignHardmaxOf(const CPUMatrix<ElemTy
                 }
             }
 
-            foreach_column (j, us)
-                us(i, j) = (j == maxJ) ? 1.0f : 0.0f;
+            if (isInplace)
+            {
+                foreach_column(j, us)
+                    us(i, j) = (j == maxJ) ? 1.0f : 0.0f;
+            }
+            else
+                us(i, maxJ) = 1.0f;
         }
     }
 
@@ -2778,7 +2782,7 @@ template <class ElemType>
 CPUMatrix<ElemType>& CPUMatrix<ElemType>::AssignNegativeSineOf(const CPUMatrix<ElemType>& a)
 {
     if (a.IsEmpty())
-        LogicError("AssignCosineOf: Matrix a is empty.");
+        LogicError("AssignNegativeSineOf: Matrix a is empty.");
 
     auto& us = *this;
     if (this != &a)
@@ -2789,6 +2793,33 @@ CPUMatrix<ElemType>& CPUMatrix<ElemType>::AssignNegativeSineOf(const CPUMatrix<E
     {
         const ElemType v = a(i, j);
         us(i, j) = -sin(v);
+    }
+
+    return *this;
+}
+
+//[this]=tan([this]) element wise
+template <class ElemType>
+CPUMatrix<ElemType>& CPUMatrix<ElemType>::InplaceTan()
+{
+    return AssignTanOf(*this);
+}
+
+template <class ElemType>
+CPUMatrix<ElemType>& CPUMatrix<ElemType>::AssignTanOf(const CPUMatrix<ElemType>& a)
+{
+    if (a.IsEmpty())
+        LogicError("AssignTanOf: Matrix a is empty.");
+
+    auto& us = *this;
+    if (this != &a)
+        RequireSize(a.GetNumRows(), a.GetNumCols());
+
+#pragma omp parallel for
+    foreach_coord(i, j, a)
+    {
+        const ElemType v = a(i, j);
+        us(i, j) = tan(v);
     }
 
     return *this;
@@ -2843,6 +2874,33 @@ CPUMatrix<ElemType>& CPUMatrix<ElemType>::AssignAsinOf(const CPUMatrix<ElemType>
     {
         const ElemType v = a(i, j);
         us(i, j) = asin(v);
+    }
+
+    return *this;
+}
+
+//[this]=atan([this]) element wise
+template <class ElemType>
+CPUMatrix<ElemType>& CPUMatrix<ElemType>::InplaceAtan()
+{
+    return AssignAtanOf(*this);
+}
+
+template <class ElemType>
+CPUMatrix<ElemType>& CPUMatrix<ElemType>::AssignAtanOf(const CPUMatrix<ElemType>& a)
+{
+    if (a.IsEmpty())
+        LogicError("AssignAtanOf: Matrix a is empty.");
+
+    auto& us = *this;
+    if (this != &a)
+        RequireSize(a.GetNumRows(), a.GetNumCols());
+
+#pragma omp parallel for
+    foreach_coord(i, j, a)
+    {
+        const ElemType v = a(i, j);
+        us(i, j) = atan(v);
     }
 
     return *this;
@@ -3280,16 +3338,22 @@ CPUMatrix<ElemType>& CPUMatrix<ElemType>::GatherFromTarget(const CPUMatrix<ElemT
 }
 
 template <class ElemType>
-CPUMatrix<ElemType>& CPUMatrix<ElemType>::ScatterToIndices(const CPUMatrix<ElemType>& values, const CPUMatrix<ElemType>& indices, size_t row_elements)
+CPUMatrix<ElemType>& CPUMatrix<ElemType>::ScatterToIndices(const CPUMatrix<ElemType>& values, const CPUMatrix<ElemType>& indices, size_t row_elements,
+    const CPUMatrix<char>* mask/*= nullptr*/)
 {
-    if (indices.IsEmpty() || values.IsEmpty())
+    if (indices.IsEmpty() || values.IsEmpty() || (mask && mask->IsEmpty()))
         LogicError("ScatterToIndices: input matrix is empty.");
+    if (mask && (indices.GetNumCols() % mask->GetNumCols() != 0))
+        LogicError("ScatterAccordingIndices: The number of columns(%zu) of the matrix slice to be masked is not a multiple of the number of columns(%zu) of the mask slice.",
+            indices.GetNumCols(), mask->GetNumCols());
 
     ElemType* indicesBufPtr = indices.Data();
     ElemType* valueBufPtr = values.Data();
+    char* maskBufPtr = mask ? mask->Data() : nullptr;
     ElemType* buffer = Data();
+    size_t numElemsPerMaskEntry = mask ? indices.GetNumCols() / mask->GetNumCols() * indices.GetNumRows() : 0;
 
-    ScatterValues(indicesBufPtr, valueBufPtr, buffer, (ElemType)1, indices.GetNumElements(), row_elements, this->GetNumCols());
+    ScatterValues(indicesBufPtr, valueBufPtr, buffer, static_cast<ElemType>(1), indices.GetNumElements(), row_elements, this->GetNumCols(), maskBufPtr, numElemsPerMaskEntry);
 
     return *this;
 }
@@ -7206,8 +7270,16 @@ void CPUMatrix<ElemType>::TensorArgOp(const CPUMatrix<ElemType>& a, ElementWiseO
 template <class ElemType>
 void CPUMatrix<ElemType>::ScatterValues(ElemType* indices, ElemType* value, ElemType* data, ElemType alpha, size_t num_indices, size_t rows, size_t cols, size_t indices_step)
 {
+    ScatterValues(indices, value, data, alpha, num_indices, rows, cols, /*mask*/nullptr, /*numElemsPerMaskEntry*/0, indices_step);
+}
+
+template <class ElemType>
+void CPUMatrix<ElemType>::ScatterValues(ElemType* indices, ElemType* value, ElemType* data, ElemType alpha, size_t num_indices, size_t rows, size_t cols, char* mask, size_t numElemsPerMaskEntry, size_t indices_step/*=1*/)
+{
     if (!indices || !value || !data)
         LogicError("ScatterValues: input data is null.");
+    if (mask && (numElemsPerMaskEntry == 0))
+        RuntimeError("ScatterValues: numElemsPerMaskEntry must not be 0 when a mask is provided.");
 
 #pragma omp parallel
     {
@@ -7221,6 +7293,9 @@ void CPUMatrix<ElemType>::ScatterValues(ElemType* indices, ElemType* value, Elem
             auto col = (size_t)col_r;
             //ignore the elements that is not partitioned into this thread
             if (col % nthread != ithread)
+                continue;
+            //check if colMask is invalid
+            if (mask && mask[i * indices_step / numElemsPerMaskEntry] == 0)
                 continue;
 
             if (col >= cols)
@@ -7247,6 +7322,7 @@ template CPUMatrix<char>& CPUMatrix<char>::operator=(CPUMatrix<char>&&);
 template void CPUMatrix<char>::SetValue(const char);
 template void CPUMatrix<char>::SetValue(const size_t numRows, const size_t numCols, char* pArray, size_t matrixFlags);
 template void CPUMatrix<char>::SetValue(CPUMatrix<char> const&);
+template bool CPUMatrix<char>::IsEqualTo(const CPUMatrix<char>& a, const char threshold) const;
 //template void CPUMatrix<char>::SetValue(GPUMatrix<char> const&);
 //template void CPUMatrix<char>::SetValue(CPUSparseMatrix<char> const&);
 //template void CPUMatrix<char>::SetValue(GPUSparseMatrix<char> const&);
@@ -7255,6 +7331,9 @@ template void CPUMatrix<char>::Resize(const size_t numRows, const size_t numCols
 template char* CPUMatrix<char>::CopyToArray(void) const;
 template void CPUMatrix<char>::CopySection(size_t numRows, size_t numCols, char* dst, size_t colStride) const;
 template void CPUMatrix<char>::Reshape(const size_t, const size_t);
+template void CPUMatrix<char>::SetUniformRandomValue(const char low, const char high, unsigned long seed);
+template void CPUMatrix<char>::SetUniformRandomValue(RNGHandle& rngHandle, const char low, const char high);
+template void CPUMatrix<char>::SetGaussianRandomValue(const char mean, const char sigma, unsigned long seed);
 
 // Support <short>
 template CPUMatrix<short>::CPUMatrix(const size_t numRows, const size_t numCols);
@@ -7268,6 +7347,7 @@ template CPUMatrix<short>& CPUMatrix<short>::operator=(CPUMatrix<short>&&);
 template void CPUMatrix<short>::SetValue(const short);
 template void CPUMatrix<short>::SetValue(const size_t numRows, const size_t numCols, short* pArray, size_t matrixFlags);
 template void CPUMatrix<short>::SetValue(CPUMatrix<short> const&);
+template bool CPUMatrix<short>::IsEqualTo(const CPUMatrix<short>& a, const short threshold) const;
 //template void CPUMatrix<short>::SetValue(GPUMatrix<short> const&);
 //template void CPUMatrix<short>::SetValue(CPUSparseMatrix<short> const&);
 //template void CPUMatrix<short>::SetValue(GPUSparseMatrix<short> const&);
@@ -7276,6 +7356,9 @@ template void CPUMatrix<short>::Resize(const size_t numRows, const size_t numCol
 template short* CPUMatrix<short>::CopyToArray(void) const;
 template void CPUMatrix<short>::CopySection(size_t numRows, size_t numCols, short* dst, size_t colStride) const;
 template void CPUMatrix<short>::Reshape(const size_t, const size_t);
+template void CPUMatrix<short>::SetUniformRandomValue(const short low, const short high, unsigned long seed);
+template void CPUMatrix<short>::SetUniformRandomValue(RNGHandle& rngHandle, const short low, const short high);
+template void CPUMatrix<short>::SetGaussianRandomValue(const short mean, const short sigma, unsigned long seed);
 
 template CPUMatrix<int>::CPUMatrix(const size_t, const size_t, int*, const size_t);
 
