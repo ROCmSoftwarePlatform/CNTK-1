@@ -99,7 +99,7 @@ void GranularGPUDataTransferer::WaitForCopyGPUToCPU()
 void GranularGPUDataTransferer::CopyCPUToGPUAsync(const void* cpuBuffer, size_t numElements, size_t elementSize, void* gpuBuffer)
 {
     PrepareDevice(m_deviceId);
-    hipMemcpyAsync(gpuBuffer, cpuBuffer, numElements * elementSize, hipMemcpyHostToDevice, GetAssignStream()) || "hipMemcpyAsync failed";
+    hipMemcpy(gpuBuffer, cpuBuffer, numElements * elementSize, hipMemcpyHostToDevice) || "hipMemcpyAsync failed";
 }
 
 void GranularGPUDataTransferer::RecordCPUToGPUCopy()

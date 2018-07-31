@@ -15,11 +15,7 @@
 #if !defined(CPUONLY) && __has_include("cuda_fp16.h")
 #include <cuda_fp16.h> // ASSUME CUDA9
 #else
-class alignas(2) __half
-{
-protected:
-    unsigned short __x;
-};
+#include <hip/hip_fp16.h>
 #endif
 
 #if defined(__HIPCC__)
@@ -51,11 +47,7 @@ public:
 #ifndef __HIP_DEVICE_COMPILE__
         CNTK::floatToFloat16(&f, &__x);
 #else
-#ifdef __HIP_PLATFORM_HCC__
-        *this = half((__half)(f)); //TODO: PRAS_AMD
-#elif defined __HIP_PLATFORM_NVCC__
         *this = half(__float2half(f));
-#endif
 #endif
     }
 
@@ -69,11 +61,7 @@ public:
 #ifndef __HIP_DEVICE_COMPILE__
         CNTK::floatToFloat16(&f, &__x); return *this;
 #else
-#ifdef __HIP_PLATFORM_HCC__
-        *this = half((__half)(f)); return *this; //TODO: PRAS_AMD
-#elif defined __HIP_PLATFORM_NVCC__
         *this = half(__float2half(f)); return *this;
-#endif
 #endif
     }
 
@@ -99,11 +87,7 @@ public:
         CNTK::float16ToFloat(&__x, &f);
         return f;
 #else
-#ifdef __HIP_PLATFORM_HCC__
-        return (float)(*this); //TODO: PRAS_AMD
-#elif defined __HIP_PLATFORM_NVCC__
         return __half2float(*this);
-#endif
 #endif
     }
 
