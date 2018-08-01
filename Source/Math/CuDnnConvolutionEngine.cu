@@ -12,8 +12,6 @@
 #include "CuDnnCommon.h"
 #include "half.hpp"
 
-//temporary...
-#define _HIPDBG_
 
 // We want tensor core be enabled in order to get(v7)/find tensor core results. But if algo without tensorcore is faster, the only way to force faster algo is to turn it off. Since re-tuning can happen quite often in CNTK, it gets bad if we don't do it carefully. It also require move to get_v7 and we can't test until we can run fp16.
 // For now, let's keep it simple and enable tensor core all the time for fp16.
