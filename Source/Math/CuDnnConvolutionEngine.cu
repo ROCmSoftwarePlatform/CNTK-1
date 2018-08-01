@@ -14,8 +14,6 @@
 #include "CuDnnCommon.h"
 #include "half.hpp"
 
-//temporary...
-#define _HIPDBG_
 
 // We want tensor core be enabled in order to get(v7)/find tensor core results. But if algo without tensorcore is faster, the only way to force faster algo is to turn it off. Since re-tuning can happen quite often in CNTK, it gets bad if we don't do it carefully. It also require move to get_v7 and we can't test until we can run fp16.
 // For now, let's keep it simple and enable tensor core all the time for fp16.
@@ -321,8 +319,10 @@ protected:
         auto staticFinder = [&,this](hipdnnConvolutionFwdAlgo_t& algo, bool noMem) -> hipdnnStatus_t
         {
 
+#ifdef _HIPDBG_
             std::cout<<"CNTK: ENTER staticFinder ---- Why?"<<std::endl;
 
+#endif
 #ifdef __HIP_PLATFORM_NVCC__
             if(!noMem)
                 return hipdnnGetConvolutionForwardAlgorithm(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, HIPDNN_CONVOLUTION_FWD_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
@@ -373,9 +373,9 @@ protected:
         {
             size_t tmpSize;
             hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;
-            
+#ifdef _HIPDBG_            
             std::cout<<"CNTK: ENTER workspaceSizeFinder "<< MaxAlgoCount << std::endl;
-            
+#endif            
             for (int i = 0; i < MaxAlgoCount; i++)
             {
 #ifdef _HIPDBG_
@@ -402,11 +402,15 @@ protected:
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
 #endif
         // Perform forward convolution operation.
+#ifdef _HIPDBG_
         std::cout<<"CNTK: Invoking hipdnnConvolutionForward"<<std::endl;
         std::cout<<"CNTK: SelectedAlgo"<<m_fwdAlgo.selectedAlgo<<std::endl;
         std::cout<<"CNTK: workspace Buffer Size"<<workspace.BufferSize()<<std::endl;
+#endif
         HIPDNN_CALL(hipdnnConvolutionForward(*m_cudnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
+#ifdef _HIPDBG_
         std::cout<<"CNTK: EXIT ForwardCore " << std::endl;
+#endif
     }
 
     void BackwardDataCore(const Mat& srcGrad, const Mat& kernel, Mat& grad, bool accumulateGradient, Mat& workspace) override
@@ -486,9 +490,11 @@ protected:
 #if !defined(__HIP_PLATFORM_HCC__)
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
 #endif
+#ifdef _HIPDBG_
         std::cout<<"CNTK: SelectedAlgo"<<m_backDataAlgo.selectedAlgo<<std::endl;
         std::cout<<"accumulateGradient"<<accumulateGradient<<std::endl;
 
+#endif
         HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_cudnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, grad.Data()));
      }
 
@@ -575,7 +581,9 @@ protected:
 #if !defined(__HIP_PLATFORM_HCC__)
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
 #endif
+#ifdef _HIPDBG_
         std::cout<<"Invoking hipdnnconvolution Backward filter"<<std::endl;
+#endif
         HIPDNN_CALL(hipdnnConvolutionBackwardFilter(*m_cudnn, &C::One, m_inT, ptr(in), m_outT, ptr(srcGrad), *m_conv, m_backFiltAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, *m_kernelT, ptr(kernelGrad)));
     }
 
@@ -839,8 +847,9 @@ private:
             algo.RecordAlgoBatchSizeWorkspaceSize(false, algo.selectedAlgo, batchSize, workspace.BufferSize());
             algo.autotuningState = AutotuningState::Running;
         }
-        
+#ifdef _HIPDBG_        
         std::cout  << "CNTK: EXIT FindBestAlgo" << std::endl;
+#endif
         return;
     }
 
