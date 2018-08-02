@@ -15,7 +15,7 @@
 #if !defined(CPUONLY) && __has_include("cuda_fp16.h")
 #include <cuda_fp16.h> // ASSUME CUDA9
 #else
-#include <hip/hip_fp16.h>
+#include "half_amd.h"
 #endif
 
 #if defined(__HIPCC__)
