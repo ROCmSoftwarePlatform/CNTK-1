@@ -24,9 +24,7 @@
 #include "half.hpp"
 #include "fpgeneric.h"
 #pragma pop_macro("TENSOR_OPS_DECL")
-#ifdef __HIP_ENABLE_CUB__
 #include <hipcub/hipcub.hpp>
-#endif /*__HIP_ENABLE_CUB__*/
 
 // We would like to use 64-bit integer to support large matrices. However, CUDA seems to support only 32-bit integer
 // For now, use int32_t to ensure that both Linux and Windows see this as 32 bit integer type.
@@ -53,7 +51,7 @@ static __inline__ __device__ double atomicAdd(double* address, double val)
 }
 #endif
 #elif defined __HIP_PLATFORM_HCC__
-/*static __inline__ __device__ double atomicAdd(double* address, double val)
+static __inline__ __device__ double atomicAdd(double* address, double val)
 {
   uint64_t* address_as_ull = (uint64_t*)address;
   double old_x = *address;
@@ -62,7 +60,7 @@ static __inline__ __device__ double atomicAdd(double* address, double val)
       new_x = old_x + val;
   } while (!hc::atomic_compare_exchange(address_as_ull, reinterpret_cast<uint64_t*>(&old_x), *reinterpret_cast<uint64_t*>(&new_x)));
   return __longlong_as_double(old_x);
-}*/
+}
 #endif
 #ifdef __HIP_ENABLE_HALF__
 // overload atomicAdd for half
@@ -5333,14 +5331,12 @@ __global__ void _assignNumOfDiffCol(const ElemType* a, const ElemType* b, ElemTy
 
         cur += (irow == crowB);
     }
-#ifdef __HIP_ENABLE_CUB__
     using BlockReduceT = hipcub::BlockReduce<int, BlockSize>;
     __shared__ typename BlockReduceT::TempStorage tmp;
 
     int res = BlockReduceT(tmp).Sum(cur);
     if (hipThreadIdx_x == 0)
         *c = res;
-#endif /*__HIP_ENABLE_CUB__*/
 }
 
 template <class ElemType>

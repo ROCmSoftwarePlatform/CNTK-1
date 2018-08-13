@@ -33,9 +33,7 @@
 #pragma warning(disable : 4515) // 'namespace': namespace uses itself
 #pragma warning(disable : 4706) // assignment within conditional expression
 #endif
-#ifdef __HIP_ENABLE_CUB__
 #include <hipcub/hipcub.hpp>
-#endif /*__HIP_ENABLE_CUB__*/
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -761,7 +759,6 @@ inline hipsparseStatus_t hipsparsedotiHelper(hipsparseHandle_t, int, const half 
 
 
 // Generalize cub calls
-#ifdef __HIP_ENABLE_CUB__
 inline hipError_t SortPairsDescending(void *d_temp_storage, size_t &temp_storage_bytes, const float *d_keys_in, float *d_keys_out, const uint64_t *d_values_in, uint64_t *d_values_out, int num_items, int begin_bit, int end_bit, hipStream_t stream)
 {
     return hipcub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream);
@@ -770,7 +767,6 @@ inline hipError_t SortPairsDescending(void *d_temp_storage, size_t &temp_storage
 {
     return hipcub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream);
 }
-#endif /*__HIP_ENABLE_CUB__*/
 #ifdef __HIP_ENABLE_HALF__
 inline hipError_t SortPairsDescending(void *, size_t, const half *, half *, const uint64_t *, uint64_t *, int, int, int, hipStream_t)
 {

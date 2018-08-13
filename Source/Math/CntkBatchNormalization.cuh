@@ -5,7 +5,6 @@
 //
 
 #pragma once
-
 #ifdef __HIP_PLATFORM_HCC__ //TODO: __add__ remove when CUB is integrated
 #define CUB_PTX_WARP_THREADS 32
 #endif
@@ -126,7 +125,7 @@ __device__ __forceinline__ void StoreValues<4, float, float>(const float src[4],
 template <typename T>
 __device__ __forceinline__ T Shuffle(T input, int srcLane, unsigned int mask)
 {
-#if defined (__HIP_DEVICE_COMPILE__) && defined ( __HIP_ENABLE_CUB__ )
+#if defined (__HIP_DEVICE_COMPILE__)
     // shfl is supported only on Kepler+
 
 #if defined( __HIP_ENABLE_ASSERT__ )
@@ -140,7 +139,7 @@ __device__ __forceinline__ T Shuffle(T input, int srcLane, unsigned int mask)
 #else
     assert(false);
     return input; // keep compiler happy
-#endif /*__HIP_DEVICE_COMPILE__ && __HIP_ENABLE_CUB__*/
+#endif /*__HIP_DEVICE_COMPILE__*/
 }
 
 namespace Operations
@@ -167,15 +166,9 @@ namespace Operations
         return rsqrt(a);
     }
 
-#ifdef __HIP_ENABLE_HALF__
-__device__ half RSqrt(half a) {
-#if __CUDA_ARCH__ >= 600 //TODO: __hip__
-	return hrsqrt(a);
-#else
+    __device__ __half RSqrt(__half a) {
 	return __float2half(rsqrtf(__half2float(a))); //TODO: PRAS_AMD
-#endif
-}
-#endif /*__HIP_ENABLE_HALF__*/
+    }
 }
 
 // This function is used to select correct unroll factor.
@@ -1029,7 +1022,6 @@ __global__ void kComputeSpatialScaleAndBiasGradients(int vectorSize, int spatial
         }
     }
     __syncthreads();
-#ifdef __HIP_ENABLE_CUB__
     using BlockReduce = hipcub::BlockReduce<comp_t, BlockDimX, hipcub::BLOCK_REDUCE_WARP_REDUCTIONS, BlockDimY>;
     // Note: must use separate temp storages for each reduction.
     __shared__ typename BlockReduce::TempStorage tmp1;
@@ -1041,7 +1033,6 @@ __global__ void kComputeSpatialScaleAndBiasGradients(int vectorSize, int spatial
         dScale[hipBlockIdx_x] = dsRes;
         dBias[hipBlockIdx_x] = dbRes;
     }
-#endif /*__HIP_ENABLE_CUB__*/
 }
 
 template <int U>
@@ -1198,11 +1189,8 @@ struct BackpropagateBatchNormGradients
                      const StatType* bnScale, StatType mbStatsWeight, const StatType* dScale,
                      const StatType* dBias, const StatType* savedMean, const StatType* savedInvStdDev, hipStream_t stream)
     {
-#if defined( __HIP_ENABLE_ASSERT__ )
         assert((vectorSize % U) == 0);
         assert(batchSize >= 1);
-#endif
-
         const int BlockDimX = 32 / U;
         const int BlockDimY = 4 * U;
         auto bdim = dim3(BlockDimX, BlockDimY);
@@ -1210,12 +1198,12 @@ struct BackpropagateBatchNormGradients
                          static_cast<unsigned int>(RoundUpToMultiple(batchSize,  BlockDimY)));
         if (spatial)
         {
-            hipLaunchKernelGGL((kBackpropagateBatchNormGradients<BlockDimX, BlockDimY, true/*spatial*/, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
+            hipLaunchKernelGGL((kBackpropagateBatchNormGradients<BlockDimX, BlockDimY, true, U, ElemType, StatType>), dim3(gdim), dim3(bdim), 0, stream, 
                 static_cast<int>(vectorSize), static_cast<int>(spatialSize), static_cast<int>(batchSize), x, dy, dx, bnScale, mbStatsWeight, dScale, dBias, savedMean, savedInvStdDev);
         }
         else
         {
-            hipLaunchKernelGGL((kBackpropagateBatchNormGradients<BlockDimX, BlockDimY, false/*not spatial*/, U>), dim3(gdim), dim3(bdim), 0, stream, 
+            hipLaunchKernelGGL((kBackpropagateBatchNormGradients<BlockDimX, BlockDimY, false, U>), dim3(gdim), dim3(bdim), 0, stream, 
                 static_cast<int>(vectorSize), static_cast<int>(spatialSize), static_cast<int>(batchSize), x, dy, dx, bnScale, mbStatsWeight, dScale, dBias, savedMean, savedInvStdDev);
         }
     }
