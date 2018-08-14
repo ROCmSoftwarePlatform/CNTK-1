@@ -5,9 +5,7 @@
 //
 
 #include "stdafx.h"
-#include "GPUMatrixCUDAKernels.cuh"
 #include "CuDnnFactories.h"
-#include "Convolution.cuh"
 #include "GPUMatrix.h"
 #include <typeinfo>
 #include <typeindex>
@@ -19,7 +17,6 @@
 
 // We want tensor core be enabled in order to get(v7)/find tensor core results. But if algo without tensorcore is faster, the only way to force faster algo is to turn it off. Since re-tuning can happen quite often in CNTK, it gets bad if we don't do it carefully. It also require move to get_v7 and we can't test until we can run fp16.
 // For now, let's keep it simple and enable tensor core all the time for fp16.
-#include <cxxabi.h>
 
 template <>
 const char* CudaErrString<hipdnnStatus_t>(hipdnnStatus_t x)
@@ -118,7 +115,7 @@ public:
         HIPDNN_CALL(hipdnnSetConvolutionNdDescriptor(m_conv, (int)dim_size, pad.data(),
                                                    stride.data(), dilation.data(),
                                                    HIPDNN_CROSS_CORRELATION, dataType == HIPDNN_DATA_HALF ? HIPDNN_DATA_FLOAT : dataType));
-#if !defined(__HIP_PLATFORM_HCC__)
+#if !defined(__HIP_PLATFORM_HCC__) //TODO NEEL:
         // allow tensor core for fp16 by default
         if(dataType == HIPDNN_DATA_HALF)
             HIPDNN_CALL(hipdnnSetConvolutionMathType(m_conv, HIPDNN_TENSOR_OP_MATH));
@@ -228,11 +225,6 @@ public:
                            size_t maxTempMemSizeInSamples, PoolKind poolKind, bool forceDeterministicAlgorithms,
                            bool poolIncludePad, bool inputHasFreeDimension)
         : Base(geometry, deviceId, imageLayout, maxTempMemSizeInSamples, poolKind, poolIncludePad),
-          m_isConvGeometryComputed(geometry->ComputeConvGeometryExplicit()),
-          m_mpRowCol(geometry->MpRowCol().size(), 1, (float*)const_cast<int*>(geometry->MpRowCol().data()),deviceId,  IsGpu(deviceId) ? matrixFlagNormal : matrixFlagDontOwnBuffer), 
-          m_mpRowIwht(geometry->MpRowIwht().size(), 1, (float*)const_cast<int*>(geometry->MpRowIwht().data()),deviceId,  IsGpu(deviceId) ? matrixFlagNormal : matrixFlagDontOwnBuffer), 
-          m_mpRowRun(geometry->MpRowRun().size(), 1, (float*)const_cast<int*>(geometry->MpRowRun().data()),deviceId,  IsGpu(deviceId) ? matrixFlagNormal : matrixFlagDontOwnBuffer), 
-          m_runs(geometry->Runs().size(), 1, (float*)const_cast<int*>(geometry->Runs().data()),deviceId,  IsGpu(deviceId) ? matrixFlagNormal : matrixFlagDontOwnBuffer), 
           m_cudnn(CuDnn::Instance()),
           m_dataType(CuDnnTensor::GetDataType<ElemType>()),
           m_forceDeterministicAlgorithms(forceDeterministicAlgorithms),
@@ -284,45 +276,17 @@ protected:
         }
     }
 
-
-    void PrintMatrixInfo(const Mat& in, const char* string) {
-        ElemType* hData = in.CopyToArray();
-        ElemType* dData = in.Data();
-        std::cout<<"Address of Device Data: "<<dData<<std::endl;
-        int row = in.GetNumRows();
-        int col = in.GetNumCols();
-        std::cout<<"Matrix Dimensions of "<<string<<" is rowXcol = "<<row<<"X"<<col<<std::endl;
-        for(int i =0; i < row; i++) {
-            for(int j =0; j < col; j++) {
-                std::cout<<hData[i * col + j]<<" ";
-            }
-            std::cout<<std::endl;
-        }
-       // exit(1);
-    }
-
     void ForwardCore(const Mat& in, const Mat& kernel, Mat& out, Mat& workspace) override
     {
         size_t batchSize = in.GetNumCols();
-        
-#ifdef _HIPDBG_
-        std::cout<<"CNTK: ENTER ForwardCore " << std::endl;
-#endif
-        
         // Find best algo and allocate temp buffer, if needed.
         auto finder = [&,this](int& calgo, hipdnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
-#ifdef _HIPDBG_
-            std::cout<<"CNTK: ENTER finder"<<std::endl;
-#endif
-            return hipdnnFindConvolutionForwardAlgorithmEx(*m_cudnn, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_outT, ptr(out), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+            return cudnnFindConvolutionForwardAlgorithmEx(*m_cudnn, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_outT, ptr(out), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
         };
         // Find max Memory needed while running static finder. Workaround for hipdnnFind fail. Number of algo is constant as in hipdnn 5.1
         auto staticFinder = [&,this](hipdnnConvolutionFwdAlgo_t& algo, bool noMem) -> hipdnnStatus_t
         {
-
-            std::cout<<"CNTK: ENTER staticFinder ---- Why?"<<std::endl;
-
 #ifdef __HIP_PLATFORM_NVCC__
             if(!noMem)
                 return hipdnnGetConvolutionForwardAlgorithm(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, HIPDNN_CONVOLUTION_FWD_SPECIFY_WORKSPACE_LIMIT, workspace.BufferSize(), &algo);
@@ -339,14 +303,7 @@ protected:
         // find deterministic algorithm 
         auto deterministicFinder = [&, this](int& calgo, hipdnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
-#ifdef _HIPDBG_
-            std::cout<<"CNTK: ENTER deterministicFinder"<<std::endl;
-#endif
-            
             auto result = finder(calgo, algoPerf);
-#ifdef _HIPDBG_
-            std::cout<<"CNTK: After Finder - selected Algo : " << (*algoPerf).algo <<std::endl;
-#endif
 #if defined (__HIP_PLATFORM_HCC__)
             auto found = std::find_if(algoPerf, algoPerf + calgo,
                 [](const hipdnnConvolutionFwdAlgoPerf_t& a) { return a.algo == HIPDNN_CONVOLUTION_FWD_ALGO_GEMM && a.status == HIPDNN_STATUS_SUCCESS; });
@@ -359,30 +316,18 @@ protected:
                 RuntimeError("cuDNN could not find a deterministic algorithm. Set 'forceDeterministicAlgorithms=false' in your configuration.");
 
             algoPerf[0] = *found;   // copy the deterministic algorithm to first entry
-#ifdef _HIPDBG_
-            std::cout<<"After Found - selected Algo : " << (*algoPerf).algo <<std::endl;
-#endif
             calgo = 1;              // set count of algorithms
-#ifdef _HIPDBG_
-            std::cout<<"CNTK: EXIT deterministicFinder"<<std::endl;
-#endif
             return result;
         };
         // find workspace size needed to auto-tune all algorithms, as well as the size needed for deterministic algorithm 
         auto workspaceSizeFinder = [&, this]() -> hipdnnStatus_t
         {
             size_t tmpSize;
-            hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;
-            
-            std::cout<<"CNTK: ENTER workspaceSizeFinder "<< MaxAlgoCount << std::endl;
-            
+            hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;     
             for (int i = 0; i < MaxAlgoCount; i++)
             {
-#ifdef _HIPDBG_
-                std::cout<<"CNTK: Invoking workspaceSizeFinder"<<std::endl;
-#endif
-                auto err0 = hipdnnGetConvolutionForwardWorkspaceSize(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, (hipdnnConvolutionFwdAlgo_t)i, &tmpSize);
-                if (err0 == HIPDNN_STATUS_SUCCESS)
+                auto err0 = cudnnGetConvolutionForwardWorkspaceSize(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, (cudnnConvolutionFwdAlgo_t)i, &tmpSize);
+                if (err0 == CUDNN_STATUS_SUCCESS)
                 {
                     if (m_fwdAlgo.MaxAlgoWorkspaceSize < tmpSize)
                         m_fwdAlgo.MaxAlgoWorkspaceSize = tmpSize;
@@ -391,9 +336,6 @@ protected:
                     err = err0;
                 }
             }
-#ifdef _HIPDBG_
-            std::cout<<"CNTK: EXIT workspaceSizeFinder " << std::endl;
-#endif
             return err;
         };
         FindBestAlgo(batchSize, m_fwdAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
@@ -402,11 +344,7 @@ protected:
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
 #endif
         // Perform forward convolution operation.
-        std::cout<<"CNTK: Invoking hipdnnConvolutionForward"<<std::endl;
-        std::cout<<"CNTK: SelectedAlgo"<<m_fwdAlgo.selectedAlgo<<std::endl;
-        std::cout<<"CNTK: workspace Buffer Size"<<workspace.BufferSize()<<std::endl;
         HIPDNN_CALL(hipdnnConvolutionForward(*m_cudnn, &C::One, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_fwdAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), &C::Zero, m_outT, ptr(out)));
-        std::cout<<"CNTK: EXIT ForwardCore " << std::endl;
     }
 
     void BackwardDataCore(const Mat& srcGrad, const Mat& kernel, Mat& grad, bool accumulateGradient, Mat& workspace) override
@@ -486,13 +424,8 @@ protected:
 #if !defined(__HIP_PLATFORM_HCC__)
         else HIPDNN_CALL(hipdnnSetConvolutionMathType(*m_conv, HIPDNN_DEFAULT_MATH));
 #endif
-        std::cout<<"CNTK: SelectedAlgo"<<m_backDataAlgo.selectedAlgo<<std::endl;
-        std::cout<<"accumulateGradient"<<accumulateGradient<<std::endl;
-
         HIPDNN_CALL(hipdnnConvolutionBackwardData(*m_cudnn, &C::One, *m_kernelT, ptr(kernel), m_outT, ptr(srcGrad), *m_conv, m_backDataAlgo.selectedAlgo, ptr(workspace), workspace.BufferSize(), accumulateGradient ? &C::One : &C::Zero, m_inT, grad.Data()));
      }
-
-
 
     void BackwardKernelCore(const Mat& srcGrad, const Mat& in, Mat& kernelGrad, bool accumulateGradient, bool /*allowReuse*/, Mat& workspace) override
     {
@@ -600,13 +533,6 @@ protected:
         m_outT.UpdateBatchSize(batchSize);
         HIPDNN_CALL(hipdnnPoolingBackward(*m_cudnn, *(m_pool), &C::One, m_outT, ptr(out), m_outT, ptr(srcGrad),
                                           m_inT, ptr(in), accumulateGradient ? &C::One : &C::Zero, m_inT, ptr(grad)));
-//#if 1
-//        PrintMatrixInfo(out, "BackwardPoolingCore: out_Mat");
-//        PrintMatrixInfo(srcGrad, "BackwardPoolingCore: srcGrad_Mat");
-//        PrintMatrixInfo(in, "BackwardPoolingCore: in_Mat");
-//        PrintMatrixInfo(grad, "BackwardPoolingCore: grad_Mat");
-//        exit(1);
-//#endif
     }
 
     void MaxUnpoolingCore(const Mat& out, const Mat& poolIn, Mat& in) override
@@ -649,10 +575,6 @@ private:
     template <typename TAlgo, typename TWorkspaceSizeFinder, typename TDeterministicFinder, typename TFinder, typename TStaticFinder>
     void FindBestAlgo(size_t batchSize, TAlgo& algo, TWorkspaceSizeFinder workspaceSizeFinder, TDeterministicFinder deterministicFinder, TFinder finder, TStaticFinder staticFinder, Mat& workspace)
     {
-#ifdef _HIPDBG_
-        std::cout  << "CNTK: ENTER FindBestAlgo" << std::endl;
-#endif
-        
         m_inT.UpdateBatchSize(batchSize);
         m_outT.UpdateBatchSize(batchSize);
 
@@ -660,9 +582,6 @@ private:
         if (!algo.NeedAutotuning(batchSize, workspace.BufferSize()))
             return;
 
-#ifdef _HIPDBG_
-        std::cout  << "CNTK: FindBestAlgo: 1, forceDeterministicAlgorithms =" << m_forceDeterministicAlgorithms << std::endl;
-#endif
         // if batchsize changes again when just finish init, go back to init again
         if (algo.autotuningState == AutotuningState::PendingTuning && batchSize > algo.LastBatchAlgoMBSize)
             algo.autotuningState = AutotuningState::Init;
@@ -670,10 +589,7 @@ private:
         // batchSize is bigger than the one when initialize current workspace, need free up space and go back to init
         if (algo.autotuningState == AutotuningState::Running && batchSize > algo.maxMBSizeSeen)
         {
-#ifdef _HIPDBG_
-            std::cout  << "CNTK: FindBestAlgo: 2" << std::endl;
-#endif
-            hipDeviceSynchronize(); // make sure no in-flight GPU kernels using workspace before release its memory
+            cudaDeviceSynchronize(); // make sure no in-flight GPU kernels using workspace before release its memory
             workspace.Resize(0,0,0,false);
             algo.RecordAlgoBatchSizeWorkspaceSize(true, algo.selectedAlgo, 0, 0);
             algo.autotuningState = AutotuningState::Init;
@@ -681,10 +597,6 @@ private:
         else if (algo.autotuningState == AutotuningState::Running && !m_forceDeterministicAlgorithms && !m_inputHasFreeDimension)  // batchSize changes to be smaller than MaxAlgoMBSize, need to re-do tuning if non-deterministic
             algo.autotuningState = AutotuningState::PendingTuning;
 
-#ifdef _HIPDBG_
-        std::cout  << "CNTK: FindBestAlgo: 3" << std::endl;
-#endif
-        
         typename TAlgo::typeT algoPerf[MaxAlgoCount];
         int calgo = 0;
         // In initState, where memory allocation for nodes are not completed, we only run the algorithm with no workspace.
@@ -692,28 +604,11 @@ private:
         // In the special case when m_inputHasFreeDimension, we only run the algorithm with no workspace.
         if (algo.autotuningState == AutotuningState::Init)
         {
-
-#ifdef _HIPDBG_
-            std::cout  << "CNTK: FindBestAlgo: 4" << std::endl;
-#endif
-            
             // find workspace size needed for finderEx and deterministic algorithm
             HIPDNN_CALL(workspaceSizeFinder());
-            
-#ifdef _HIPDBG_
-            std::cout  << "CNTK: FindBestAlgo: 5: " << m_forceDeterministicAlgorithms << std::endl;
-            std::cout  << "CNTK: FindBestAlgo: 5_1 MaxAlgoMBSize: " << algo.MaxAlgoMBSize << std::endl;
-            //std::cout  << "CNTK: FindBestAlgo: 5_2 supportsStaticFinder: " << supportsStaticFinder << std::endl;
-#endif
-
             if (m_forceDeterministicAlgorithms)
             {
-                workspace.Resize((algo.DeterministicAlgoWorkspaceSize + sizeof(ElemType) - 1) / sizeof(ElemType), 1, 0, false);
-
-#ifdef _HIPDBG_
-                std::cout  << "CNTK: FindBestAlgo: 6  WS size = " << workspace.BufferSize() << std::endl;
-#endif
-                
+                workspace.Resize((algo.DeterministicAlgoWorkspaceSize + sizeof(ElemType) - 1) / sizeof(ElemType), 1, 0, false);        
                 HIPDNN_CALL(deterministicFinder(calgo, algoPerf));
                 assert(calgo == 1);                                 // only one deterministic algorithm will be returned
                 algo.RecordAlgoBatchSizeWorkspaceSize(true, (*algoPerf).algo, batchSize, (*algoPerf).memory);
@@ -721,35 +616,21 @@ private:
             }
             else
             {
-#ifdef _HIPDBG_
-                std::cout  << "CNTK: FindBestAlgo: 7" << std::endl;
-#endif
                 // This branch handles two cases: a) When first MB comes through, and b) When input has free dimensions.
                 // If the handling of these two cases changes, we may need to create separate branches for them.
                 HIPDNN_CALL(staticFinder(algo.selectedAlgo, true));
-                
-#ifdef _HIPDBG_
-                std::cout  << "CNTK: FindBestAlgo: 8" << std::endl;
-#endif
                 algo.maxMBSizeSeen = batchSize;
                 // Here MaxAlgoWorkspaceSize is temporarily storing 'possible' need changed by staticFinder.
                 // Thus we don't set maxAlgo records and those will be tuned later.
                 algo.RecordAlgoBatchSizeWorkspaceSize(false, algo.selectedAlgo, batchSize, 0);
                 algo.autotuningState = m_inputHasFreeDimension ? AutotuningState::Running : AutotuningState::PendingTuning;
             }
-#ifdef _HIPDBG_
-            std::cout  << "CNTK: FindBestAlgo: 9" << std::endl;
-#endif
-            
             return;
         }
 
         // we allocate workspace and find algorithm if batchSize is higher than ever seen
         if (algo.MaxAlgoMBSize == 0)    // MaxAlgoMBSize is 0 only after Init. After this heavy tuning, MaxAlgoMBSize will be set to >0, thus we tune just once.
         {
-#ifdef _HIPDBG_
-            std::cout  << "CNTK: FindBestAlgo: 10" << std::endl;
-#endif
             size_t curSize = workspace.BufferSize();
 
             // To control memory usage. No one seems to be using this flag
@@ -759,12 +640,7 @@ private:
             try
             {   // first try allocate as much to run FindEX, this may fail when accumulate is on (in which case additional memory is allocated in finder()), thus we do try...catch...
                 size_t free, total, resizeTo = 0;
-                CUDA_CALL(hipMemGetInfo(&free, &total));
-
-#ifdef _HIPDBG_
-                std::cout  << "CNTK: FindBestAlgo: 11" << std::endl;
-#endif
-                
+                CUDA_CALL(hipMemGetInfo(&free, &total));          
                 free += workspace.BufferSize();
                 // We reserve 2% of the total GPU memory because CuDNN seem to behave erroneously when there is no memory left
                 if(free > (total/50))
@@ -775,25 +651,16 @@ private:
                 if(resizeTo > 0)
                     workspace.Resize((resizeTo + sizeof(ElemType) - 1) / sizeof(ElemType), 1);     // resize the workspace so that we can run the finder
 
-#ifdef _HIPDBG_
-                std::cout  << "CNTK: FindBestAlgo: 12" << std::endl;
-#endif
-
                 // Pending State now, let's do a find and get algorithm Perfs
                 calgo = 0;
                 HIPDNN_CALL(finder(calgo, algoPerf));
-
-#ifdef _HIPDBG_
-                std::cout  << "CNTK: FindBestAlgo: 13" << std::endl;
-#endif
                 assert(calgo > 0);
-                
                 auto res = algoPerf;        // first returned algorithm is the fastest
                 algo.RecordAlgoBatchSizeWorkspaceSize(true, (*res).algo, batchSize, (*res).memory);
 #ifdef __HIP_PLATFORM_NVCC__
                 algo.AlgoMathType = (*res).mathType;
 #elif defined __HIP_PLATFORM_HCC__
-                algo.AlgoMathType = HIPDNN_DEFAULT_MATH; //TODO: PRAS_AMD
+                algo.AlgoMathType = HIPDNN_DEFAULT_MATH; //TODO: NEEL
 #endif
                 algo.autotuningState = AutotuningState::Running;
                 if (algo.MaxAlgoWorkspaceSize < curSize)   // need to shrink the workspace
@@ -815,7 +682,7 @@ private:
 #ifdef __HIP_PLATFORM_NVCC__
                     algo.AlgoMathType = (*res).mathType;
 #elif defined __HIP_PLATFORM_HCC__
-                    algo.AlgoMathType = HIPDNN_DEFAULT_MATH; //TODO: PRAS_AMD
+                    algo.AlgoMathType = HIPDNN_DEFAULT_MATH; //TODO: NEEL
 #endif
                     algo.autotuningState = AutotuningState::Running;
                 }
@@ -839,8 +706,6 @@ private:
             algo.RecordAlgoBatchSizeWorkspaceSize(false, algo.selectedAlgo, batchSize, workspace.BufferSize());
             algo.autotuningState = AutotuningState::Running;
         }
-        
-        std::cout  << "CNTK: EXIT FindBestAlgo" << std::endl;
         return;
     }
 
@@ -909,18 +774,6 @@ private:
         }
     };
 
-    // IMP NOTE: Make sure that in the declaration below m_isConvGeometryComputed is declared
-    // before m_mpRowCol. This ordering is required to ensure the right order of initialization
-    // in the initializer list in the ctor (above) of this class.
-    bool m_isConvGeometryComputed;
-
-
-    Matrix<float> m_mpRowCol;   
-    // Convolution-specific maps.
-    Matrix<float> m_mpRowIwht;
-    Matrix<float> m_mpRowRun;
-    Matrix<float> m_runs;
- 
     CuDnn::ptr_t m_cudnn;
     hipdnnDataType_t m_dataType;
     CuDnnTensor m_inT;
@@ -1001,7 +854,6 @@ bool CuDnnConvolutionEngineFactory<ElemType>::IsSupported(DEVICEID_TYPE deviceId
 
 template class CuDnnConvolutionEngineFactory<float>;
 template class CuDnnConvolutionEngineFactory<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class CuDnnConvolutionEngineFactory<half>;
-#endif //__HIP_ENABLE_HALF__
+
 } } }

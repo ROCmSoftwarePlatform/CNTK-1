@@ -6,7 +6,6 @@
 // define half type since __half is device only
 // TODO: investigate performance of implementation, function signature and efficiency
 
-#ifdef __HIP_ENABLE_HALF__
 #pragma once
 
 #include "../CNTKv2LibraryDll/API/HalfConverter.hpp"
@@ -321,12 +320,3 @@ STD_HALF_BINOP(pow)
 }
 
 #undef __CUDA_HOSTDEVICE__
-#else  //__HIP_ENABLE_HALF__
-#pragma once
-
-template <typename ElemType>
-struct TypeSelector
-{
-    typedef ElemType comp_t;
-};
-#endif //__HIP_ENABLE_HALF__

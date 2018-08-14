@@ -48,7 +48,6 @@ typedef hiprandState_t hiprandState;
 
 // kernel(s) for half functions with no library support
 namespace {
-#ifdef __HIP_ENABLE_HALF__
 __global__ void transposeNoOverlap(half *odata, const half *idata, const int m, const int n)
 {
     __shared__ half tile[TRANS_TILE_DIM][TRANS_TILE_DIM+1];
@@ -106,7 +105,22 @@ __global__ void GenerateNormalHalf(hiprandState *state, half *result, int n, hal
     result[id] = (float)mean + (float)stddev * x;
     if(id == n-1) *state = localState;
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
+
+_global__ void helperCopyHalf2Float(float *f, const half *h, const int n)
+{
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    if (id >= n)
+        return;
+    f[id] = (float)h[id];
+}
+
+__global__ void helperCopyFloat2Half(half *h, const float *f, const int n)
+{
+    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
+    if (id >= n)
+        return;
+    h[id] = (half)f[id];
 
 // kernels can convert matrix between half and float. speed currently not optimized, may need to add half2
 /*
@@ -137,24 +151,6 @@ __global__ void copyFloat2Half(half *odata, const float *idata, const int n)
 }
 */
 
-#ifdef __HIP_ENABLE_HALF__
-__global__ void helperCopyHalf2Float(float *f, const half *h, const int n)
-{
-    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
-    if (id >= n)
-        return;
-    f[id] = (float)h[id];
-}
-
-__global__ void helperCopyFloat2Half(half *h, const float *f, const int n)
-{
-    int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
-    if (id >= n)
-        return;
-    h[id] = (half)f[id];
-}
-#endif /*__HIP_ENABLE_HALF__*/
-
 }
 
 // Generalize library calls to be use in template functions
@@ -168,8 +164,7 @@ inline hipblasStatus_t hipblasgemmHelper(hipblasHandle_t handle, hipblasOperatio
 {
     return hipblasDgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
 }
-#ifdef __HIP_ENABLE_HALF__
-inline hipblasStatus_t hipblasgemmHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, int k, const half* alpha, const half* A, int lda, const half* B, int ldb, const half* beta, half* C, int ldc)
+inline cublasStatus_t cublasgemmHelper(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, int k, const half* alpha, const half* A, int lda, const half* B, int ldb, const half* beta, half* C, int ldc)
 {
     // This does true FP16 computation which is slow for non-Volta GPUs
     //return hipblasHgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
@@ -179,27 +174,7 @@ inline hipblasStatus_t hipblasgemmHelper(hipblasHandle_t handle, hipblasOperatio
     //hipblasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH); //TODO:PRAS_2.4
     //return hipblasGemmEx(handle, transa, transb, m, n, k, &h_a, A, CUDA_R_16F, lda, B, CUDA_R_16F, ldb, &h_b, C, CUDA_R_16F, ldc, CUDA_R_32F, CUBLAS_GEMM_DFALT); //TODO:PRAS_2.4
     return hipblasHgemm(handle, transa, transb, m, n, k, reinterpret_cast<const hipblasHalf*>(alpha), reinterpret_cast<hipblasHalf*>(const_cast<half*>(A)), lda, reinterpret_cast<hipblasHalf*>(const_cast<half*>(B)), ldb, reinterpret_cast<const hipblasHalf*>(beta), reinterpret_cast<hipblasHalf*>(C), ldc);
-    
-    /*float *fA, *fB, *fC;
-    hipMalloc(&fA, (lda * k) * sizeof(float));
-    hipMalloc(&fB, (ldb * n) * sizeof(float));
-    hipMalloc(&fC, (ldc * n) * sizeof(float));
-
-    int max = (lda * k );
-    ( max < (ldb * n)) && ( max = (ldb * n));
-    ( max < (ldc * n)) && ( max = (ldc * n));
-
-    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(max), dim3(256), 0, 0, fA, A, (lda * k));
-    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(max), dim3(256), 0, 0, fB, B, (ldb * n));
-    hipLaunchKernelGGL((helperCopyHalf2Float), dim3(max), dim3(256), 0, 0, fC, C, (ldc * n));
-
-    hipblasStatus_t status;
-    status = hipblasSgemm(handle, transa, transb, m, n, k, &h_a, (const float*)fA, lda, (const float*)fB, ldb, &h_b, fC, ldc);
-
-    hipLaunchKernelGGL((helperCopyFloat2Half), dim3(max), dim3(256), 0, 0, C, fC, (ldc * n));
-    return status;*/
 }
-#endif /*__HIP_ENABLE_HALF__*/
 
 // batched gemm
 inline hipblasStatus_t hipblasGemmBatchedHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, int k, const float* alpha, const float *Aarray[], int lda, const float *Barray[], int ldb, const float *beta, float *Carray[], int ldc, int batchCount)
@@ -210,12 +185,12 @@ inline hipblasStatus_t hipblasGemmBatchedHelper(hipblasHandle_t handle, hipblasO
 {
     return hipblasDgemmBatched(handle, transa, transb, m, n, k, alpha, Aarray, lda, Barray, ldb, beta, Carray, ldc, batchCount);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipblasStatus_t hipblasGemmBatchedHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, int k, const half* alpha, const half *Aarray[], int lda, const half *Barray[], int ldb, const half *beta, half *Carray[], int ldc, int batchCount)
 {
     return HIPBLAS_STATUS_NOT_SUPPORTED;//hipblasHgemmBatched(handle, transa, transb, m, n, k, alpha, (const __half**)Aarray, lda, (const __half**)Barray, ldb, beta, (__half**)Carray, ldc, batchCount);/TODO:PRAS_2.4
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 // axpy
 inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const float* alpha, const float* x, int incx, float* y, int incy)
@@ -234,7 +209,7 @@ inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const do
 {
     return hipblasDaxpy(handle, n, alpha, x, incx, y, incy);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const half* alpha, const half* x, int incx, half* y, int incy)
 {
     float tmp_alpha = *alpha;
@@ -255,7 +230,6 @@ inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const ha
         hipLaunchKernelGGL((helperCopyFloat2Half), dim3(blocks), dim3(256), 0, 0, y, df_y, n);
 
     return status;
-    //return hipblasAxpyEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, CUDA_R_32F); TODO:PRAS_2.4
 }
 inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const half* alpha, const half* x, int incx, half* y, int incy, int num_x, int num_y) //TODO:PRAS_2.4
 {
@@ -279,7 +253,7 @@ inline hipblasStatus_t hipblasaxpyHelper(hipblasHandle_t handle, int n, const ha
     return status;
 }
 
-#endif /*__HIP_ENABLE_HALF__*/
+
 // transpose using geam
 inline hipblasStatus_t hipblasTransposeHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, float *alpha, float *A, int lda, float *beta, float *B, int ldb, float *C, int ldc)
 {
@@ -289,7 +263,7 @@ inline hipblasStatus_t hipblasTransposeHelper(hipblasHandle_t handle, hipblasOpe
 {
     return hipblasDgeam(handle, transa, transb, m, n, alpha, A, lda, beta, B, ldb, C, ldc);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipblasStatus_t hipblasTransposeHelper(hipblasHandle_t, hipblasOperation_t, hipblasOperation_t, int m, int n, half *, half *A, int, half *, half *, int, half *C, int)
 {
     if(C != A)
@@ -303,7 +277,7 @@ inline hipblasStatus_t hipblasTransposeHelper(hipblasHandle_t, hipblasOperation_
         RuntimeError("In place transpose(half) not supported."); // hipblas do not support this either. There might be bug if this actually get called.
     return (hipblasStatus_t) 0;
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 // asum
 inline hipblasStatus_t hipblasasumHelper(hipblasHandle_t handle, int n, const float *x, int incx, float *result)
@@ -314,7 +288,7 @@ inline hipblasStatus_t hipblasasumHelper(hipblasHandle_t handle, int n, const do
 {
     return hipblasDasum(handle, n, x, incx, result);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipblasStatus_t hipblasasumHelper(hipblasHandle_t, int n, const half *x, int incx, half *result)
 {
     // pass in hipdnn handle/descriptor to remove overhead?
@@ -371,7 +345,7 @@ inline hipblasStatus_t hipblasasumHelper(hipblasHandle_t, int n, const half *x, 
 
     return (hipblasStatus_t) 0;
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 // amax
 inline hipblasStatus_t hipblasamaxHelper(hipblasHandle_t handle, int n, const float *x, int incx, int *result)
@@ -382,7 +356,7 @@ inline hipblasStatus_t hipblasamaxHelper(hipblasHandle_t handle, int n, const do
 {
     return hipblasIdamax(handle, n, x, incx, result);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipblasStatus_t hipblasamaxHelper(hipblasHandle_t, int n, const half *x, int incx, int *result)
 {
     unsigned int h_result_uint = 0;
@@ -443,7 +417,7 @@ inline hipblasStatus_t hipblasamaxHelper(hipblasHandle_t, int n, const half *x, 
     *result = (int) h_result_uint;
     return (hipblasStatus_t) 0;
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 // scal
 inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t handle, int n, const float *alpha, float *x, int incx)
@@ -455,7 +429,6 @@ inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t handle, int n, const do
     return hipblasDscal(handle, n, alpha, x, incx);
 }
 
-#ifdef __HIP_ENABLE_HALF__
 inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t handle, int n, const half *alpha, half *x, int incx)
 {
     float tmp_alpha = *alpha;
@@ -475,7 +448,7 @@ inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t handle, int n, const ha
 
     //return hipblasScalEx(handle, n, (void*)&tmp_alpha, CUDA_R_32F, (void*)x, CUDA_R_16F, incx, CUDA_R_32F); TODO:PRAS_2.4
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 inline hipblasStatus_t hipblasscalHelper(hipblasHandle_t,int,const char *,char *, int)
 {
@@ -495,7 +468,7 @@ inline hipblasStatus_t hipblasdotHelper(hipblasHandle_t handle, int n, const dou
 {
     return hipblasDdot(handle, n, x, incx, y, incy, result);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipblasStatus_t hipblasdotHelper(hipblasHandle_t handle, int n, const half *x, int incx, const half *y, int incy, half *result)
 {
     float *float_x, *float_y, *float_result;
@@ -517,7 +490,7 @@ inline hipblasStatus_t hipblasdotHelper(hipblasHandle_t handle, int n, const hal
 
     //return hipblasDotEx(handle, n, (void*)x, CUDA_R_16F, incx, (void*)y, CUDA_R_16F, incy, (void*)result, CUDA_R_16F, CUDA_R_32F); TODO:PRAS_2.4
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 // hiprand
 inline hiprandStatus_t hiprandGenerateUniformHelper(hiprandGenerator_t generator, float *outputPtr, size_t num)
 {
@@ -527,7 +500,7 @@ inline hiprandStatus_t hiprandGenerateUniformHelper(hiprandGenerator_t generator
 {
     return hiprandGenerateUniformDouble(generator, outputPtr, num);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hiprandStatus_t hiprandGenerateUniformHelper(hiprandGenerator_t, half *outputPtr, size_t num)
 {
     hiprandState *devStates;
@@ -540,7 +513,7 @@ inline hiprandStatus_t hiprandGenerateUniformHelper(hiprandGenerator_t, half *ou
 
     return (hiprandStatus_t) 0;
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 inline hiprandStatus_t hiprandGenerateNormalHelper(hiprandGenerator_t generator, float *outputPtr, size_t n, float mean, float stddev)
 {
@@ -551,7 +524,7 @@ inline hiprandStatus_t hiprandGenerateNormalHelper(hiprandGenerator_t generator,
     return hiprandGenerateNormalDouble(generator, outputPtr, n, mean, stddev);
 }
 
-#ifdef __HIP_ENABLE_HALF__
+
 inline hiprandStatus_t hiprandGenerateNormalHelper(hiprandGenerator_t, half *outputPtr, size_t n, half mean, half stddev)
 {
     hiprandState *devStates;
@@ -564,7 +537,7 @@ inline hiprandStatus_t hiprandGenerateNormalHelper(hiprandGenerator_t, half *out
 
     return (hiprandStatus_t) 0;
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 // hipsparse
 inline hipsparseStatus_t hipsparsecsr2denseHelper(hipsparseHandle_t handle, int m, int n, const hipsparseMatDescr_t descrA, const float *csrValA, const int *csrRowPtrA, const int *csrColIndA, float *A, int lda)
@@ -575,12 +548,12 @@ inline hipsparseStatus_t hipsparsecsr2denseHelper(hipsparseHandle_t handle, int 
 {
     return hipsparseDcsr2dense(handle, m, n, descrA, csrValA, csrRowPtrA, csrColIndA, A, lda);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipsparseStatus_t hipsparsecsr2denseHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const half *, const int *, const int *, half *, int)
 {
     RuntimeError("Unsupported template argument(half) in GPUSparseMatrix");
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 inline hipsparseStatus_t hipsparsecsr2denseHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const short *, const int *, const int *, short *, int)
 {
     RuntimeError("Unsupported template argument(short) in GPUSparseMatrix");
@@ -598,12 +571,12 @@ inline hipsparseStatus_t hipsparsecsc2denseHelper(hipsparseHandle_t handle, int 
 {
     return hipsparseDcsc2dense(handle, m, n, descrA, cscValA, cscRowIndA, cscColPtrA, A, lda);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipsparseStatus_t hipsparsecsc2denseHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const half *, const int *, const int *, half *, int)
 {
     RuntimeError("Unsupported template argument(half) in GPUSparseMatrix");
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 inline hipsparseStatus_t hipsparsecsc2denseHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const short *, const int *, const int *, short *, int)
 {
     RuntimeError("Unsupported template argument(short) in GPUSparseMatrix");
@@ -621,12 +594,12 @@ inline hipsparseStatus_t hipsparsecsr2cscHelper(hipsparseHandle_t handle, int m,
 {
     return hipsparseDcsr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd, cscVal, cscRowInd, cscColPtr, copyValues, idxBase);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipsparseStatus_t hipsparsecsr2cscHelper(hipsparseHandle_t, int, int, int, const half *, const int *, const int *, half *, int *, int *, hipsparseAction_t, hipsparseIndexBase_t)
 {
     RuntimeError("Unsupported template argument(half) in hipsparsecsr2cscHelper");
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 inline hipsparseStatus_t hipsparsennzHelper(hipsparseHandle_t handle, hipsparseDirection_t dirA, int m, int n, const hipsparseMatDescr_t descrA, const float *A, int lda, int *nnzPerRowColumn, int *nnzTotalDevHostPtr)
 {
@@ -636,12 +609,12 @@ inline hipsparseStatus_t hipsparsennzHelper(hipsparseHandle_t handle, hipsparseD
 {
     return hipsparseDnnz(handle, dirA, m, n, descrA, A, lda, nnzPerRowColumn, nnzTotalDevHostPtr);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipsparseStatus_t hipsparsennzHelper(hipsparseHandle_t,hipsparseDirection_t,int,int , const hipsparseMatDescr_t, const half *, int, int *, int *)
 {
     RuntimeError("Unsupported template argument(half) in GPUSparseMatrix");
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 inline hipsparseStatus_t hipsparsennzHelper(hipsparseHandle_t,hipsparseDirection_t,int,int , const hipsparseMatDescr_t, const short *, int, int *, int *)
 {
     RuntimeError("Unsupported template argument(short) in GPUSparseMatrix");
@@ -659,12 +632,12 @@ inline hipsparseStatus_t hipsparsedense2csrHelper(hipsparseHandle_t handle, int 
 {
     return hipsparseDdense2csr(handle, m, n, descrA, A, lda, nnzPerRow, csrValA, csrRowPtrA, csrColIndA);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipsparseStatus_t hipsparsedense2csrHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const half *, int, const int *, half *, int *, int *)
 {
     RuntimeError("Unsupported template argument(half) in GPUSparseMatrix");
 }
-#endif /*__HIP_ENABLE_HALF__*/
+#
 inline hipsparseStatus_t hipsparsedense2csrHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const short *, int, const int *, short *, int *, int *)
 {
     RuntimeError("Unsupported template argument(short) in GPUSparseMatrix");
@@ -682,12 +655,12 @@ inline hipsparseStatus_t hipsparsedense2cscHelper(hipsparseHandle_t handle, int 
 {
     return hipsparseDdense2csc(handle, m, n, descrA, A, lda, nnzPerCol, cscValA, cscRowIndA, cscColPtrA);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipsparseStatus_t hipsparsedense2cscHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const half *, int, const int *, half *, int *, int *)
 {
     RuntimeError("Unsupported template argument(half) in GPUSparseMatrix");
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 inline hipsparseStatus_t hipsparsedense2cscHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const short *, int, const int *, short *, int *, int *)
 {
     RuntimeError("Unsupported template argument(short) in GPUSparseMatrix");
@@ -705,12 +678,12 @@ inline hipsparseStatus_t hipsparsecsrmmHelper(hipsparseHandle_t handle, hipspars
 {
     return hipsparseDcsrmm(handle, transA, m, n, k, nnz, alpha, descrA, csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipsparseStatus_t hipsparsecsrmmHelper(hipsparseHandle_t, hipsparseOperation_t, int, int, int, int, const half *, const hipsparseMatDescr_t, const half *, const int *, const int *, const half *, int, const half *, half *, int)
 {
     RuntimeError("Unsupported template argument(half) in hipsparsecsrmmHelper");
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 inline hipsparseStatus_t hipsparsecsrgemmHelper(hipsparseHandle_t handle, hipsparseOperation_t transA, hipsparseOperation_t transB, int m, int n, int k, const hipsparseMatDescr_t descrA, const int nnzA, const float *csrValA, const int *csrRowPtrA, const int *csrColIndA, const hipsparseMatDescr_t descrB, const int nnzB, const float *csrValB, const int *csrRowPtrB, const int *csrColIndB, const hipsparseMatDescr_t descrC, float *csrValC, const int *csrRowPtrC, int *csrColIndC)
 {
@@ -720,12 +693,12 @@ inline hipsparseStatus_t hipsparsecsrgemmHelper(hipsparseHandle_t handle, hipspa
 {
     return hipsparseDcsrgemm(handle, transA, transB, m, n, k, descrA, nnzA, csrValA, csrRowPtrA, csrColIndA, descrB, nnzB, csrValB, csrRowPtrB, csrColIndB, descrC, csrValC, csrRowPtrC, csrColIndC);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipsparseStatus_t hipsparsecsrgemmHelper(hipsparseHandle_t, hipsparseOperation_t, hipsparseOperation_t, int, int, int, const hipsparseMatDescr_t, const int, const half *, const int *, const int *, const hipsparseMatDescr_t, const int, const half *, const int *, const int *, const hipsparseMatDescr_t, half *, const int *, int *)
 {
     RuntimeError("Unsupported template argument(half) in hipsparsecsrgemmHelper");
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 inline hipsparseStatus_t hipsparsecsrgeamHelper(hipsparseHandle_t handle, int m, int n, const float *alpha, const hipsparseMatDescr_t descrA, int nnzA, const float *csrValA, const int *csrRowPtrA, const int *csrColIndA, const float *beta, const hipsparseMatDescr_t descrB, int nnzB, const float *csrValB, const int *csrRowPtrB, const int *csrColIndB, const hipsparseMatDescr_t descrC, float *csrValC, int *csrRowPtrC, int *csrColIndC)
 {
@@ -735,12 +708,12 @@ inline hipsparseStatus_t hipsparsecsrgeamHelper(hipsparseHandle_t handle, int m,
 {
     return hipsparseDcsrgeam(handle, m, n, alpha, descrA, nnzA, csrValA, csrRowPtrA, csrColIndA, beta, descrB, nnzB, csrValB, csrRowPtrB, csrColIndB, descrC, csrValC, csrRowPtrC, csrColIndC);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipsparseStatus_t hipsparsecsrgeamHelper(hipsparseHandle_t, int, int, const half *, const hipsparseMatDescr_t, int, const half *, const int *, const int *, const half *, const hipsparseMatDescr_t, int, const half *, const int *, const int *, const hipsparseMatDescr_t, half *, int *, int *)
 {
     RuntimeError("Unsupported template argument(half) in hipsparsecsrgeamHelper");
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 inline hipsparseStatus_t hipsparsedotiHelper(hipsparseHandle_t handle, int nnz, const float *xVal, const int *xInd, const float *y, float *resultDevHostPtr, hipsparseIndexBase_t idxBase)
 {
@@ -750,12 +723,12 @@ inline hipsparseStatus_t hipsparsedotiHelper(hipsparseHandle_t handle, int nnz, 
 {
     return hipsparseDdoti(handle, nnz, xVal, xInd, y, resultDevHostPtr, idxBase);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipsparseStatus_t hipsparsedotiHelper(hipsparseHandle_t, int, const half *, const int *, const half *, half *, hipsparseIndexBase_t)
 {
     RuntimeError("Unsupported template argument(half) in hipsparsedotiHelper");
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 
 // Generalize cub calls
@@ -767,11 +740,11 @@ inline hipError_t SortPairsDescending(void *d_temp_storage, size_t &temp_storage
 {
     return hipcub::DeviceRadixSort::SortPairsDescending(d_temp_storage, temp_storage_bytes, d_keys_in, d_keys_out, d_values_in, d_values_out, num_items, begin_bit, end_bit, stream);
 }
-#ifdef __HIP_ENABLE_HALF__
+
 inline hipError_t SortPairsDescending(void *, size_t, const half *, half *, const uint64_t *, uint64_t *, int, int, int, hipStream_t)
 {
     RuntimeError("Unsupported template argument(half) in SortPairsDescending");
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 #endif // CPUONLY

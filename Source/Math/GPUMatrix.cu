@@ -19,6 +19,7 @@
 #include "TensorOps.h"
 #ifdef __HIP_PLATFORM_NVCC__
 #include "device_launch_parameters.h"
+#include <cuda.h>
 #endif // nv platform check
 #include <hip/hip_runtime.h>
 #include <hiprand.h>
@@ -318,11 +319,8 @@ hipblasHandle_t _initHIPBLAS(int devId)
 template <class ElemType>
 void GPUMatrix<ElemType>::SetDevice(DEVICEID_TYPE deviceId)
 {
-#if defined( __HIP_ENABLE_ASSERT__ )
     assert(deviceId >= 0);
-#endif
-
-    CUDA_CALL(hipSetDevice(deviceId));
+    CUDA_CALL(cudaSetDevice(deviceId));
 }
 
 // PrepareDevice - Setup the correct cuda context for an operation
@@ -466,6 +464,9 @@ void GPUMatrix<ElemType>::performElementWiseFunction(ElementWiseOperator kind, c
     case ElementWiseOperator::opTanh:
         hipLaunchKernelGGL((_elementWiseTanhOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, src, Data(), N);
 	return ;
+    case ElementWiseOperator::opAtanh:
+        hipLaunchKernelGGL((_elementWiseAtanhOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, src, Data(), N);
+        return;   
     case ElementWiseOperator::opSqrt:
         hipLaunchKernelGGL((_elementWiseSqrtOnCuda<ElemType>), dim3(blocksPerGrid), dim3(GridDim::maxThreadsPerBlock), 0, t_stream, src, Data(), N);
 	return ;
@@ -619,9 +620,7 @@ std::unique_ptr<GPUMatrix<ElemType>> GPUMatrix<ElemType>::GetOrCreateWorkspace()
     // REVIEW alexeyk: not thread-safe, fine for now.
     if (m_workspace == nullptr)
         m_workspace = std::make_unique<conc_stack<std::unique_ptr<GPUMatrix<ElemType>>>>();
-#if defined( __HIP_ENABLE_ASSERT__ )
     assert(m_workspace != nullptr);
-#endif
     auto deviceId = GetComputeDeviceId();
     return m_workspace->pop_or_create([deviceId]()
                                       {
@@ -632,9 +631,7 @@ std::unique_ptr<GPUMatrix<ElemType>> GPUMatrix<ElemType>::GetOrCreateWorkspace()
 template <class ElemType>
 void GPUMatrix<ElemType>::ReleaseWorkspace(std::unique_ptr<GPUMatrix<ElemType>> src) const
 {
-#if defined( __HIP_ENABLE_ASSERT__ )
     assert(m_workspace != nullptr);
-#endif
     m_workspace->push(std::move(src));
 }
 
@@ -823,9 +820,7 @@ GPUMatrix<ElemType> GPUMatrix<ElemType>::Diagonal() const
 template <class ElemType>
 void GPUMatrix<ElemType>::MinusOneAt(GPUMatrix<ElemType>& c, const size_t position)
 {
-#if defined( __HIP_ENABLE_ASSERT__ )
     assert(position < c.GetNumElements());
-#endif
 
     CUDA_LONG n = (CUDA_LONG) c.GetNumElements();
     CUDA_LONG p = (CUDA_LONG) position;
@@ -2336,24 +2331,9 @@ GPUMatrix<ElemType>& GPUMatrix<ElemType>::AssignLogSoftmaxOf(const GPUMatrix<Ele
         PrepareDevice();
         CUDA_LONG N = (CUDA_LONG) GetNumCols();
         CUDA_LONG M = (CUDA_LONG) GetNumRows();
-
-
-
         SyncGuard syncGuard;
         // note: kernel uses hard-coded thread dimension
         hipLaunchKernelGGL((_assignColumnwiseLogSoftmaxOf512Threads), dim3(N), dim3(512), 0, t_stream, static_cast<const ElemType*>(a.Data()), static_cast<ElemType*>(Data()), static_cast<const CUDA_LONG>(N), static_cast<const CUDA_LONG>(M));
-         // note: kernel uses hard-coded thread dimension
-//
-//          ElemType* hA = CopyToArray();
-//                std::cout<<"Input to _assignColumnwiseLogSoftmaxOf512Threads kernel with Numrows and Columns: "<< M <<" and " << N <<std::endl;
-//                for(int i =0; i < M; i++) {
-//                    for (int j =0; j < N; j++){
-//                        std::cout<<(float)hA[i * N + j]<<" ";
-//                    }
-//                    std::cout<<std::endl;
-//                }
-//           exit(1);
-
     }
     else
     {
@@ -3055,6 +3035,7 @@ void GPUMatrix<ElemType>::VectorMax(GPUMatrix<ElemType>& maxIndexes, GPUMatrix<E
     // If first param is nullptr then no actual work is done except writing result to cbtemp.
     CUDA_CALL(SortPairsDescending(nullptr, cbtemp, inVal, outVal1, inIdx, outIdx, celt, 0, sizeof(ElemType) * 8, t_stream));
     size_t ctemp1 = (cbtemp + sizeof(ElemType) - 1) / sizeof(ElemType);
+    // Determine temp buffer size needed for SortPairs to sort indices on the second pass.
     cbtemp = 0;
     CUDA_CALL(hipcub::DeviceRadixSort::SortPairs(nullptr, cbtemp, outIdx, inIdx, outVal1, outVal2, celt, 0, 32, t_stream));
     size_t ctemp2 = (cbtemp + sizeof(ElemType) - 1) / sizeof(ElemType);
@@ -3100,8 +3081,8 @@ void GPUMatrix<ElemType>::VectorMin(GPUMatrix<ElemType>& minIndexes, GPUMatrix<E
         LogicError("VectorMax: Matrix is empty.");
 
     const GPUMatrix<ElemType>& us = *this;
-    const CUDA_LONG m = (CUDA_LONG) GetNumRows();
-    const CUDA_LONG n = (CUDA_LONG) GetNumCols();
+    const int m = (int) GetNumRows();
+    const int n = (int) GetNumCols();
 
     assert(m > 0 && n > 0); // converting from size_t to int may cause overflow
     PrepareDevice();
@@ -3792,7 +3773,7 @@ template <class ElemType>
             assert(n == (int) a.GetNumCols());
             if (n != (int) a.GetNumCols())
                 InvalidArgument("To add row vector, cols should match.");
-            int num_x = a.GetNumElements(); //TODO: PRAS_2.4
+            int num_x = a.GetNumElements(); //TODO: NEEL
             int num_y = c.GetNumElements();
 
             foreach_row (i, c)
@@ -5074,63 +5055,43 @@ void GPUMatrix<ElemType>::TensorArgOp(const GPUMatrix<ElemType>& a, ElementWiseO
 // =======================================================================
 template class GPUMatrix<float>;
 template class GPUMatrix<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class GPUMatrix<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 template class DeviceBoundNumber<float>;
 template class DeviceBoundNumber<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class DeviceBoundNumber<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // instantiation of cast methods
 template void GPUMatrix<char>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<char>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
-#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<char>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
-#endif /*__HIP_ENABLE_HALF__*/
 template void GPUMatrix<short>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<short>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
-#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<short>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
-#endif /*__HIP_ENABLE_HALF__*/
 template void GPUMatrix<int>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<int>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
-#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<int>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
-#endif /*__HIP_ENABLE_HALF__*/
 template void GPUMatrix<float>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<float>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
-#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<float>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
-#endif /*__HIP_ENABLE_HALF__*/
 template void GPUMatrix<double>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<double>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
-#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<double>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
 template void GPUMatrix<half>::CastAssignValuesOf<float>(const GPUMatrix<float>* other);
 template void GPUMatrix<half>::CastAssignValuesOf<double>(const GPUMatrix<double>* other);
 template void GPUMatrix<half>::CastAssignValuesOf<half>(const GPUMatrix<half>* other);
-#endif /*__HIP_ENABLE_HALF__*/
 
 // instantiation of templated methods
 template void GPUMatrix<float>::AdaDelta<float>(GPUMatrix<float>& gradients, GPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon);
 template void GPUMatrix<double>::AdaDelta<double>(GPUMatrix<double>& gradients, GPUMatrix<double>& functionValues, double learningRate, double rho, double epsilon);
-#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<float>::AdaDelta<half>(GPUMatrix<half>& gradients, GPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon);
-#endif /*__HIP_ENABLE_HALF__*/
 
 template void GPUMatrix<float>::BatchNormalizationForward(const GPUMatrix<float>& scale, const GPUMatrix<float>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, GPUMatrix<float>& runMean, GPUMatrix<float>& runVariance, GPUMatrix<float>& out, double epsilon, GPUMatrix<float>& saveMean, GPUMatrix<float>& saveInvStdDev) const;
 template void GPUMatrix<double>::BatchNormalizationForward(const GPUMatrix<double>& scale, const GPUMatrix<double>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, GPUMatrix<double>& runMean, GPUMatrix<double>& runVariance, GPUMatrix<double>& out, double epsilon, GPUMatrix<double>& saveMean, GPUMatrix<double>& saveInvStdDev) const;
-#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<half>::BatchNormalizationForward(const GPUMatrix<float>& scale, const GPUMatrix<float>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, GPUMatrix<float>& runMean, GPUMatrix<float>& runVariance, GPUMatrix<half>& out, double epsilon, GPUMatrix<float>& saveMean, GPUMatrix<float>& saveInvStdDev) const;
-#endif /*__HIP_ENABLE_HALF__*/
 
 template void GPUMatrix<float>::BatchNormalizationBackward(const GPUMatrix<float>& in, GPUMatrix<float>& grad, const GPUMatrix<float>& scale, double blendFactor, const GPUMatrix<float>& saveMean, const GPUMatrix<float>& saveInvStdDev, GPUMatrix<float>& scaleGrad, GPUMatrix<float>& biasGrad) const;
 template void GPUMatrix<double>::BatchNormalizationBackward(const GPUMatrix<double>& in, GPUMatrix<double>& grad, const GPUMatrix<double>& scale, double blendFactor, const GPUMatrix<double>& saveMean, const GPUMatrix<double>& saveInvStdDev, GPUMatrix<double>& scaleGrad, GPUMatrix<double>& biasGrad) const;
-#ifdef __HIP_ENABLE_HALF__
 template void GPUMatrix<half>::BatchNormalizationBackward(const GPUMatrix<half>& in, GPUMatrix<half>& grad, const GPUMatrix<float>& scale, double blendFactor, const GPUMatrix<float>& saveMean, const GPUMatrix<float>& saveInvStdDev, GPUMatrix<float>& scaleGrad, GPUMatrix<float>& biasGrad) const;
-#endif /*__HIP_ENABLE_HALF__*/
 
 template <class ElemType>
 hipblasHandle_t GPUMatrix<ElemType>::s_cuHandle[GPUMatrix<ElemType>::MaxGpus] = {0};
@@ -5199,9 +5160,7 @@ template short* TracingGPUMemoryAllocator::Allocate<short>(int, size_t);
 template char* TracingGPUMemoryAllocator::Allocate<char>(int, size_t);
 template float* TracingGPUMemoryAllocator::Allocate<float>(int, size_t);
 template double* TracingGPUMemoryAllocator::Allocate<double>(int, size_t);
-#ifdef __HIP_ENABLE_HALF__
 template half* TracingGPUMemoryAllocator::Allocate<half>(int, size_t);
-#endif /*__HIP_ENABLE_HALF__*/
 
 template void TracingGPUMemoryAllocator::Free<int>(int, int*, bool);
 template void TracingGPUMemoryAllocator::Free<size_t>(int, size_t*, bool);
@@ -5209,9 +5168,7 @@ template void TracingGPUMemoryAllocator::Free<short>(int, short*, bool);
 template void TracingGPUMemoryAllocator::Free<char>(int, char*, bool);
 template void TracingGPUMemoryAllocator::Free<float>(int, float*, bool);
 template void TracingGPUMemoryAllocator::Free<double>(int, double*, bool);
-#ifdef __HIP_ENABLE_HALF__
 template void TracingGPUMemoryAllocator::Free<half>(int, half*, bool);
-#endif /*__HIP_ENABLE_HALF__*/
 
 }}}
 

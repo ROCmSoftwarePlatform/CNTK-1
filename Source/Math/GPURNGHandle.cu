@@ -21,7 +21,7 @@ GPURNGHandle::GPURNGHandle(int deviceId, uint64_t seed, uint64_t offset)
 
     HIPRAND_CALL(hiprandCreateGenerator(&m_generator, HIPRAND_RNG_PSEUDO_XORWOW));
     HIPRAND_CALL(hiprandSetPseudoRandomGeneratorSeed(m_generator, cudaSeed));
-    // TODO: __hip__ HIPRAND_CALL(hiprandSetGeneratorOrdering(m_generator, HIPRAND_ORDERING_PSEUDO_SEEDED));
+    // TODO: NEEL HIPRAND_CALL(hiprandSetGeneratorOrdering(m_generator, HIPRAND_ORDERING_PSEUDO_SEEDED));
     HIPRAND_CALL(hiprandSetGeneratorOffset(m_generator, offset));
 }
 

@@ -24,7 +24,6 @@
 #include "half.hpp"
 #include "fpgeneric.h"
 #pragma pop_macro("TENSOR_OPS_DECL")
-#include <hipcub/hipcub.hpp>
 
 // We would like to use 64-bit integer to support large matrices. However, CUDA seems to support only 32-bit integer
 // For now, use int32_t to ensure that both Linux and Windows see this as 32 bit integer type.
@@ -62,14 +61,14 @@ static __inline__ __device__ double atomicAdd(double* address, double val)
   return __longlong_as_double(old_x);
 }
 #endif
-#ifdef __HIP_ENABLE_HALF__
+
 // overload atomicAdd for half
 static __inline__ __device__ half atomicAdd(half* address, half val)
 {
     assert(false); // TODO: implement later
     return val;
 }
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 
 // TODO: replace this with TensorOps.h LogAdd(). It differs in using ElemType throughout, while this one seems to use 'double' versions of exp() and log().
@@ -157,9 +156,7 @@ struct GridDim
         m_blocksPerGrid = CeilDiv(N, m_threadsPerBlock);
         if (m_blocksPerGrid == 1)
             m_threadsPerBlock = N; // don't launch more than necessary  --TODO: Does this make a difference at all?
-#if defined( __HIP_ENABLE_ASSERT__ )
         assert(m_blocksPerGrid * m_threadsPerBlock >= N);
-#endif
     }
 
     static const std::vector<hipDeviceProp_t>& GetCachedDeviceProps()
@@ -5186,9 +5183,7 @@ __global__ void _rcrfTransGrdComputeMax1024Labels(
             fTmp = alpha[id];
 
         fTmp2 = fTmp + pair_scores[j] - zeta[j];
-#if defined( __HIP_ENABLE_ASSERT__ )
         assert(fTmp2 <= 0.0);
-#endif
         fTmp2 += beta[j];
 
         fTmp = exp_(fTmp2);
@@ -5312,9 +5307,7 @@ __global__ void _copyTopKResults(const uint64_t* indexes, const ElemType* values
 template <int BlockSize, class ElemType>
 __global__ void _assignNumOfDiffCol(const ElemType* a, const ElemType* b, ElemType* c, CUDA_LONG crowB, CUDA_LONG ccol)
 {
-#if defined( __HIP_ENABLE_ASSERT__ )
-    assert(hipGridDim_x == 1 && hipGridDim_y == 1 && hipGridDim_z == 1);
-#endif
+    assert(gridDim.x == 1 && gridDim.y == 1 && gridDim.z == 1);
 
     int cur = 0;
     CUDA_LONG icol = hipThreadIdx_x;
