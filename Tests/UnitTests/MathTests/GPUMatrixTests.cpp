@@ -27,10 +27,8 @@ BOOST_FIXTURE_TEST_CASE(MatrixCopyAssignAcrossDevices, RandomSeedFixture)
     {
         Matrix<float> m_gpu(2, 3, array.data(), c_deviceIdZero, matrixFlagNormal);
         Matrix<float> m_copy_gpu_0(m_gpu, c_deviceIdZero);
-        if (hasTwoGpus){
-            Matrix<float> m_gpu_1(2, 3, array.data(), c_deviceIdZero + 1, matrixFlagNormal);
-            Matrix<float> m_copy_gpu_1(m_gpu_1, c_deviceIdZero + 1);
-        }
+        if (hasTwoGpus)
+            Matrix<float> m_copy_gpu_1(m_gpu, c_deviceIdZero + 1);
         Matrix<float> m_copy_cpu(m_gpu, -1);
     }
 

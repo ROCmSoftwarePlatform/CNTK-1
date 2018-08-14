@@ -9,6 +9,8 @@
 # that provides
 #   BUILDTYPE= One of release or debug
 #     defaults to release
+#   BUILD_VERSION= CNTK version number to be used while building
+#   BUILD_PUBLIC= One of yes or no
 #   MKL_PATH= path to MKLML installation
 #     only needed if MATHLIB=mkl
 #   GDK_INCLUDE_PATH= path to CUDA GDK include path, so $(GDK_INCLUDE_PATH)/nvml.h exists
@@ -34,6 +36,8 @@
 #   BOOST_PATH= path to Boost installation, so $(BOOST_PATH)/include/boost/test/unit_test.hpp
 #     defaults to /usr/local/boost-1.60.0
 #   PYTHON_SUPPORT=true iff CNTK v2 Python module should be build
+#   PYTHON_WITH_DEPS=1 Adds third party libraries in the python package (e.g. CUDA). Must be equal to 1 or unset
+#   PYTHON_WITH_DEBUG=1 Do not strip libraries for the python package. Must be equal to 1 or unset
 #   SWIG_PATH= path to SWIG (>= 3.0.10)
 #   PYTHON_VERSIONS= list of Python versions to build for
 #     A Python version is identified by "27", "35", or "36".
@@ -58,11 +62,6 @@ ifneq ("$(wildcard $(BUILD_TOP)/Config.make)","")
   include $(BUILD_TOP)/Config.make
 else
   $(error Cannot find $(BUILD_TOP)/Config.make.  Please see the CNTK documentation at https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Linux for configuration instructions.)
-endif
-
-ifdef HIP_PATH
-HIPCC=${HIP_PATH}/bin/hipcc
-HIP_PLATFORM=$(shell ${HIP_PATH}/bin/hipconfig --compiler)
 endif
 
 ifndef BUILDTYPE
@@ -95,27 +94,9 @@ SOURCEDIR:= Source
 INCLUDEPATH:= $(addprefix $(SOURCEDIR)/, Common/Include CNTKv2LibraryDll CNTKv2LibraryDll/API CNTKv2LibraryDll/proto ../Examples/Extensibility/CPP Math CNTK ActionsLib ComputationNetworkLib SGDLib SequenceTrainingLib CNTK/BrainScript Readers/ReaderLib PerformanceProfilerDll)
 INCLUDEPATH+=$(PROTOBUF_PATH)/include
 # COMMON_FLAGS include settings that are passed both to NVCC and C++ compilers.
-COMMON_FLAGS:= -DHAS_MPI=$(HAS_MPI) -D_POSIX_SOURCE -D_XOPEN_SOURCE=600 -D__USE_XOPEN2K -std=c++11 -DCUDA_NO_HALF -D__CUDA_NO_HALF_OPERATORS__ 
+COMMON_FLAGS:= -DHAS_MPI=$(HAS_MPI) -D_POSIX_SOURCE -D_XOPEN_SOURCE=600 -D__USE_XOPEN2K -std=c++11 -DCUDA_NO_HALF -D__CUDA_NO_HALF_OPERATORS__
 CPPFLAGS:=
 CXXFLAGS:= $(SSE_FLAGS) -std=c++0x -fopenmp -fpermissive -fPIC -Werror -fcheck-new
-
-ifdef HIP_PATH
-COMMON_FLAGS += -DHIP_COMPILE
-ifeq ($(HIP_PLATFORM), nvcc)
-	CXXFLAGS += -D__HIP_PLATFORM_NVCC__
-	COMPILE_FLAGS = -Xcompiler "-fPIC"
-	COMMON_FLAGS += -D__HIP_ENABLE_HALF__ 
-else
-ifeq ($(HIP_PLATFORM), hcc)
-	CXXFLAGS += -D__HIP_PLATFORM_HCC__
-	COMPILE_FLAGS = "-fPIC"
-	COMMON_FLAGS += -D__HIP_ENABLE_HALF_ 
-endif
-endif
-else
-COMMON_FLAGS += -DCUDA_COMPILE
-endif
-        
 LIBPATH:=
 LIBS_LIST:=
 LDFLAGS:=
@@ -138,13 +119,9 @@ SRC:=
 all : buildall
 
 # Set up basic nvcc options and add CUDA targets from above
-ifneq ($(HIP_PLATFORM), hcc)
-        CUFLAGS = -m 64
-endif
+CUFLAGS = -m 64
 
-ifdef HIP_PATH
-
-ifeq ($(HIP_PLATFORM), nvcc)
+ifdef CUDA_PATH
   ifndef GDK_INCLUDE_PATH
     GDK_INCLUDE_PATH=/usr/include/nvidia/gdk
     $(info defaulting GDK_INCLUDE_PATH to $(GDK_INCLUDE_PATH))
@@ -155,13 +132,24 @@ ifeq ($(HIP_PLATFORM), nvcc)
     $(info defaulting GDK_NVML_LIB_PATH to $(GDK_NVML_LIB_PATH))
   endif
 
+  ifndef CUB_PATH
+    $(info defaulting CUB_PATH to /usr/local/cub-1.4.1)
+    CUB_PATH=/usr/local/cub-1.4.1
+  endif
+
+  DEVICE = gpu
+
+  NVCC = $(CUDA_PATH)/bin/nvcc
+
   INCLUDEPATH+=$(GDK_INCLUDE_PATH)
+  INCLUDEPATH+=$(CUB_PATH)
+
+# Set up CUDA includes and libraries
   INCLUDEPATH += $(CUDA_PATH)/include
   LIBPATH += $(CUDA_PATH)/lib64
-  LIBS_LIST += hipblas hiprand hipsparse
   LIBS_LIST += cublas cudart cuda curand cusparse nvidia-ml
 
-  # Set up cuDNN if needed
+# Set up cuDNN if needed
   ifdef CUDNN_PATH
     INCLUDEPATH += $(CUDNN_PATH)/cuda/include
     LIBPATH += $(CUDNN_PATH)/cuda/lib64
@@ -176,39 +164,6 @@ ifeq ($(HIP_PLATFORM), nvcc)
     LIBS_LIST += nccl
     COMMON_FLAGS += -DUSE_NCCL
   endif
-  INCLUDEPATH += $(INSTALL_DIR)/cub
-endif
-
-ifeq ($(HIP_PLATFORM), hcc)
-  LIBS_LIST += hipblas hip_hcc hiprand hipsparse MIOpen
-  INCLUDEPATH += ${INSTALL_DIR}/miopen/include/
-  INCLUDEPATH += $(INSTALL_DIR)/rocprim/include/
-endif
-
-  ifndef CUB_PATH
-    $(info defaulting CUB_PATH to /opt/rocm/hipcub)
-    CUB_PATH=/opt/rocm/hipcub
-  endif
-
-  DEVICE = gpu
-
-  INCLUDEPATH+=$(CUB_PATH)/include
-
-# Set up CUDA includes and libraries
-  ifdef HIPDNN_PATH
-    INCLUDEPATH += $(HIPDNN_PATH)/include
-    #LIBPATH += /opt/rocm/lib64
-    LIBPATH += $(INSTALL_DIR)/lib64
-    LIBS_LIST += hipDNN
-    COMMON_FLAGS +=-DUSE_HIPDNN
-  endif
-  INCLUDEPATH += $(HIP_PATH)/include
-  INCLUDEPATH += $(INSTALL_DIR)/hipblas/include/
-  INCLUDEPATH += $(INSTALL_DIR)/hiprand/include/
-  INCLUDEPATH += $(INSTALL_DIR)/rocrand/include/
-  INCLUDEPATH += $(INSTALL_DIR)/hcsparse/include/
-  LIBPATH += $(INSTALL_DIR)/lib64
-
 else
   DEVICE = cpu
 
@@ -217,16 +172,17 @@ endif
 
 ifeq ("$(MATHLIB)","mkl")
   INCLUDEPATH += $(MKL_PATH)/include
-  LIBS_LIST += m iomp5 pthread mklml_intel mkldnn
+  # disable MKL-DNN until we pick up the fix for AMD cache size https://github.com/intel/mkl-dnn/commit/ccfbf83ab489b42f7452b6701498b07c28cdb502
+  #LIBS_LIST += m iomp5 pthread mklml_intel mkldnn
+  LIBS_LIST += m iomp5 pthread mklml_intel
   MKL_LIB_PATH := $(MKL_PATH)/lib
   LIBPATH += $(MKL_LIB_PATH)
-  COMMON_FLAGS += -DUSE_MKL -DUSE_MKLDNN
+  #COMMON_FLAGS += -DUSE_MKL -DUSE_MKLDNN
+  COMMON_FLAGS += -DUSE_MKL
 endif
 
-ifeq ($(HIP_PLATFORM), nvcc)
 ifeq ($(CUDA_GDR),1)
   COMMON_FLAGS += -DUSE_CUDA_GDR
-endif
 endif
 
 ifeq ("$(MATHLIB)","openblas")
@@ -257,20 +213,13 @@ endif
 # Set up nvcc target architectures (will generate code to support them all, i.e. fat-binary, in release mode)
 # In debug mode we only include cubin/PTX for 30 and rely on PTX / JIT to generate the required native cubin format
 # see also http://docs.nvidia.com/cuda/pascal-compatibility-guide/index.html#building-applications-with-pascal-support
-ifeq ($(HIP_PLATFORM), nvcc)
-GENCODE_SM30 := -gencode arch=compute_30,code=sm_30
-GENCODE_SM35 := -gencode arch=compute_35,code=sm_35
-GENCODE_SM50 := -gencode arch=compute_50,code=sm_50
-GENCODE_SM52 := -gencode arch=compute_52,code=sm_52
-GENCODE_SM60 := -gencode arch=compute_60,code=sm_60
-GENCODE_SM61 := -gencode arch=compute_61,code=sm_61
-GENCODE_SM70 := -gencode arch=compute_70,code=sm_70
-#GENCODE := $(GENCODE_SM30) $(GENCODE_SM35) $(GENCODE_SM50) $(GENCODE_SM52) $(GENCODE_SM60) $(GENCODE_SM61)
-else
-ifeq ($(HIP_PLATFORM), hcc)
-GENCODE_FLAGS := -Wno-deprecated-register
-endif
-endif
+GENCODE_SM30 := -gencode arch=compute_30,code=\"sm_30,compute_30\"
+GENCODE_SM35 := -gencode arch=compute_35,code=\"sm_35,compute_35\"
+GENCODE_SM50 := -gencode arch=compute_50,code=\"sm_50,compute_50\"
+GENCODE_SM52 := -gencode arch=compute_52,code=\"sm_52,compute_52\"
+GENCODE_SM60 := -gencode arch=compute_60,code=\"sm_60,compute_60\"
+GENCODE_SM61 := -gencode arch=compute_61,code=\"sm_61,compute_61\"
+GENCODE_SM70 := -gencode arch=compute_70,code=\"sm_70,compute_70\"
 
 # Should we relocate *.gcno and *.gcda files using -fprofile-dir option?
 # Use GCOV_PREFIX and GCOV_PREFIX_STRIP if relocating:
@@ -287,32 +236,26 @@ ifeq ("$(BUILDTYPE)","debug")
   ifdef CNTK_CUDA_CODEGEN_DEBUG
     GENCODE_FLAGS := $(CNTK_CUDA_CODEGEN_DEBUG)
   else
-    ifneq ($(HIP_PLATFORM), hcc)
-      GENCODE_FLAGS := $(GENCODE_SM30)
-      CUFLAGS += -use_fast_math
-    endif
+    GENCODE_FLAGS := $(GENCODE_SM30)
   endif
 
   CXXFLAGS += -g
   LDFLAGS += -rdynamic
   COMMON_FLAGS += -D_DEBUG -DNO_SYNC
-  CUFLAGS += -O0 -g -lineinfo  $(GENCODE_FLAGS)
+  CUFLAGS += -O0 -g -use_fast_math -lineinfo  $(GENCODE_FLAGS)
 endif
 
 ifeq ("$(BUILDTYPE)","release")
   ifdef CNTK_CUDA_CODEGEN_RELEASE
     GENCODE_FLAGS := $(CNTK_CUDA_CODEGEN_RELEASE)
   else
-    ifneq ($(HIP_PLATFORM), hcc)
-        GENCODE_FLAGS := $(GENCODE_SM30) $(GENCODE_SM35) $(GENCODE_SM50) $(GENCODE_SM60) $(GENCODE_SM61) $(GENCODE_SM70)
-        CUFLAGS += -use_fast_math
-    endif
+    GENCODE_FLAGS := $(GENCODE_SM30) $(GENCODE_SM35) $(GENCODE_SM50) $(GENCODE_SM60) $(GENCODE_SM61) $(GENCODE_SM70)
   endif
 
-  CXXFLAGS += -g -O3
+  CXXFLAGS += -g -O4
   LDFLAGS += -rdynamic
   COMMON_FLAGS += -DNDEBUG -DNO_SYNC
-  CUFLAGS += -O3 -g $(GENCODE_FLAGS)
+  CUFLAGS += -O3 -g -use_fast_math $(GENCODE_FLAGS)
 endif
 
 ifdef CNTK_CUDA_DEVICE_DEBUGINFO
@@ -335,11 +278,23 @@ ORIGINDIR:='$$ORIGIN'
 # Components VERSION info
 ########################################
 
-CNTK_COMPONENT_VERSION := 2.4
+# CNTK version which should be used where CNTK version is required. Ex: print version or tag CNTK binaries.
+CNTK_VERSION := $(BUILD_VERSION)
+
+# Cntk Version banner is printed wherever CNTK_VERSION should be printed. ex: python -c 'import cntk;cntk.__version__'.
+CNTK_VERSION_BANNER := $(CNTK_VERSION)
+ifeq ("$(BUILD_PUBLIC)","no")
+CNTK_VERSION_BANNER := $(CNTK_VERSION_BANNER)+
+endif
+
+# Cntk binaries (generated by build) are appended with CNTK_COMPONENT_VERSION. Ex: libCntk.Core-$(CNTK_COMPONENT_VERSION).dll
+CNTK_COMPONENT_VERSION := $(CNTK_VERSION)
 ifeq ("$(BUILDTYPE)","debug")
 CNTK_COMPONENT_VERSION := $(CNTK_COMPONENT_VERSION)d
 endif
 
+CPPFLAGS += -DCNTK_VERSION="$(CNTK_VERSION)"
+CPPFLAGS += -DCNTK_VERSION_BANNER="$(CNTK_VERSION_BANNER)"
 CPPFLAGS += -DCNTK_COMPONENT_VERSION="$(CNTK_COMPONENT_VERSION)"
 
 CNTKMATH:=Cntk.Math-$(CNTK_COMPONENT_VERSION)
@@ -434,6 +389,7 @@ MATH_SRC =\
 	$(SOURCEDIR)/Math/CPUMatrixTensorFloat.cpp \
 	$(SOURCEDIR)/Math/CPUMatrixTensorDouble.cpp \
 	$(SOURCEDIR)/Math/CPUMatrixTensorHalf.cpp \
+	$(SOURCEDIR)/Math/CPUMatrixTensorSpecial.cpp \
 	$(SOURCEDIR)/Math/CPURNGHandle.cpp \
 	$(SOURCEDIR)/Math/CPUSparseMatrix.cpp \
 	$(SOURCEDIR)/Math/ConvolutionEngine.cpp \
@@ -446,7 +402,7 @@ MATH_SRC =\
 	$(SOURCEDIR)/Math/TensorView.cpp \
 	$(SOURCEDIR)/Math/NcclComm.cpp \
 
-ifdef HIP_PATH
+ifdef CUDA_PATH
 MATH_SRC +=\
 	$(SOURCEDIR)/Math/CuDnnBatchNormalization.cu \
 	$(SOURCEDIR)/Math/CuDnnCommon.cu \
@@ -481,11 +437,8 @@ $(CNTKMATH_LIB): $(MATH_OBJ) | $(PERF_PROFILER_LIB)
 	@echo $(SEPARATOR)
 	@echo creating $@ for $(ARCH) with build type $(BUILDTYPE)
 	@mkdir -p $(dir $@)
-ifeq ($(HIP_PLATFORM), hcc)
-	$(HIPCC) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) -o $@ $^ $(LIBS) -fopenmp=libiomp5 -l$(PERF_PROFILER)
-else
-	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ $(LIBS) -fopenmp -l$(PERF_PROFILER) 
-endif
+	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ $(LIBS) -fopenmp -l$(PERF_PROFILER)
+
 
 # Any executable using Common or ReaderLib needs to link these libraries.
 READER_LIBS := $(CNTKMATH_LIB) $(PERF_PROFILER_LIB)
@@ -521,7 +474,7 @@ SEQUENCE_TRAINING_LIB_SRC =\
 	$(SOURCEDIR)/SequenceTrainingLib/latticeforwardbackward.cpp \
 	$(SOURCEDIR)/SequenceTrainingLib/parallelforwardbackward.cpp \
 
-ifdef HIP_PATH
+ifdef CUDA_PATH
 SEQUENCE_TRAINING_LIB_SRC +=\
 	$(SOURCEDIR)/Math/cudalatticeops.cu \
 	$(SOURCEDIR)/Math/cudalattice.cpp \
@@ -578,7 +531,8 @@ CNTKLIBRARY_COMMON_SRC =\
 	$(SOURCEDIR)/CNTKv2LibraryDll/proto/onnx/core/graph.cpp \
 	$(SOURCEDIR)/CNTKv2LibraryDll/proto/onnx/core/model.cpp \
 	$(SOURCEDIR)/CNTKv2LibraryDll/proto/onnx/Operators.cpp \
-	$(SOURCEDIR)/CNTKv2LibraryDll/proto/onnx/CNTKToONNX.cpp \
+	$(SOURCEDIR)/CNTKv2LibraryDll/proto/onnx/RNNHelper.cpp \
+    $(SOURCEDIR)/CNTKv2LibraryDll/proto/onnx/CNTKToONNX.cpp \
 	$(SOURCEDIR)/CNTKv2LibraryDll/proto/onnx/ONNXToCNTK.cpp \
 	$(SOURCEDIR)/CNTKv2LibraryDll/proto/onnx/ONNX.cpp \
 
@@ -761,7 +715,7 @@ $(EVAL_EXTENDED_CLIENT): $(EVAL_EXTENDED_CLIENT_OBJ) | $(EVAL_LIB) $(READER_LIBS
 ########################################
 CNTKLIBRARY_CPP_EVAL_EXAMPLES:=$(BINDIR)/CNTKLibraryCPPEvalExamples
 
-ifdef HIP_PATH
+ifdef CUDA_PATH
 CNTKLIBRARY_CPP_EVAL_EXAMPLES_SRC=\
 	$(SOURCEDIR)/../Examples/Evaluation/CNTKLibraryCPPEvalGPUExamples/CNTKLibraryCPPEvalGPUExamples.cpp\
 	$(SOURCEDIR)/../Examples/Evaluation/CNTKLibraryCPPEvalCPUOnlyExamples/CNTKLibraryCPPEvalExamples.cpp
@@ -1086,48 +1040,39 @@ endif
 endif
 
 ########################################
-# ImageWriter plugin
+# DelayLoadedExtensions plugin
 ########################################
 
 ifdef OPENCV_PATH
-IMAGEWRITER_LIBS_LIST := opencv_core opencv_imgproc opencv_imgcodecs
-IMAGEWRITER_LIBS:= $(addprefix -l,$(IMAGEWRITER_LIBS_LIST))
+DELAY_LOADED_EXTENSIONS_LIBS_LIST := opencv_core opencv_imgproc opencv_imgcodecs
+DELAY_LOADED_EXTENSIONS_LIBS:= $(addprefix -l,$(DELAY_LOADED_EXTENSIONS_LIBS_LIST))
 
-IMAGEWRITER_SRC =\
-  $(SOURCEDIR)/ImageWriterDll/ImageWriter.cpp \
+DELAY_LOADED_EXTENSIONS_SRC =\
+  $(SOURCEDIR)/DelayLoadedExtensionsDll/ImageWriter.cpp \
 
-IMAGEWRITER_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(IMAGEWRITER_SRC))
+DELAY_LOADED_EXTENSIONS_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(DELAY_LOADED_EXTENSIONS_SRC))
 
-IMAGEWRITER:=$(LIBDIR)/Cntk.ImageWriter-$(CNTK_COMPONENT_VERSION).so
-ALL_LIBS += $(IMAGEWRITER)
-PYTHON_LIBS += $(IMAGEWRITER)
-JAVA_LOAD_DEPS += $(IMAGEWRITER_LIBS)
-SRC+=$(IMAGEWRITER_SRC)
+DELAY_LOADED_EXTENSIONS:=$(LIBDIR)/Cntk.DelayLoadedExtensions-$(CNTK_COMPONENT_VERSION).so
+ALL_LIBS += $(DELAY_LOADED_EXTENSIONS)
+PYTHON_LIBS += $(DELAY_LOADED_EXTENSIONS)
+JAVA_LOAD_DEPS += $(DELAY_LOADED_EXTENSIONS_LIBS)
+SRC+=$(DELAY_LOADED_EXTENSIONS_SRC)
 
 INCLUDEPATH += $(OPENCV_PATH)/include
 LIBPATH += $(OPENCV_PATH)/lib $(OPENCV_PATH)/release/lib
 
-$(IMAGEWRITER): $(IMAGEWRITER_OBJ)
+$(DELAY_LOADED_EXTENSIONS): $(DELAY_LOADED_EXTENSIONS_OBJ)
 	@echo $(SEPARATOR)
-	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBDIR) $(LIBPATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ $(IMAGEWRITER_LIBS)
+	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBDIR) $(LIBPATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ $(DELAY_LOADED_EXTENSIONS_LIBS)
 endif
 
 ########################################
 # 1bit SGD setup
 ########################################
 
-ifeq ("$(CNTK_ENABLE_1BitSGD)","true")
-
-ifeq (,$(wildcard Source/1BitSGD/*.h))
-  $(error Build with 1bit-SGD was requested but cannot find the code. Please check https://docs.microsoft.com/en-us/cognitive-toolkit/Enabling-1bit-SGD for instructions)
-endif
-
-  INCLUDEPATH += $(SOURCEDIR)/1BitSGD
-
-  COMMON_FLAGS += -DCNTK_PARALLEL_TRAINING_SUPPORT
-  # temporarily adding to 1bit, need to work with others to fix it
-endif
-
+INCLUDEPATH += $(SOURCEDIR)/1BitSGD
+COMMON_FLAGS += -DCNTK_PARALLEL_TRAINING_SUPPORT
+# temporarily adding to 1bit, need to work with others to fix it
 
 ########################################
 # ASGD(multiverso) setup
@@ -1333,7 +1278,7 @@ $(UNITTEST_READER): $(UNITTEST_READER_OBJ) | $(HTKMLFREADER) $(HTKDESERIALIZERS)
 	@echo $(SEPARATOR)
 	@mkdir -p $(dir $@)
 	@echo building $@ for $(ARCH) with build type $(BUILDTYPE)
-	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(BOOSTLIB_PATH)) -o $@ $^ $(BOOSTLIBS) $(L_READER_LIBS) -ldl -fopenmp
+	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) $(patsubst %,-L%, $(LIBDIR) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH) $(BOOSTLIB_PATH)) -o $@ $^ $(BOOSTLIBS) $(L_READER_LIBS) $(LIBS) -ldl -fopenmp
 
 UNITTEST_NETWORK_SRC = \
 	$(SOURCEDIR)/../Tests/UnitTests/NetworkTests/AccumulatorNodeTests.cpp \
@@ -1374,7 +1319,7 @@ $(UNITTEST_NETWORK): $(UNITTEST_NETWORK_OBJ) | $(READER_LIBS) $(CNTKTEXTFORMATRE
 	@echo $(SEPARATOR)
 	@mkdir -p $(dir $@)
 	@echo building $@ for $(ARCH) with build type $(BUILDTYPE)
-	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(GDK_NVML_LIB_PATH) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH) $(BOOSTLIB_PATH)) -o $@ $^ $(BOOSTLIBS) $(LIBS) $(lMULTIVERSO) $(L_READER_LIBS) -ldl -fopenmp  $(PROTOBUF_PATH)/lib/libprotobuf.a 
+	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(GDK_NVML_LIB_PATH) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH) $(BOOSTLIB_PATH)) -o $@ $^ $(BOOSTLIBS) $(LIBS) $(lMULTIVERSO) $(L_READER_LIBS) -ldl -fopenmp  $(PROTOBUF_PATH)/lib/libprotobuf.a  
 
 UNITTEST_MATH_SRC = \
 	$(SOURCEDIR)/../Tests/UnitTests/MathTests/BatchNormalizationEngineTests.cpp \
@@ -1411,11 +1356,7 @@ $(UNITTEST_MATH): $(UNITTEST_MATH_OBJ) | $(READER_LIBS)
 	@echo $(SEPARATOR)
 	@mkdir -p $(dir $@)
 	@echo building $@ for $(ARCH) with build type $(BUILDTYPE)
-ifeq ($(HIP_PLATFORM), hcc)
-	$(HIPCC) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(GDK_NVML_LIB_PATH) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH) $(BOOSTLIB_PATH)) -g -o $@ $^ $(BOOSTLIBS) $(LIBS)  $(L_READER_LIBS) -ldl -fopenmp=libiomp5 -pthread -Wl,-rpath -Wl,/usr/local/mpi/lib -Wl,--enable-new-dtags -L/usr/local/mpi/lib -lmpi_cxx -lmpi
-else
 	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(LIBPATH) $(GDK_NVML_LIB_PATH) $(BOOSTLIB_PATH)) $(patsubst %, $(RPATH)%, $(ORIGINLIBDIR) $(LIBPATH) $(BOOSTLIB_PATH)) -o $@ $^ $(BOOSTLIBS) $(LIBS)  $(L_READER_LIBS) -ldl -fopenmp
-endif
 
 UNITTEST_BRAINSCRIPT_SRC = \
 	$(SOURCEDIR)/CNTK/BrainScript/BrainScriptEvaluator.cpp \
@@ -1480,11 +1421,28 @@ unittests: $(UNITTEST_EVAL) $(UNITTEST_READER) $(UNITTEST_NETWORK) $(UNITTEST_MA
 endif
 
 ifeq ("$(PYTHON_SUPPORT)","true")
+$(info Building Python package)
 
 # Libraries needed for the run-time (i.e., excluding test binaries)
 # TODO MPI doesn't appear explicitly here, hidden by mpic++ usage (but currently, it should be user installed)
 PYTHON_LIBS_LIST := $(LIBS_LIST) $(IMAGEREADER_LIBS_LIST)
 PYTHON_LIBS_EXCLUDE_LIST := m pthread nvidia-ml
+PYTHON_SETUP_PY_ARGS :=
+PYTHON_PROJECT_NAME:=cntk
+ifndef PYTHON_WITH_DEPS
+PYTHON_LIBS_EXCLUDE_LIST += cublas cudart curand cusparse cuda cudnn opencv_core opencv_imgproc opencv_imgcodecs mklml_intel mkldnn iomp5 nccl
+else
+$(warning Building Python package WITH dependencies)
+PYTHON_SETUP_PY_ARGS += --with-deps
+endif
+ifdef PYTHON_WITH_DEBUG
+$(warning Building Python packages WITH debug symbols)
+PYTHON_SETUP_PY_ARGS += --with-debug-symbol
+endif
+ifeq ("$(DEVICE)","gpu")
+PYTHON_PROJECT_NAME:=cntk-gpu
+endif
+PYTHON_SETUP_PY_ARGS += --project-name $(PYTHON_PROJECT_NAME)
 PYTHON_EXTRA_LIBS_BASENAMES:=$(addsuffix .so,$(addprefix lib,$(filter-out $(PYTHON_LIBS_EXCLUDE_LIST),$(PYTHON_LIBS_LIST))))
 
 # TODO dependencies
@@ -1500,6 +1458,8 @@ python: $(PYTHON_LIBS)
             py_paths[36]=$(PYTHON36_PATH); \
             export LD_LIBRARY_PATH=$$LD_LIBRARY_PATH:$$(echo $(GDK_NVML_LIB_PATH) $(LIBPATH) | tr " " :); \
             ldd $$(find $(LIBDIR) -maxdepth 1 -type f -print) | grep "not found" && false; \
+            export CNTK_VERSION=$(CNTK_VERSION); \
+            export CNTK_VERSION_BANNER=$(CNTK_VERSION_BANNER); \
             export CNTK_COMPONENT_VERSION=$(CNTK_COMPONENT_VERSION); \
             export CNTK_LIBRARIES="$(PYTHON_LIBS)"; \
             export CNTK_EXTRA_LIBRARIES=$$(ldd $(LIBDIR)/* | grep "^\s.*=> " | cut -d ">" -f 2- --only-delimited | cut -d "(" -f 1 --only-delimited | sort -u | grep -Ff <(echo $(PYTHON_EXTRA_LIBS_BASENAMES) | xargs -n1)); \
@@ -1512,7 +1472,7 @@ python: $(PYTHON_LIBS)
             for ver in $(PYTHON_VERSIONS); \
             do \
                 test -x $${py_paths[$$ver]}; \
-                $${py_paths[$$ver]} setup.py \
+                $${py_paths[$$ver]} setup.py $(PYTHON_SETUP_PY_ARGS) \
                     build_ext --inplace \
                     bdist_wheel \
                         --dist-dir $$PYTHONDIR || exit $$?; \
@@ -1547,6 +1507,10 @@ java: $(JAVA_LIBS)
 	$(CXX) $(LDFLAGS) -shared $(COMMON_FLAGS) $(CPPFLAGS) $(CXXFLAGS) $(INCLUDEPATH:%=-I%) $(JDK_INCLUDE_PATH:%=-I%) $(patsubst %,$(RPATH)%, $(ORIGINDIR)) -L$(LIBDIR) $(JAVA_SWIG_DIR)/cntk_java_wrap.cxx -l$(CNTKMATH) -l$(CNTKLIBRARY) -o $(JAVA_SO_NAME)
 	mkdir -p $(JAVA_SWIG_DIR)/com/microsoft/CNTK/lib/linux
 	echo $(JAVA_SO_NAME:$(LIBDIR)/%=%) > $(JAVA_SWIG_DIR)/com/microsoft/CNTK/lib/linux/NATIVE_LOAD_MANIFEST
+	for so in libopen-pal.so.13 libopen-rte.so.12 libmpi.so.12 libmpi_cxx.so.1; do \
+	    cp -p $(MPI_PATH)/lib/$$so $(JAVA_SWIG_DIR)/com/microsoft/CNTK/lib/linux; \
+	    echo $$so >> $(JAVA_SWIG_DIR)/com/microsoft/CNTK/lib/linux/NATIVE_MANIFEST; \
+	done
 	for so in libiomp5.so libmklml_intel.so; do \
 	    cp -p $(MKL_LIB_PATH)/$$so $(JAVA_SWIG_DIR)/com/microsoft/CNTK/lib/linux; \
 	    echo $$so >> $(JAVA_SWIG_DIR)/com/microsoft/CNTK/lib/linux/NATIVE_MANIFEST; \
@@ -1566,10 +1530,13 @@ ifdef CUDA_PATH
 	echo 'libnvidia-ml.so' >> $(JAVA_SWIG_DIR)/com/microsoft/CNTK/lib/linux/NATIVE_MANIFEST
 endif
 	cp -p $(JAVA_SWIG_DIR)/CNTKNativeUtils.java $(JAVA_SWIG_DIR)/com/microsoft/CNTK/CNTKNativeUtils.java
+	cd $(JAVA_SWIG_DIR) && $(JDK_BIN_PATH)/jar -cvf cntk-javadoc.jar README.md
+	cd $(JAVA_SWIG_DIR) && $(JDK_BIN_PATH)/jar -cvf cntk-sources.jar com
 	$(JDK_BIN_PATH)/javac $(GENERATED_JAVA_DIR)/*.java
+	rm -rf $(GENERATED_JAVA_DIR)/*.java
 	mkdir -p $(LIBDIR)/java
 	cd $(JAVA_SWIG_DIR) && $(JDK_BIN_PATH)/jar -cvf cntk.jar com
-	cp $(JAVA_SWIG_DIR)/cntk.jar $(LIBDIR)/java
+	cp $(JAVA_SWIG_DIR)/cntk.jar $(JAVA_SWIG_DIR)/cntk-sources.jar $(LIBDIR)/java
 	javac -cp $(JAVA_SWIG_DIR) $(JAVA_TEST_DIR)/src/Main.java -d $(LIBDIR)/java
 
 ALL += java
@@ -1608,7 +1575,7 @@ $(OBJDIR)/%.o : %.cu $(BUILD_CONFIGURATION)
 	@echo $(SEPARATOR)
 	@echo creating $@ for $(ARCH) with build type $(BUILDTYPE)
 	@mkdir -p $(dir $@)
-	$(HIPCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) $(COMPILE_FLAGS)
+	$(NVCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) -Xcompiler "-fPIC -Werror"
 
 $(OBJDIR)/%.pb.o : %.pb.cc $(BUILD_CONFIGURATION)
 	@echo $(SEPARATOR)
@@ -1634,4 +1601,3 @@ clean:
 buildall : $(ALL)
 	@echo $(SEPARATOR)
 	@echo finished building for $(ARCH) with build type $(BUILDTYPE)
-

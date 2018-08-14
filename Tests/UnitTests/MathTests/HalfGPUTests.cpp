@@ -14,7 +14,6 @@ using namespace Microsoft::MSR::CNTK;
 
 namespace Microsoft { namespace MSR { namespace CNTK { namespace Test {
 
-#ifdef __HIP_ENABLE_HALF__
 // Tests from GPUMatrixCudaBlasTests.cpp
 BOOST_AUTO_TEST_SUITE(Half_GPUMatrixSuite)
 
@@ -87,10 +86,8 @@ BOOST_FIXTURE_TEST_CASE(MatrixCopyAssignAcrossDevices, RandomSeedFixture)
     {
         Matrix<half> m_gpu(2, 3, array.data(), c_deviceIdZero, matrixFlagNormal);
         Matrix<half> m_copy_gpu_0(m_gpu, c_deviceIdZero);
-        if (hasTwoGpus){
-            Matrix<half> m_gpu_1(2, 3, array.data(), c_deviceIdZero + 1, matrixFlagNormal);
-            Matrix<half> m_copy_gpu_1(m_gpu_1, c_deviceIdZero + 1);
-        }
+        if (hasTwoGpus)
+            Matrix<half> m_copy_gpu_1(m_gpu, c_deviceIdZero + 1);
         Matrix<half> m_copy_cpu(m_gpu, -1);
     }
 
@@ -977,7 +974,6 @@ BOOST_FIXTURE_TEST_CASE(GPUMatrixFileWriteRead, RandomSeedFixture)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-#endif // __HIP_ENABLE_HALF__
 
 }
 } } }
