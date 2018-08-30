@@ -262,7 +262,7 @@ protected:
     void EnsureCompatible() override
     {
         if (m_imageLayout != ImageLayoutKind::CHW)
-            RuntimeError("cuDNN convolution engine supports only CHW/cudnn layout.");
+            RuntimeError("cuDNN convolution engine supports only CHW/hipdnn layout.");
         if (!IsGpu(m_deviceId))
             RuntimeError("cuDNN convolution engine supports GPU devices only.");
     }
@@ -282,7 +282,7 @@ protected:
         // Find best algo and allocate temp buffer, if needed.
         auto finder = [&,this](int& calgo, hipdnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount]) -> hipdnnStatus_t
         {
-            return cudnnFindConvolutionForwardAlgorithmEx(*m_cudnn, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_outT, ptr(out), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
+            return hipdnnFindConvolutionForwardAlgorithmEx(*m_cudnn, m_inT, ptr(in), *m_kernelT, ptr(kernel), *m_conv, m_outT, ptr(out), MaxAlgoCount, &calgo, algoPerf, ptr(workspace), workspace.BufferSize());
         };
         // Find max Memory needed while running static finder. Workaround for hipdnnFind fail. Number of algo is constant as in hipdnn 5.1
         auto staticFinder = [&,this](hipdnnConvolutionFwdAlgo_t& algo, bool noMem) -> hipdnnStatus_t
@@ -326,8 +326,8 @@ protected:
             hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;     
             for (int i = 0; i < MaxAlgoCount; i++)
             {
-                auto err0 = cudnnGetConvolutionForwardWorkspaceSize(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, (cudnnConvolutionFwdAlgo_t)i, &tmpSize);
-                if (err0 == CUDNN_STATUS_SUCCESS)
+                auto err0 = hipdnnGetConvolutionForwardWorkspaceSize(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, (hipdnnConvolutionFwdAlgo_t)i, &tmpSize);
+                if (err0 == HIPDNN_STATUS_SUCCESS)
                 {
                     if (m_fwdAlgo.MaxAlgoWorkspaceSize < tmpSize)
                         m_fwdAlgo.MaxAlgoWorkspaceSize = tmpSize;
@@ -589,7 +589,7 @@ private:
         // batchSize is bigger than the one when initialize current workspace, need free up space and go back to init
         if (algo.autotuningState == AutotuningState::Running && batchSize > algo.maxMBSizeSeen)
         {
-            cudaDeviceSynchronize(); // make sure no in-flight GPU kernels using workspace before release its memory
+            hipDeviceSynchronize(); // make sure no in-flight GPU kernels using workspace before release its memory
             workspace.Resize(0,0,0,false);
             algo.RecordAlgoBatchSizeWorkspaceSize(true, algo.selectedAlgo, 0, 0);
             algo.autotuningState = AutotuningState::Init;
