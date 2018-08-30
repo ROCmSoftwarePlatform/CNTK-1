@@ -43,7 +43,7 @@ using namespace std;
 #ifdef __HIP_PLATFORM_NVCC__
 #include "math_constants.h"
 #elif defined __HIP_PLATFORM_HCC__
-#include "hip/hip_runtime_api.h"
+#include "hip/hip_runtime.h"
 #define CUDART_MIN_DENORM_F __int_as_float(0x00000001)                                               
 #endif
 #if !defined(__HIP_ARCH_HAS_THREAD_FENCE_SYSTEM__) && !defined(__HIP_ARCH_HAS_SYNC_THREAD_EXT__) //TODO: __hip__
