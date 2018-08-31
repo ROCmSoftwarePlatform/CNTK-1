@@ -4,7 +4,6 @@
 
 #undef DIRECT_MODE // [v-hansu] use the direct formula for smbr mode, proven makes no difference
 
-#include <hip/hip_runtime_api.h>
 #ifdef __HIP_PLATFORM_NVCC__
 #include <cuda.h>
 #endif
@@ -16,6 +15,7 @@
 #include "math.h"
 #include <assert.h>
 #include <stdexcept>
+#include <hip/hip_runtime.h>
 
 #ifdef _WIN32
 #define NOMINMAX

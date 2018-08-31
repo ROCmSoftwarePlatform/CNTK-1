@@ -1413,8 +1413,6 @@ BOOST_FIXTURE_TEST_CASE(MatrixFSAdagradUpdate_WithAndWithout_UnitGain, RandomSee
 
 BOOST_AUTO_TEST_SUITE_END()
 
-
-#ifdef __HIP_ENABLE_HALF__
 BOOST_AUTO_TEST_SUITE(Half_MatrixUnitTests)
 
 BOOST_FIXTURE_TEST_CASE(MatrixConstructors, RandomSeedFixture)
@@ -2823,7 +2821,6 @@ BOOST_FIXTURE_TEST_CASE(MatrixFSAdagradUpdate_WithAndWithout_UnitGain, RandomSee
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-#endif //__HIP_ENABLE_HALF__
 
 }
 } } }

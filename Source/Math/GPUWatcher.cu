@@ -9,6 +9,9 @@
 #ifndef CPUONLY
 
 #include "GPUWatcher.h"
+#ifdef __HIP_PLATFORM_NVCC__
+    #include <cuda.h>
+#endif
 #include <hip/hip_runtime.h>
 
 int GPUWatcher::GetGPUIdWithTheMostFreeMemory()

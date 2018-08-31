@@ -62,18 +62,19 @@ protected:
         {
             assert(expAvgFactor == 0 && blendFactor == 1);
             savedMean.Resize(0, 0);      // (these are not produced in this case)
-            HIPDNN_CALL2(hipdnnBatchNormalizationForwardInference(*m_cudnn, mode, &C::One, &C::Zero, m_inOutCuDnnT, ptr(in), m_inOutCuDnnT, ptr(out),
-                                                                    m_scaleBiasCuDnnT, ptr(scale), ptr(bias), ptr(runMean), ptr(runVariance), m_cudnnEpsilon),
-                        "\nProbably hitting cuDNN limit on batch size, try reducing minibatch size");
+            savedInvStdDev.Resize(0, 0);
+            //TODO NEEL: Add support for BNInference
+            //HIPDNN_CALL2(hipnnBatchNormalizationForwardInference(*m_cudnn, mode, &C::One, &C::Zero, m_inOutCuDnnT, ptr(in), m_inOutCuDnnT, ptr(out),
+              //                                                    m_scaleBiasCuDnnT, ptr(scale), ptr(bias), ptr(runMean), ptr(runVariance), m_cudnnEpsilon),
+                    //    "\nProbably hitting cuDNN limit on batch size, try reducing minibatch size");
         }
         else
         {
             savedMean.Resize(runMean);
             savedInvStdDev.Resize(runMean);
-            HIPDNN_CALL(hipdnnBatchNormalizationForwardTraining(*m_cudnn, mode, const_cast<void*>(static_cast<const void*>(&C::One)),const_cast<void*>(static_cast<const void*>(&C::Zero)),
-                                                                m_inOutCuDnnT, ptr(in), m_inOutCuDnnT, ptr(out), m_scaleBiasCuDnnT, const_cast<void*>(static_cast<const void*>(ptr(scale))), 
-                                                                const_cast<void*>(static_cast<const void*>(ptr(bias))), expAvgFactor, const_cast<void*>(static_cast<const void*>(ptr(runMean))),
-                                                                const_cast<void*>(static_cast<const void*>(ptr(runVariance))),m_cudnnEpsilon, ptr(savedMean), ptr(savedInvStdDev)));
+            HIPDNN_CALL(hipdnnBatchNormalizationForwardTraining(*m_cudnn, mode, (void*)&C::One, (void*)&C::Zero, m_inOutCuDnnT, ptr(in),
+                                                              m_inOutCuDnnT, ptr(out), m_scaleBiasCuDnnT, (void*)ptr(scale), (void*)ptr(bias), expAvgFactor, ptr(runMean), ptr(runVariance),
+                                                              m_cudnnEpsilon, ptr(savedMean), ptr(savedInvStdDev)));
         }
     }
 
@@ -138,9 +139,8 @@ private:
 
 template class CuDnnBatchNormEngine<float, float>;
 template class CuDnnBatchNormEngine<double, double>;
-#ifdef __HIP_ENABLE_HALF__
 template class CuDnnBatchNormEngine<half, float>;
-#endif //__HIP_ENABLE_HALF__
+
 template <typename InoutType, typename StatType>
 std::unique_ptr<BatchNormEngine<InoutType, StatType>> CuDnnBatchNormEngineFactory<InoutType, StatType>::Create(DEVICEID_TYPE deviceId, const TensorShape& inOutT,
                                                                                          bool spatial, ImageLayoutKind imageLayout)
@@ -150,9 +150,8 @@ std::unique_ptr<BatchNormEngine<InoutType, StatType>> CuDnnBatchNormEngineFactor
 
 template class CuDnnBatchNormEngineFactory<float, float>;
 template class CuDnnBatchNormEngineFactory<double, double>;
-#ifdef __HIP_ENABLE_HALF__
 template class CuDnnBatchNormEngineFactory<half, float>;
-#endif //__HIP_ENABLE_HALF__
+
 CudaTimer::~CudaTimer()
 {
     // TODO: Should not throw if std::uncaught_exception()

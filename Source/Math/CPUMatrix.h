@@ -14,9 +14,7 @@
 #include <ctime>
 #include <limits.h>
 #include "QuantizedOperations.h"
-#ifdef __HIP_ENABLE_HALF__
 #include "half.hpp"
-#endif /*__HIP_ENABLE_HALF__*/
 
 //#include "GPUMatrix.h"
 //#include "CPUSparseMatrix.h"
@@ -435,6 +433,13 @@ public:
     static int SetNumThreads(int numThreads);
     static int GetMaxNumThreads();
 
+    enum OptimizationFlag
+    {
+        OPT_EVAL_WITH_MKL = 1, // using Intel MKL functions for evaluation performance
+    };
+    static void SetOptimizationFlags(int flags);
+    static int  GetOptimizationFlags();
+
     static void SetCompatibleMode();
 
     // static BLAS functions
@@ -581,13 +586,14 @@ private:
     void Clear();
 
     void ScatterValues(ElemType* indices, ElemType* value, ElemType* data, ElemType alpha, size_t num_indices, size_t rows, size_t cols, size_t indices_step = 1);
+
+private:
+    static int m_optimizationFlags;
 };
 
 typedef CPUMatrix<float> CPUSingleMatrix;
 typedef CPUMatrix<double> CPUDoubleMatrix;
-#ifdef __HIP_ENABLE_HALF__
 typedef CPUMatrix<half> CPUHalfMatrix;
-#endif  //__HIP_ENABLE_HALF__
 
 template<typename ElemType>
 void CPUMatrixTensorOpImpl(ElemType beta, const CPUMatrix<ElemType>& a, CPUMatrix<ElemType>& o, ElemType alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,

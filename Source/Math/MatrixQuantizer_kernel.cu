@@ -1,6 +1,9 @@
 #ifndef __MATRIX_QUANTIZER_KERNEL_CUH__
 #define __MATRIX_QUANTIZER_KERNEL_CUH__
 #include <float.h>
+#ifdef __HIP_PLATFORM_NVCC__
+    #include <cuda.h>
+#endif
 #include <hip/hip_runtime_api.h>
 #ifdef __HIP_PLATFORM_NVCC__
 #include <device_launch_parameters.h>
@@ -139,8 +142,9 @@ __global__ void _ComputeQuantiStatParj(const ElemType* us, const ElemType* inRes
     size_t bits = 1 << ldNbits;
     const size_t colSizeByte = Microsoft::MSR::CNTK::QuantizedColumn<ElemType>::QuantizedColumnSize(bits, rows);
     auto& qcol = *(Microsoft::MSR::CNTK::QuantizedColumn<ElemType>*) &qpackage[colSizeByte * j];
-    Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::template ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int,REDUCTION_BLOCK_SIZE>);
-   //TODO: __hip__ solve this and revert on AMD Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int,REDUCTION_BLOCK_SIZE>);
+
+    Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::template ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,
+                                                                                                      subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int, REDUCTION_BLOCK_SIZE>);
 }
 
 //caller: griddim and blockdim should be both 1d
@@ -148,7 +152,7 @@ __global__ void _ComputeQuantiStatParj(const ElemType* us, const ElemType* inRes
 //called to quantize a GPU matrix
 template <class ElemType, bool ZeroThresholdFor1Bit>
 __global__ void _QuantizeStripjOneQWord(
-    const ElemType* us,
+    const ElemType* us,      
     ElemType* curResidual,
     long M, long N,
     char* qMat,
@@ -175,7 +179,6 @@ __global__ void _QuantizeStripjOneQWord(
 
     // quantize one QWord to qCol[iQWord]
     qCol.bits[iQWord] = q.template QuantizeOneQWord<ZeroThresholdFor1Bit>(us, curResidual, M, iQWord, M, numQWordsPerCol, j, newResidual);
-    //TODO: __hip__ solver this and revert on AMD qCol.bits[iQWord] = q.QuantizeOneQWord<ZeroThresholdFor1Bit>(us, curResidual, M, iQWord, M, numQWordsPerCol, j, newResidual);
 }
 
 template <class ElemType>

@@ -18,7 +18,7 @@ public:
         m_testDataPath = parentPath + L"/../../Tests/UnitTests/BrainScriptTests";
 #else
         // The executable path on Linux is e.g. <cntk>/build/cpu/release/bin/
-        m_testDataPath = parentPath + L"/../../../Tests/UnitTests/BrainScriptTests";
+        m_testDataPath = parentPath + L"/../../../../Tests/UnitTests/BrainScriptTests";
 #endif
 
         boost::filesystem::path absTestPath(m_testDataPath);

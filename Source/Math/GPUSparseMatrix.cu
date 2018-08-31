@@ -144,7 +144,7 @@ void GPUSparseMatrix<ElemType>::DeepCast(const GPUSparseMatrix<ElemType2>& deepC
             SecondaryIndexLocation(),
             SecondaryIndexCount(),
             GetNumNZElements());
-    } //TODO: __remove__ remove the argument object calling in kenel call
+    }
 
     // TODO: to copy other variables used only for class based LM
 }
@@ -2005,6 +2005,7 @@ void GPUSparseMatrix<ElemType>::Multiply(const GPUSparseMatrix<ElemType>& S1, bo
     int nnzB = (int) S2.GetNumNZElements();
 
     SyncGuard syncGuard;
+    // Step 1
     c.PrepareBuffer(m, n, false, // false means we cannot reuse the "c" buffer if it exists for temporaries
                     [&](GPUSPARSE_INDEX_TYPE* csrRowPtrC) -> size_t
                     {
@@ -2604,91 +2605,6 @@ void GPUSparseMatrix<ElemType>::AssignColumnSliceToDense(GPUMatrix<ElemType>& sl
     HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
 
 }
-//TODO: __hip__ template specialization for char and short. Find the cause and revert.
-template <>
-void GPUSparseMatrix<char>::AssignColumnSliceToDense(GPUMatrix<char>& slice, size_t startColumn, size_t numCols) const
-{
-    int m = (int) GetNumRows();
-    int n = (int) GetNumCols();
-
-    // We can either error out or RequireSize. Because RequireSize will error out if it's not allowed, I think this makes more sense.
-    slice.RequireSize(m, numCols);
-
-    if (startColumn + numCols > n)
-        InvalidArgument("The slice (%d+%d) is out of range of the source matrix (%d).", (int) startColumn, (int) numCols, (int) n);
-
-    if (GetFormat() != MatrixFormat::matrixFormatSparseCSC)
-    {
-        if ((startColumn != 0) || (numCols != GetNumCols()))
-            NOT_IMPLEMENTED;
-
-        return this->CopyToDenseMatrix(slice);
-    }
-
-    PrepareDevice();
-    hipsparseHandle_t hipsparseHandle = 0;
-    HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
-    hipsparseMatDescr_t descr = 0;
-    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descr));
-    hipsparseSetMatType(descr, HIPSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatIndexBase(descr, HIPSPARSE_INDEX_BASE_ZERO);
-
-    SyncGuard syncGuard;
-    HIPSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
-    if (sizeof(char) == sizeof(float))
-    {
-        HIPSPARSE_CALL(hipsparseScsc2dense(hipsparseHandle, m, numCols, descr, (float*) Buffer(), RowLocation(), ColLocation() + startColumn, (float*) slice.Data(), m));
-    }
-    else
-    {
-        HIPSPARSE_CALL(hipsparseDcsc2dense(hipsparseHandle, m, numCols, descr, (double*) Buffer(), RowLocation(), ColLocation() + startColumn, (double*) slice.Data(), m));
-    }
-
-    HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
-
-}
-template <>
-void GPUSparseMatrix<short>::AssignColumnSliceToDense(GPUMatrix<short>& slice, size_t startColumn, size_t numCols) const
-{
-    int m = (int) GetNumRows();
-    int n = (int) GetNumCols();
-
-    // We can either error out or RequireSize. Because RequireSize will error out if it's not allowed, I think this makes more sense.
-    slice.RequireSize(m, numCols);
-
-    if (startColumn + numCols > n)
-        InvalidArgument("The slice (%d+%d) is out of range of the source matrix (%d).", (int) startColumn, (int) numCols, (int) n);
-
-    if (GetFormat() != MatrixFormat::matrixFormatSparseCSC)
-    {
-        if ((startColumn != 0) || (numCols != GetNumCols()))
-            NOT_IMPLEMENTED;
-
-        return this->CopyToDenseMatrix(slice);
-    }
-
-    PrepareDevice();
-    hipsparseHandle_t hipsparseHandle = 0;
-    HIPSPARSE_CALL(hipsparseCreate(&hipsparseHandle));
-    hipsparseMatDescr_t descr = 0;
-    HIPSPARSE_CALL(hipsparseCreateMatDescr(&descr));
-    hipsparseSetMatType(descr, HIPSPARSE_MATRIX_TYPE_GENERAL);
-    hipsparseSetMatIndexBase(descr, HIPSPARSE_INDEX_BASE_ZERO);
-
-    SyncGuard syncGuard;
-    HIPSPARSE_CALL(hipsparseSetStream(hipsparseHandle, t_stream));
-    if (sizeof(short) == sizeof(float))
-    {
-        HIPSPARSE_CALL(hipsparseScsc2dense(hipsparseHandle, m, numCols, descr, (float*) Buffer(), RowLocation(), ColLocation() + startColumn, (float*) slice.Data(), m));
-    }
-    else
-    {
-        HIPSPARSE_CALL(hipsparseDcsc2dense(hipsparseHandle, m, numCols, descr, (double*) Buffer(), RowLocation(), ColLocation() + startColumn, (double*) slice.Data(), m));
-    }
-
-    HIPSPARSE_CALL(hipsparseDestroy(hipsparseHandle));
-
-}
 template <class ElemType>
 GPUMatrix<ElemType> GPUSparseMatrix<ElemType>::CopyColumnSliceToDense(size_t startColumn, size_t numCols) const
 {
@@ -3183,47 +3099,33 @@ void GPUSparseMatrix<ElemType>::performElementWiseFunction(ElementWiseOperator k
 
 template class MATH_API GPUSparseMatrix<float>;
 template class MATH_API GPUSparseMatrix<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class MATH_API GPUSparseMatrix<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // instantiate cast methods
 template void GPUSparseMatrix<char>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<char>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
-#ifdef __HIP_ENABLE_HALF__
 template void GPUSparseMatrix<char>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
-#endif /*__HIP_ENABLE_HALF__*/
 template void GPUSparseMatrix<short>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<short>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
-#ifdef __HIP_ENABLE_HALF__
 template void GPUSparseMatrix<short>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
-#endif /*__HIP_ENABLE_HALF__*/
 template void GPUSparseMatrix<int>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<int>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
-#ifdef __HIP_ENABLE_HALF__
 template void GPUSparseMatrix<int>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
-#endif /*__HIP_ENABLE_HALF__*/
 template void GPUSparseMatrix<float>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<float>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
-#ifdef __HIP_ENABLE_HALF__
 template void GPUSparseMatrix<float>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
-#endif /*__HIP_ENABLE_HALF__*/
 template void GPUSparseMatrix<double>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<double>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
-#ifdef __HIP_ENABLE_HALF__
 template void GPUSparseMatrix<double>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
 template void GPUSparseMatrix<half>::DeepCast(const GPUSparseMatrix<float>& deepCopyFrom);
 template void GPUSparseMatrix<half>::DeepCast(const GPUSparseMatrix<double>& deepCopyFrom);
 template void GPUSparseMatrix<half>::DeepCast(const GPUSparseMatrix<half>& deepCopyFrom);
-#endif /*__HIP_ENABLE_HALF__*/
+
 
 // instantiate learner methods
 template void GPUSparseMatrix<float>::AdaDelta<float>(GPUMatrix<float>&c, GPUMatrix<float>&functionValues, float learningRate, float rho, float epsilon, int* timestamps, int currentTimestamp);
 template void GPUSparseMatrix<double>::AdaDelta<double>(GPUMatrix<double>&c, GPUMatrix<double>&functionValues, double learningRate, double rho, double epsilon, int* timestamps, int currentTimestamp);
-
-#ifdef __HIP_ENABLE_HALF__
 template void GPUSparseMatrix<half>::AdaDelta<float>(GPUMatrix<float>&c, GPUMatrix<float>&functionValues, float learningRate, float rho, float epsilon, int* timestamps, int currentTimestamp);
-#endif /*__HIP_ENABLE_HALF__*/
 
 // We use Matrix<char> as the backing store for QuantizedMatrix
 // Let's explicitly instantiate the methods we need for that purpose
@@ -3349,9 +3251,7 @@ MATH_API File& operator>>(File& stream, GPUSparseMatrix<ElemType>& us)
 
 template MATH_API File& operator>>(File& stream, GPUSparseMatrix<float>& us);
 template MATH_API File& operator>>(File& stream, GPUSparseMatrix<double>& us);
-#ifdef __HIP_ENABLE_HALF__
 template MATH_API File& operator>>(File& stream, GPUSparseMatrix<half>& us);
-#endif /*__HIP_ENABLE_HALF__*/
 
 template <class ElemType>
 MATH_API File& operator<<(File& stream, const GPUSparseMatrix<ElemType>& us)
@@ -3410,9 +3310,7 @@ MATH_API File& operator<<(File& stream, const GPUSparseMatrix<ElemType>& us)
 
 template MATH_API File& operator<<(File& stream, const GPUSparseMatrix<float>& us);
 template MATH_API File& operator<<(File& stream, const GPUSparseMatrix<double>& us);
-#ifdef __HIP_ENABLE_HALF__
 template MATH_API File& operator<<(File& stream, const GPUSparseMatrix<half>& us);
-#endif /*__HIP_ENABLE_HALF__*/
 
 
 }}}

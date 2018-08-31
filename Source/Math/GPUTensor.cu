@@ -17,6 +17,9 @@
 #define TENSOR_OPS_DECL __device__ __host__
 #include "TensorOps.h"
 #include "fast_divmod.h"
+#ifdef __HIP_PLATFORM_NVCC__
+    #include <cuda.h>
+#endif
 #include <hip/hip_runtime.h>
 #include "hipblas.h"
 #include <assert.h>
@@ -751,7 +754,7 @@ struct TensorArgOpElement<ElemType, N, M, K, /*k=*/-1>
 
 // launch tensor op with CUDA
 template <class ElemType, C_size_t N, C_int M, C_int K>
-static __global__ void _launchTensorOp(ElemType beta, FixedArray<ElemType*, N> pointers, ElemType alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
+__global__ void _launchTensorOp(ElemType beta, FixedArray<ElemType*, N> pointers, ElemType alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
                                 FixedArray<C_unsigned_int, K> regularOpStrides, FixedMatrix<C_int, N, K> regularStrides, CUDA_LONG numElements,
                                 FixedArray<C_unsigned_int, M> reducingOpDims, FixedMatrix<C_int, N, M> reducingStrides,
                                 FixedArray<fast_divmod, K> regularOpStrideDivmod, FixedArray<fast_divmod, M> reducingOpDimDivmod)
@@ -1002,7 +1005,7 @@ static void LaunchTensorOpWithReduction(ElemType beta, array<ElemType*, N> point
         //  - Z: reduction chunks
 
         // reduction goes into thread dim X
-        CUDA_LONG reductionChunkSize = CeilDiv(reductionDim, numReductionChunks);
+        int reductionChunkSize = CeilDiv(reductionDim, numReductionChunks);
         int numThreadsX = std::min<int>(reductionChunkSize, GridDim::maxThreadsPerBlock); // any that's over will be done by looping inside the kernel
 
         // --- cases (a1) and (a2)
@@ -1269,7 +1272,6 @@ template void TensorOpN<double, 4>(double beta, array<double*, 4> pointers, doub
                                    const array<size_t, 4>& offsets,
                                    const SmallVector<size_t>& regularOpDims, const array<SmallVector<ptrdiff_t>, 4>& regularStrides,
                                    const SmallVector<size_t>& reducingOpDims, const array<SmallVector<ptrdiff_t>, 4>& reducingStrides);
-#ifdef __HIP_ENABLE_HALF__
 template void TensorOpN<half, 2>(half beta, array<half*, 2> pointers, half alpha, ElementWiseOperator op, ElementWiseOperator reductionOp,
                                   const array<size_t, 2>& offsets,
                                   const SmallVector<size_t>& regularOpDims, const array<SmallVector<ptrdiff_t>, 2>& regularStrides,
@@ -1282,13 +1284,11 @@ template void TensorOpN<half, 4>(half beta, array<half*, 4> pointers, half alpha
                                   const array<size_t, 4>& offsets,
                                   const SmallVector<size_t>& regularOpDims, const array<SmallVector<ptrdiff_t>, 4>& regularStrides,
                                   const SmallVector<size_t>& reducingOpDims, const array<SmallVector<ptrdiff_t>, 4>& reducingStrides);
-#endif //__HIP_ENABLE_HALF__
+
 
 template void LaunchUnaryTensorOp(float beta, const float* pa, float* pb, float alpha, ElementWiseOperator op, size_t regularOpDim);
 template void LaunchUnaryTensorOp(double beta, const double* pa, double* pb, double alpha, ElementWiseOperator op, size_t regularOpDim);
-#ifdef __HIP_ENABLE_HALF__
 template void LaunchUnaryTensorOp(half beta, const half* pa, half* pb, half alpha, ElementWiseOperator op, size_t regularOpDim);
-#endif //__HIP_ENABLE_HALF__
 
 }}}
 

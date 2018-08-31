@@ -65,7 +65,6 @@ OverloadUnaryMathFns(atanh);
 // Add overload for half math functions(Assume CUDA 9)
 // Only enable fp16 math for sm_60(P100) and sm_70+(V100)
 // Not using macro above because of unstable/lack of API
-#ifdef __HIP_ENABLE_HALF__
 DECL half exp_(half v) {
 #if __CUDA_ARCH__ >= 700 || __CUDA_ARCH__ == 600
     return hexp(v);
@@ -98,14 +97,12 @@ DECL half fabs_(half v) {
     short t = *(short*)&v & 0x7FFF;    //TODO: Check this!
     return *(half*)(&t);
 }
-#endif //__HIP_ENABLE_HALF__
 
 // add int version to fabs_ overload
 DECL int fabs_(int v) {
     return abs(v);
 }
 
-#ifdef __HIP_ENABLE_HALF__
 DECL half cos_(half v) {
 #if __CUDA_ARCH__ >= 700 || __CUDA_ARCH__ == 600
     return hcos(v);
@@ -133,7 +130,6 @@ DECL half floor_(half v) {
 DECL half log1p_(half v) {
     return half(log1pf((float)v));
 }
-#endif //__HIP_ENABLE_HALF__
 
 // isnan
 DECL bool isnan_(float v) {
@@ -142,8 +138,6 @@ DECL bool isnan_(float v) {
 DECL bool isnan_(double v) {
     return v != v;
 }
-
-#ifdef __HIP_ENABLE_HALF__
 DECL bool isnan_(half v) {
 #if __CUDA_ARCH__ >= 700 || __CUDA_ARCH__ == 600
     return __hisnan(v);
@@ -151,7 +145,6 @@ DECL bool isnan_(half v) {
     return v != v;
 #endif
 }
-#endif
 
 
 // max/min
@@ -163,7 +156,7 @@ DECL float min(float a, float b) {
     return fminf(a,b);
 }
 
-#ifdef __HIP_ENABLE_HALF__
+
 DECL half max(half a, half b) {
     return (float)a > (float)b ? a : b;
 }
@@ -176,11 +169,10 @@ DECL float max(half a, float b) {
 DECL half min(half a, half b) {
     return (float)a < (float)b ? a : b;
 }
-#endif //__HIP_ENABLE_HALF__
+
 // overload for CUDA only functions
 #if defined(__HIPCC__)
 
-#ifdef __HIP_ENABLE_HALF__
 DECL half rsqrt_(half v) {
 #if __CUDA_ARCH__ >= 700 || __CUDA_ARCH__ == 600
     return hrsqrt(v);
@@ -188,8 +180,6 @@ DECL half rsqrt_(half v) {
     return half(rsqrtf((float)v));
 #endif
 }
-#endif // __HIP_ENABLE_HALF__
-
 DECL float rsqrt_(float v) {
     return rsqrtf(v);
 }
@@ -222,11 +212,9 @@ DECL double rsqrt_(double v) {
 // #pragma fast-math pop
 OverloadBinaryMathFns(pow);
 
-#ifdef __HIP_ENABLE_HALF__
 DECL half pow_(half v,  half e) {
     return half(powf((float)v , (float)e));     //TODO: Improve efficiency?
 }
-#endif // __HIP_ENABLE_HALF__
 
 template<typename T>
 DECL T safepow_(T base, T exponent)
