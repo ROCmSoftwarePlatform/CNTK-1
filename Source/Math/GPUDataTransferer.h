@@ -2,6 +2,9 @@
 
 #ifndef CPUONLY
 #include <hip/hip_runtime_api.h>
+#ifdef __HIP_PLATFORM_NVCC__
+#include <cuda.h>
+#endif
 #endif // !CPUONLY
 
 #include "Basics.h"

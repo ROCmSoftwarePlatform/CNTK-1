@@ -5,6 +5,9 @@
 #include "Basics.h"
 #include "BestGpu.h" // for CPUONLY
 #ifndef CPUONLY
+#ifdef __HIP_PLATFORM_NVCC__
+    #include <cuda.h>
+#endif
 #include <hip/hip_runtime_api.h>
 #ifdef __HIP_PLATFORM_NVCC__
 #include <device_launch_parameters.h>

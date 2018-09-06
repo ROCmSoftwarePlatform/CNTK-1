@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include "Basics.h"
 #include "BestGpu.h"
-#include "hip/hip_runtime.h"
+#include "hip/hip_runtime_api.h"
 
 #ifndef CPUONLY
 

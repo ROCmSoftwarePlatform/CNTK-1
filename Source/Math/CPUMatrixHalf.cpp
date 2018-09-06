@@ -19,7 +19,6 @@ static void ConvertBuffer(DstT* dst, const SrcT* src, size_t count)
     }
 }
 
-#ifdef __HIP_ENABLE_HALF__
 // specialization to convert from half to float for computation, and then store in half
 template <>
 void CPUMatrix<half>::MultiplyAndWeightedAdd(half alpha, const CPUMatrix<half>& a, const bool transposeA, const CPUMatrix<half>& b, const bool transposeB,
@@ -116,22 +115,19 @@ void CPUMatrix<half>::AveragePoolingBackward(const CPUMatrix<int>& mpRowCol, con
 
 // explicit instantiations, due to CPUMatrix being too big and causing VS2015 cl crash.
 template class MATH_API CPUMatrix<half>;
-#endif //__HIP_ENABLE_HALF__
+template<> int CPUMatrix<half>::m_optimizationFlags = 0;
 
 // instantiate templated methods
 template void CPUMatrix<float>::AdaDelta(CPUMatrix<float>& gradients, CPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon);
 template void CPUMatrix<double>::AdaDelta(CPUMatrix<double>& gradients, CPUMatrix<double>& functionValues, double learningRate, double rho, double epsilon);
-#ifdef __HIP_ENABLE_HALF__
 template void CPUMatrix<float>::AdaDelta(CPUMatrix<half>& gradients, CPUMatrix<float>& functionValues, float learningRate, float rho, float epsilon);
-#endif //__HIP_ENABLE_HALF__
+
 template void CPUMatrix<float>::BatchNormalizationForward(const CPUMatrix<float>& scale, const CPUMatrix<float>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, CPUMatrix<float>& runMean, CPUMatrix<float>& runVariance, CPUMatrix<float>& out, double epsilon, CPUMatrix<float>& saveMean, CPUMatrix<float>& saveInvStdDev) const;
 template void CPUMatrix<double>::BatchNormalizationForward(const CPUMatrix<double>& scale, const CPUMatrix<double>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, CPUMatrix<double>& runMean, CPUMatrix<double>& runVariance, CPUMatrix<double>& out, double epsilon, CPUMatrix<double>& saveMean, CPUMatrix<double>& saveInvStdDev) const;
-#ifdef __HIP_ENABLE_HALF__
 template void CPUMatrix<half>::BatchNormalizationForward(const CPUMatrix<float>& scale, const CPUMatrix<float>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, CPUMatrix<float>& runMean, CPUMatrix<float>& runVariance, CPUMatrix<half>& out, double epsilon, CPUMatrix<float>& saveMean, CPUMatrix<float>& saveInvStdDev) const;
-#endif // __HIP_ENABLE_HALF__
+
 template void CPUMatrix<float>::BatchNormalizationBackward(const CPUMatrix<float>& in, CPUMatrix<float>& grad, const CPUMatrix<float>& scale, double blendFactor, const CPUMatrix<float>& saveMean, const CPUMatrix<float>& saveInvStdDev, CPUMatrix<float>& scaleGrad, CPUMatrix<float>& biasGrad) const;
 template void CPUMatrix<double>::BatchNormalizationBackward(const CPUMatrix<double>& in, CPUMatrix<double>& grad, const CPUMatrix<double>& scale, double blendFactor, const CPUMatrix<double>& saveMean, const CPUMatrix<double>& saveInvStdDev, CPUMatrix<double>& scaleGrad, CPUMatrix<double>& biasGrad) const;
-#ifdef __HIP_ENABLE_HALF__
 template void CPUMatrix<half>::BatchNormalizationBackward(const CPUMatrix<half>& in, CPUMatrix<half>& grad, const CPUMatrix<float>& scale, double blendFactor, const CPUMatrix<float>& saveMean, const CPUMatrix<float>& saveInvStdDev, CPUMatrix<float>& scaleGrad, CPUMatrix<float>& biasGrad) const;
-#endif /*__HIP_ENABLE_HALF__*/
+
 }}}

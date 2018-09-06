@@ -20,9 +20,7 @@ struct Err
 
 bool AreEqual(float a, float b, float maxRelError, float maxAbsError);
 bool AreEqual(double a, double b, double maxRelError, double maxAbsError);
-#ifdef __HIP_ENABLE_HALF__
 bool AreEqual(float a, half b, float maxRelError, float maxAbsError);
-#endif //__HIP_ENABLE_HALF__
 
 size_t CountNans(const SingleMatrix& src);
 
@@ -50,7 +48,6 @@ bool CheckEqual(const Matrix<T>& result, const Matrix<T>& reference, std::string
     return count == 0;
 }
 
-#ifdef __HIP_ENABLE_HALF__
 inline bool CheckEqual(const Matrix<float>& result, const Matrix<half>& reference, std::string& msg, float maxRelError, float maxAbsError)
 {
     std::unique_ptr<float[]> res(result.CopyToArray());
@@ -73,7 +70,6 @@ inline bool CheckEqual(const Matrix<float>& result, const Matrix<half>& referenc
     }
     return count == 0;
 }
-#endif //__HIP_ENABLE_HALF__
 
 
 } } } }

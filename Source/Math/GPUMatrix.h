@@ -19,7 +19,6 @@
 #include <iostream> // for cout/cerr
 #include <memory>   // for unique_ptr
 #include <limits.h> // for ULONG_MAX
-#include "hip/hip_runtime_api.h"
 
 //#include "CPUMatrix.h"
 //#include "CPUSparseMatrix.h"
@@ -29,7 +28,7 @@
 #include <unistd.h>
 #endif
 
-#ifdef __HIP_PLATFORM_NVCC__
+#ifdef __HIP_PLATFORM_NVCC__ //TODO: NEEL
 /*struct cublasContext;
 typedef struct cublasContext* cublasHandle_t;
 typedef cublasHandle_t hipblasHandle_t;*/ //TODO: PRAS_2.4 use this if hcblas is used, instead of hipblas

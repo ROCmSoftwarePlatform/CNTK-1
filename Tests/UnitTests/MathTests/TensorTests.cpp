@@ -103,8 +103,6 @@ BOOST_AUTO_TEST_CASE(OldRnnForwardProp)
 
 BOOST_AUTO_TEST_SUITE_END()
 
-#ifdef __HIP_ENABLE_HALF__
-
 BOOST_AUTO_TEST_SUITE(Half_MathTensorTests)
 
 BOOST_AUTO_TEST_CASE(ElementwiseAddition)
@@ -194,5 +192,5 @@ BOOST_AUTO_TEST_CASE(OldRnnForwardProp)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-#endif //__HIP_ENABLE_HALF__
+
 }}}}
