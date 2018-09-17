@@ -50,18 +50,6 @@ static __inline__ __device__ double atomicAdd(double* address, double val)
     return __longlong_as_double(old);
 }
 #endif
-#elif defined __HIP_PLATFORM_HCC__
-static __inline__ __device__ double atomicAdd(double* address, double val)
-{
-  uint64_t* address_as_ull = (uint64_t*)address;
-  double old_x = *address;
-  double new_x;
-  do {
-      new_x = old_x + val;
-  } while (!hc::atomic_compare_exchange(address_as_ull, reinterpret_cast<uint64_t*>(&old_x), *reinterpret_cast<uint64_t*>(&new_x)));
-  return __longlong_as_double(old_x);
-}
-#endif
 #ifdef __HIP_ENABLE_HALF__
 // overload atomicAdd for half
 static __inline__ __device__ half atomicAdd(half* address, half val)
