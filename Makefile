@@ -109,7 +109,6 @@ else
 ifeq ($(HIP_PLATFORM), hcc)
 	CXXFLAGS += -D__HIP_PLATFORM_HCC__
 	COMPILE_FLAGS = "-fPIC"
-	#COMMON_FLAGS += -D__HIP_ENABLE_HALF_ 
 endif
 endif
 else
