@@ -107,7 +107,7 @@ __global__ void GenerateNormalHalf(hiprandState *state, half *result, int n, hal
 }
 
 
-_global__ void helperCopyHalf2Float(float *f, const half *h, const int n)
+__global__ void helperCopyHalf2Float(float *f, const half *h, const int n)
 {
     int id = hipBlockDim_x * hipBlockIdx_x + hipThreadIdx_x;
     if (id >= n)
@@ -164,7 +164,7 @@ inline hipblasStatus_t hipblasgemmHelper(hipblasHandle_t handle, hipblasOperatio
 {
     return hipblasDgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
 }
-inline cublasStatus_t cublasgemmHelper(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, int k, const half* alpha, const half* A, int lda, const half* B, int ldb, const half* beta, half* C, int ldc)
+inline hipblasStatus_t hipblasgemmHelper(hipblasHandle_t handle, hipblasOperation_t transa, hipblasOperation_t transb, int m, int n, int k, const half* alpha, const half* A, int lda, const half* B, int ldb, const half* beta, half* C, int ldc)
 {
     // This does true FP16 computation which is slow for non-Volta GPUs
     //return hipblasHgemm(handle, transa, transb, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
