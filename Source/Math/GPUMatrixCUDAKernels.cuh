@@ -50,6 +50,7 @@ static __inline__ __device__ double atomicAdd(double* address, double val)
     return __longlong_as_double(old);
 }
 #endif
+#endif
 #ifdef __HIP_ENABLE_HALF__
 // overload atomicAdd for half
 static __inline__ __device__ half atomicAdd(half* address, half val)

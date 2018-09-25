@@ -30,7 +30,7 @@
 
 class alignas(2) half : public __half {
 public:
-     half() = default;
+    __FP16_DECL__  half() = default;
     __FP16_DECL__ half(const half& other) { __x = other.__x; }
     __FP16_DECL__ half& operator=(const half& other) { __x = other.__x; return *this; }
     __FP16_DECL__ half(half&& other) { *this = std::move(other); }
