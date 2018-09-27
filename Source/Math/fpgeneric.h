@@ -121,7 +121,7 @@ __global__ void helperCopyFloat2Half(half *h, const float *f, const int n)
     if (id >= n)
         return;
     h[id] = (half)f[id];
-
+}
 // kernels can convert matrix between half and float. speed currently not optimized, may need to add half2
 /*
 __global__ void copyHalf2Float(float *odata, const half *idata, const int n)

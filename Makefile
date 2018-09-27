@@ -109,7 +109,7 @@ else
 ifeq ($(HIP_PLATFORM), hcc)
 	CXXFLAGS += -D__HIP_PLATFORM_HCC__
 	COMPILE_FLAGS = "-fPIC"
-	COMMON_FLAGS += -D__HIP_ENABLE_HALF_ 
+	#COMMON_FLAGS += -D__HIP_ENABLE_HALF_ 
 endif
 endif
 else
@@ -482,7 +482,7 @@ $(CNTKMATH_LIB): $(MATH_OBJ) | $(PERF_PROFILER_LIB)
 	@echo creating $@ for $(ARCH) with build type $(BUILDTYPE)
 	@mkdir -p $(dir $@)
 ifeq ($(HIP_PLATFORM), hcc)
-	$(HIPCC) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) -o $@ $^ $(LIBS) -fopenmp=libiomp5 -l$(PERF_PROFILER)
+	$(HIPCC) $(LDFLAGS) -fPIC -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) -o $@ $^ $(LIBS) -fopenmp=libiomp5 -l$(PERF_PROFILER)
 else
 	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ $(LIBS) -fopenmp -l$(PERF_PROFILER) 
 endif

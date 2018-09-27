@@ -14,7 +14,7 @@
 #if !defined(CPUONLY) && __has_include("cuda_fp16.h")
 #include <cuda_fp16.h> // ASSUME CUDA9
 #else
-#include "half_amd.h"
+#include "hip/hip_fp16.h"
 #endif
 
 #if defined(__HIPCC__)
@@ -29,7 +29,7 @@
 
 class alignas(2) half : public __half {
 public:
-     half() = default;
+    __FP16_DECL__ half() = default;
     __FP16_DECL__ half(const half& other) { __x = other.__x; }
     __FP16_DECL__ half& operator=(const half& other) { __x = other.__x; return *this; }
     __FP16_DECL__ half(half&& other) { *this = std::move(other); }

@@ -241,7 +241,6 @@ __global__ void kComputeBatchMeanAndInvStdDev(int vectorSize, int batchSize,
     assert(::isfinite(expAvgFactor) && 0 <= expAvgFactor && expAvgFactor <= 1);
     assert(::isfinite(blendFactor) && 0 <= blendFactor && blendFactor <= 1);
     assert(batchSize >= 1);
-#endif
 
     if (expAvgFactor != 0 || blendFactor != 1)
     {

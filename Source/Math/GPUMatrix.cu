@@ -19,7 +19,7 @@
 #include "TensorOps.h"
 #ifdef __HIP_PLATFORM_NVCC__
 #include "device_launch_parameters.h"
-#include <cuda.h>
+#include <hip.h>
 #endif // nv platform check
 #include <hip/hip_runtime.h>
 #include <hiprand.h>
@@ -34,7 +34,7 @@
 #include <boost/random/uniform_real_distribution.hpp>
 #include "CPUMatrix.h"
 
-#pragma comment(lib, "cudart.lib") // instruct linker to reference these libs
+#pragma comment(lib, "hiprt.lib") // instruct linker to reference these libs
 #pragma comment(lib, "cublas.lib")
 #pragma comment(lib, "cusparse.lib")
 #pragma comment(lib, "curand.lib")
@@ -253,7 +253,7 @@ std::pair<size_t, size_t> TracingGPUMemoryAllocator::GetFreeAndTotalMemoryInMBs(
     return {free / numBytesPerMB, total / numBytesPerMB};
 }
 
-// PrepareDevice - Setup the correct cuda context for an operation
+// PrepareDevice - Setup the correct hip context for an operation
 // deviceId - the device on which the operation will take place
 void PrepareDevice(DEVICEID_TYPE deviceId)
 {
@@ -320,10 +320,10 @@ template <class ElemType>
 void GPUMatrix<ElemType>::SetDevice(DEVICEID_TYPE deviceId)
 {
     assert(deviceId >= 0);
-    CUDA_CALL(cudaSetDevice(deviceId));
+    CUDA_CALL(hipSetDevice(deviceId));
 }
 
-// PrepareDevice - Setup the correct cuda context for an operation
+// PrepareDevice - Setup the correct hip context for an operation
 // deviceId - the device on which the operation will take place
 //            defaults to -1, which means use matrices current device
 template <class ElemType>
@@ -401,7 +401,7 @@ void GPUMatrix<ElemType>::ChangeDeviceTo(DEVICEID_TYPE to_id)
         // IOMMU DMAR needs to be disabled for CUDA P2P, otherwise it will silently hang.
         // Unfortunately, hipDeviceCanAccessPeer returns true irrespective of the IOMMU settings.
         // More details: https://bugzilla.kernel.org/show_bug.cgi?id=188271
-        // http://docs.nvidia.com/cuda/gpudirect-rdma/#supported-systems
+        // http://docs.nvidia.com/hip/gpudirect-rdma/#supported-systems
         // TODO: enable UVA p2p access once this is fixed.
 
         // first try peer access
@@ -603,8 +603,8 @@ void GPUMatrix<ElemType>::Clear()
     {
         if (GetComputeDeviceId()>= 0)
         {
-            // BUG: We do not check the CUDA return code for cudaFree here since this may get called
-            // during processExit when cudaFree will fail. The destruction of CUDA objects during
+            // BUG: We do not check the CUDA return code for hipFree here since this may get called
+            // during processExit when hipFree will fail. The destruction of CUDA objects during
             // process exit must be avoided
             ReleaseStorageMemory();
         }
@@ -5172,7 +5172,7 @@ template void TracingGPUMemoryAllocator::Free<half>(int, half*, bool);
 
 }}}
 
-// !!!!This is from helper_cuda.h which comes with CUDA samples!!!! Consider if it is beneficial to just include all helper_cuda.h
+// !!!!This is from helper_hip.h which comes with CUDA samples!!!! Consider if it is beneficial to just include all helper_hip.h
 // TODO: This is duplicated in BestGpu.cpp
 // Beginning of GPU Architecture definitions
 int _ConvertSMVer2Cores(int major, int minor)
@@ -5213,16 +5213,16 @@ int _ConvertSMVer2Cores(int major, int minor)
 
 //inline CUDA_LONG _GetFreeMemoryOnCUDADevice(int devId)
 //{
-//    CUdevice cudaDevice;
-//    CUresult result = cuDeviceGet(&cudaDevice, devId);
+//    CUdevice hipDevice;
+//    CUresult result = cuDeviceGet(&hipDevice, devId);
 //    if(result!= CUDA_SUCCESS)
 //    {
 //        return 0;
 //    }
 //
-//    // create cuda context
-//    CUcontext cudaContext;
-//    result = cuCtxCreate(&cudaContext, CU_CTX_SCHED_AUTO, cudaDevice);
+//    // create hip context
+//    CUcontext hipContext;
+//    result = cuCtxCreate(&hipContext, CU_CTX_SCHED_AUTO, hipDevice);
 //    if(result != CUDA_SUCCESS)
 //    {
 //        return 0;
