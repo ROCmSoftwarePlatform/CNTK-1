@@ -92,7 +92,7 @@ cudnn_check=cuda/include/cudnn.h
 
 have_hipdnn=no
 hipdnn_path=
-hipdnn_check=include/hipDNN.h
+hipdnn_check=include/hipdnn.h
 
 have_opencv=no
 opencv_path=
