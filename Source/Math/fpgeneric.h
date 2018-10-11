@@ -19,7 +19,7 @@
 #include "hip/hip_runtime.h"
 #include <hipblas.h>
 #include <hipsparse.h>
-#include <hipDNN.h>
+#include <hipdnn.h>
 #include <hiprand.h>
 #include <hiprand_kernel.h>
 #include <time.h>
