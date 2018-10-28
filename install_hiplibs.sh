@@ -278,7 +278,7 @@ do
             cd ${pathlist["${scpLIST[$i]}"]}
         fi
         echo -e "$NC $spacef INSTALLING ${repoList[$i]} $spaceb"
-        if [ "${repoList[$i]}" != "hipDNN" ] && [ "${repoList[$i]}" != "MIOpen" ] && [ "${repoList[$i]}" != "rocPRIM" ]; then
+        if [ "${repoList[$i]}" != "MIOpen" ] && [ "${repoList[$i]}" != "rocPRIM" ]; then
             mkdir $build_dir -p && cd $build_dir
             $cmake_it .. && make -j $(nproc) && sudo make install
         elif [ "${repoList[$i]}" == "MIOpen" ]; then

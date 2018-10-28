@@ -26,7 +26,7 @@ public:
                         m_cudnn(CuDnn::Instance()),
                         m_inOutCuDnnT(GetInOutTensor(inOutT), CuDnnTensor::GetDataType<InoutType>()),
                         m_scaleBiasCuDnnT(GetScaleBiasTensor(inOutT, spatial), CuDnnTensor::GetDataType<StatType>()),
-                        m_cudnnEpsilon(HIPDNN_BN_MIN_EPSILON)
+                        m_cudnnEpsilon(1e-05)
     {
     }
 
@@ -57,7 +57,7 @@ protected:
         hipdnnBatchNormMode_t mode = m_spatial ? HIPDNN_BATCHNORM_SPATIAL_PERSISTENT : HIPDNN_BATCHNORM_PER_ACTIVATION;
         if (inferenceOnly) mode = m_spatial ? HIPDNN_BATCHNORM_SPATIAL : HIPDNN_BATCHNORM_PER_ACTIVATION;
         // cuDNN will fail with BAD_PARAM if epsilon < HIPDNN_BN_MIN_EPSILON.
-        m_cudnnEpsilon = max(epsilon, HIPDNN_BN_MIN_EPSILON);
+        m_cudnnEpsilon = max(epsilon, 1e-05);
         if (inferenceOnly)
         {
             assert(expAvgFactor == 0 && blendFactor == 1);

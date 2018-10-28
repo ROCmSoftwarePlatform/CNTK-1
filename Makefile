@@ -97,7 +97,7 @@ INCLUDEPATH+=$(PROTOBUF_PATH)/include
 # COMMON_FLAGS include settings that are passed both to NVCC and C++ compilers.
 COMMON_FLAGS:= -DHAS_MPI=$(HAS_MPI) -D_POSIX_SOURCE -D_XOPEN_SOURCE=600 -D__USE_XOPEN2K -std=c++11 -DCUDA_NO_HALF -D__CUDA_NO_HALF_OPERATORS__ 
 CPPFLAGS:=
-CXXFLAGS:= $(SSE_FLAGS) -std=c++0x -fopenmp -fpermissive -fPIC -Werror -fcheck-new
+CXXFLAGS:= $(SSE_FLAGS) -std=c++0x -fopenmp -fpermissive -fPIC  -fcheck-new
 
 ifdef HIP_PATH
 COMMON_FLAGS += -DHIP_COMPILE
@@ -155,7 +155,9 @@ ifeq ($(HIP_PLATFORM), nvcc)
   endif
 
   INCLUDEPATH+=$(GDK_INCLUDE_PATH)
+  CUDA_PATH=/usr/local/cuda
   INCLUDEPATH += $(CUDA_PATH)/include
+  INCLUDEPATH += /usr/local/cub/
   LIBPATH += $(CUDA_PATH)/lib64
   LIBS_LIST += hipblas hiprand hipsparse
   LIBS_LIST += cublas cudart cuda curand cusparse nvidia-ml

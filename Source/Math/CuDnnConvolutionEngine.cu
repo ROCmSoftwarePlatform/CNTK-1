@@ -552,26 +552,6 @@ private:
     static const int MaxAlgoCount = 10;
 #endif
 
-#ifdef __HIP_PLATFORM_NVCC__
-    hipdnnStatus_t convertType(cudnnConvolutionFwdAlgo_t in, hipdnnConvolutionFwdAlgo_t* out)
-    {
-        return cudnnTohipConvolutionFwdAlgo(in, out);
-    }
-    hipdnnStatus_t convertType(cudnnConvolutionBwdDataAlgo_t in, hipdnnConvolutionBwdDataAlgo_t* out)
-    {
-        return cudnnTohipConvolutionBwdDataAlgo(in, out);
-    }
-    hipdnnStatus_t convertType(cudnnConvolutionBwdFilterAlgo_t in, hipdnnConvolutionBwdFilterAlgo_t* out)
-    {
-        return cudnnTohipConvolutionBwdFilterAlgo(in, out);
-    }
-    hipdnnStatus_t convertType(cudnnMathType_t in, hipdnnMathType_t *out)
-    {
-	    return cudnnTohipMathType(in, out);
-    }
-#endif
-
-
     template <typename TAlgo, typename TWorkspaceSizeFinder, typename TDeterministicFinder, typename TFinder, typename TStaticFinder>
     void FindBestAlgo(size_t batchSize, TAlgo& algo, TWorkspaceSizeFinder workspaceSizeFinder, TDeterministicFinder deterministicFinder, TFinder finder, TStaticFinder staticFinder, Mat& workspace)
     {
