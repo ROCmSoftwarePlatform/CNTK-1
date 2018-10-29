@@ -164,7 +164,6 @@ if [ "$platform" == "hcc" ]; then
 fi
 
 repoList+=(rocRAND HcSPARSE hipBLAS hipDNN rocPRIM)
-declare -A cmake_install_prefix_dict=(["HIP"]="/opt/rocm/HIP" ["hipDNN"]="/opt/rocm/hipdnn" ["hipBLAS"]="/opt/rocm/hipBLAS")
 commitList+=(1890bb31675a6cbaa7766e947c8e35c4d1010ad6 907a505c27bac57a6d1f372154b744dd14ced943 193e50ed975a02d5efad566239107e3d7c768712 898b9d9ae7ed58a46beecc0fb0b785716da204f9 caef132d64b29a7d857eb68af5323fc302d26766)
 installDir+=(hiprand hcsparse hipblas hipdnn hipcub)
 libList+=(hiprand hipsparse hipblas hipdnn hipcub)

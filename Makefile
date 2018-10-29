@@ -159,8 +159,7 @@ ifeq ($(HIP_PLATFORM), nvcc)
   INCLUDEPATH += $(CUDA_PATH)/include
   INCLUDEPATH += /usr/local/cub/
   LIBPATH += $(CUDA_PATH)/lib64
-  LIBS_LIST += hipblas hiprand hipsparse
-  LIBS_LIST += cublas cudart cuda curand cusparse nvidia-ml
+  LIBS_LIST += hipblas hiprand hipsparse hipdnn nvidia-ml cudart
 
   # Set up cuDNN if needed
   ifdef CUDNN_PATH
@@ -198,9 +197,9 @@ endif
 # Set up CUDA includes and libraries
   ifdef HIPDNN_PATH
     INCLUDEPATH += $(HIPDNN_PATH)/include
-    #LIBPATH += /opt/rocm/lib64
     LIBPATH += $(INSTALL_DIR)/lib64
-    LIBS_LIST += hipDNN
+	LIBPATH += ${INSTALL_DIR}/hipdnn/lib
+	LIBS_LIST += hipdnn
     COMMON_FLAGS +=-DUSE_HIPDNN
   endif
   INCLUDEPATH += $(HIP_PATH)/include
@@ -208,6 +207,7 @@ endif
   INCLUDEPATH += $(INSTALL_DIR)/hiprand/include/
   INCLUDEPATH += $(INSTALL_DIR)/rocrand/include/
   INCLUDEPATH += $(INSTALL_DIR)/hcsparse/include/
+  INCLUDEPATH += $(INSTALL_DIR)/hipdnn/include
   LIBPATH += $(INSTALL_DIR)/lib64
 
 else
