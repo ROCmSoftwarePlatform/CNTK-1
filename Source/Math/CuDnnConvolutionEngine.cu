@@ -332,6 +332,14 @@ protected:
             hipdnnConvolutionFwdAlgoPerf_t algoPerf[MaxAlgoCount];
             hipdnnStatus_t retVal = finder(calgo, algoPerf);
             algo = algoPerf[0].algo;
+            if(noMem) {
+              for(int i =0; i < calgo ; i++)
+                 if (algoPerf[i].memory == 0){
+                     algo = algoPerf[i].algo;
+                     return retVal;
+              }
+             retVal = HIPDNN_STATUS_NOT_SUPPORTED;
+            }
             return retVal;
 #endif
 
@@ -373,9 +381,10 @@ protected:
         {
             size_t tmpSize;
             hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;
-#ifdef _HIPDBG_            
+#ifdef _HIPDBG_
             std::cout<<"CNTK: ENTER workspaceSizeFinder "<< MaxAlgoCount << std::endl;
-#endif            
+#endif
+#ifdef __HIP_PLATFORM_NVCC__
             for (int i = 0; i < MaxAlgoCount; i++)
             {
 #ifdef _HIPDBG_
@@ -391,6 +400,18 @@ protected:
                     err = err0;
                 }
             }
+#else
+            hipdnnConvolutionFwdAlgo_t algo;
+            err = hipdnnGetConvolutionForwardWorkspaceSize(*m_cudnn, m_inT, *m_kernelT, *m_conv, m_outT, algo, &tmpSize);
+            if (err == HIPDNN_STATUS_SUCCESS)
+            {
+                if (m_fwdAlgo.MaxAlgoWorkspaceSize < tmpSize)
+                {
+                    m_fwdAlgo.MaxAlgoWorkspaceSize = tmpSize;
+                    m_fwdAlgo.DeterministicAlgoWorkspaceSize = tmpSize;
+               }
+            }
+#endif
 #ifdef _HIPDBG_
             std::cout<<"CNTK: EXIT workspaceSizeFinder " << std::endl;
 #endif
@@ -444,6 +465,14 @@ protected:
             hipdnnConvolutionBwdDataAlgoPerf_t algoPerf[MaxAlgoCount];
             hipdnnStatus_t retVal = finder(calgo, algoPerf);
             algo = algoPerf[0].algo;
+            if(noMem) {
+              for(int i =0; i < calgo ; i++)
+                 if (algoPerf[i].memory == 0){
+                     algo = algoPerf[i].algo;
+                     return retVal;
+              }
+              retVal = HIPDNN_STATUS_NOT_SUPPORTED;
+            }
             return retVal;
 #endif
         };
@@ -470,6 +499,7 @@ protected:
         {
             size_t tmpSize;
             hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;
+#ifdef __HIP_PLATFORM_NVCC__
             for (int i = 0; i < MaxAlgoCount; i++)
             {
                 auto err0 = hipdnnGetConvolutionBackwardDataWorkspaceSize(*m_cudnn, *m_kernelT, m_outT, *m_conv, m_inT, (hipdnnConvolutionBwdDataAlgo_t)i, &tmpSize);
@@ -482,6 +512,18 @@ protected:
                     err = err0;
                 }
             }
+#else
+            hipdnnConvolutionBwdDataAlgo_t algo;
+            err = hipdnnGetConvolutionBackwardDataWorkspaceSize(*m_cudnn, *m_kernelT, m_outT, *m_conv, m_inT, algo, &tmpSize);
+            if (err == HIPDNN_STATUS_SUCCESS)
+            {
+                if (m_backDataAlgo.MaxAlgoWorkspaceSize < tmpSize)
+                {
+                    m_backDataAlgo.MaxAlgoWorkspaceSize = tmpSize;
+                    m_backDataAlgo.DeterministicAlgoWorkspaceSize = tmpSize;
+               }
+            }
+#endif
             return err;
         };
         FindBestAlgo(batchSize, m_backDataAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
@@ -540,6 +582,14 @@ protected:
             hipdnnConvolutionBwdFilterAlgoPerf_t algoPerf[MaxAlgoCount];
             hipdnnStatus_t retVal = finder(calgo, algoPerf);
             algo = algoPerf[0].algo;
+            if(noMem) {
+                for(int i =0; i < calgo ; i++)
+                    if (algoPerf[i].memory == 0){
+                       algo = algoPerf[i].algo;
+                       return retVal;
+                    }
+                retVal = HIPDNN_STATUS_NOT_SUPPORTED;
+            }
             return retVal;
 #endif
         };
@@ -561,6 +611,7 @@ protected:
         {
             size_t tmpSize;
             hipdnnStatus_t err = HIPDNN_STATUS_EXECUTION_FAILED;
+#ifdef __HIP_PLATFORM_NVCC__
             for (int i = 0; i < MaxAlgoCount; i++)
             {
                 auto err0 = hipdnnGetConvolutionBackwardFilterWorkspaceSize(*m_cudnn, m_inT, m_outT, *m_conv, *m_kernelT, (hipdnnConvolutionBwdFilterAlgo_t)i, &tmpSize);
@@ -574,6 +625,19 @@ protected:
                 }
             }
             return err;
+#else
+            hipdnnConvolutionBwdFilterAlgo_t algo;
+            err = hipdnnGetConvolutionBackwardFilterWorkspaceSize(*m_cudnn, m_inT, m_outT, *m_conv, *m_kernelT, algo, &tmpSize);
+            if (err == HIPDNN_STATUS_SUCCESS)
+            {
+                if (m_backFiltAlgo.MaxAlgoWorkspaceSize < tmpSize)
+                {
+                    m_backFiltAlgo.MaxAlgoWorkspaceSize = tmpSize;
+                    m_backFiltAlgo.DeterministicAlgoWorkspaceSize = tmpSize;
+               }
+            }
+               return err;
+#endif
         };
         FindBestAlgo(batchSize, m_backFiltAlgo, workspaceSizeFinder, deterministicFinder, finder, staticFinder, workspace);
         // Compute gradients with respect to the output tensor (data).
@@ -729,12 +793,20 @@ private:
             }
             else
             {
+#ifdef __HIP_PLATFORM_HCC__
+                if(workspace.BufferSize() < algo.MaxAlgoWorkspaceSize)
+                    workspace.Resize(algo.MaxAlgoWorkspaceSize,1);
+
+                HIPDNN_CALL(staticFinder(algo.selectedAlgo, false));
+#else
+                HIPDNN_CALL(staticFinder(algo.selectedAlgo, true));
+#endif
+
 #ifdef _HIPDBG_
                 std::cout  << "CNTK: FindBestAlgo: 7" << std::endl;
 #endif
                 // This branch handles two cases: a) When first MB comes through, and b) When input has free dimensions.
                 // If the handling of these two cases changes, we may need to create separate branches for them.
-                HIPDNN_CALL(staticFinder(algo.selectedAlgo, true));
                 
 #ifdef _HIPDBG_
                 std::cout  << "CNTK: FindBestAlgo: 8" << std::endl;
