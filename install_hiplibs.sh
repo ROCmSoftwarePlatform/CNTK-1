@@ -11,7 +11,7 @@ cur_dir=$(pwd)
 
 RED=$(tput setaf 1) GREEN=$(tput setaf 2) NC=$(tput sgr0) #output colours
 
-#clone="git clone https://github.com/ROCmSoftwarePlatform"
+clone="git clone https://github.com/ROCmSoftwarePlatform"
 
 #build steps
 

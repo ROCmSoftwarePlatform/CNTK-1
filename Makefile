@@ -1164,8 +1164,8 @@ $(MULTIVERSO_LIB):
 	@mkdir -p $(SOURCEDIR)/Multiverso/build/$(BUILDTYPE)
 	@cmake -DCMAKE_VERBOSE_MAKEFILE=TRUE \
 		-DCMAKE_CXX_COMPILER=$(CXX) \
-		-DOpenMP_CXX_FLAGS="" \
-		-DOpenMP_C_FLAGS="" \
+                -DOpenMP_CXX_FLAGS="" \
+                -DOpenMP_C_FLAGS="" \
 		-DBoost_NO_BOOST_CMAKE=TRUE \
 		-DBoost_NO_SYSTEM_PATHS=TRUE \
 		-DBOOST_ROOT:PATHNAME=$(BOOST_PATH) \
