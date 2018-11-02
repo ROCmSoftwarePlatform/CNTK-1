@@ -351,7 +351,7 @@ BOOST_AUTO_TEST_CASE(BatchNormalizationBackward)
             CudaTimer time2;
             time2.Start();
             engCudnn->Backward(xB, dyB, dxB, scaleB, 0, saveMeanB, saveInvStdDevB, dScaleB, dBiasB, false);
-            engCudnn->Backward(xB, dyB, dxB, scaleB, 0, saveMeanB, saveInvStdDevB, dScaleB, dBiasB, false);
+            engCudnn->Backward(xB, dyB, dxB, scaleB, 0, saveMeanB, saveInvStdDevB, dScaleB, dBiasB, true);
             time2.Stop();
 
             std::stringstream tmsg;
