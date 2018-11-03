@@ -97,7 +97,7 @@ INCLUDEPATH+=$(PROTOBUF_PATH)/include
 # COMMON_FLAGS include settings that are passed both to NVCC and C++ compilers.
 COMMON_FLAGS:= -DHAS_MPI=$(HAS_MPI) -D_POSIX_SOURCE -D_XOPEN_SOURCE=600 -D__USE_XOPEN2K -std=c++11 -DCUDA_NO_HALF -D__CUDA_NO_HALF_OPERATORS__ 
 CPPFLAGS:=
-CXXFLAGS:= $(SSE_FLAGS) -std=c++0x -fopenmp -fpermissive -fPIC -Werror -fcheck-new
+CXXFLAGS:= $(SSE_FLAGS) -std=c++0x -fopenmp -fpermissive -fPIC  -fcheck-new
 
 ifdef HIP_PATH
 COMMON_FLAGS += -DHIP_COMPILE
@@ -156,10 +156,11 @@ ifeq ($(HIP_PLATFORM), nvcc)
   endif
 
   INCLUDEPATH+=$(GDK_INCLUDE_PATH)
+  CUDA_PATH=/usr/local/cuda
   INCLUDEPATH += $(CUDA_PATH)/include
+  INCLUDEPATH += /usr/local/cub/
   LIBPATH += $(CUDA_PATH)/lib64
-  LIBS_LIST += hipblas hiprand hipsparse
-  LIBS_LIST += cublas cudart cuda curand cusparse nvidia-ml
+  LIBS_LIST += hipblas hiprand hipsparse hipdnn nvidia-ml cudart
 
   # Set up cuDNN if needed
   ifdef CUDNN_PATH
@@ -197,9 +198,11 @@ endif
 # Set up CUDA includes and libraries
   ifdef HIPDNN_PATH
     INCLUDEPATH += $(HIPDNN_PATH)/include
-    #LIBPATH += /opt/rocm/lib64
     LIBPATH += $(INSTALL_DIR)/lib64
-    LIBS_LIST += hipdnn
+
+	LIBPATH += ${INSTALL_DIR}/hipdnn/lib
+	LIBS_LIST += hipdnn
+
     COMMON_FLAGS +=-DUSE_HIPDNN
   endif
   INCLUDEPATH += $(HIP_PATH)/include
@@ -207,6 +210,7 @@ endif
   INCLUDEPATH += $(INSTALL_DIR)/hiprand/include/
   INCLUDEPATH += $(INSTALL_DIR)/rocrand/include/
   INCLUDEPATH += $(INSTALL_DIR)/hcsparse/include/
+  INCLUDEPATH += $(INSTALL_DIR)/hipdnn/include
   LIBPATH += $(INSTALL_DIR)/lib64
 
 else
@@ -1163,8 +1167,8 @@ $(MULTIVERSO_LIB):
 	@mkdir -p $(SOURCEDIR)/Multiverso/build/$(BUILDTYPE)
 	@cmake -DCMAKE_VERBOSE_MAKEFILE=TRUE \
 		-DCMAKE_CXX_COMPILER=$(CXX) \
-		-DOpenMP_CXX_FLAGS="" \
-		-DOpenMP_C_FLAGS="" \
+                -DOpenMP_CXX_FLAGS="" \
+                -DOpenMP_C_FLAGS="" \
 		-DBoost_NO_BOOST_CMAKE=TRUE \
 		-DBoost_NO_SYSTEM_PATHS=TRUE \
 		-DBOOST_ROOT:PATHNAME=$(BOOST_PATH) \

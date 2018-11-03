@@ -85,7 +85,7 @@ __global__ void GenerateUniformHalf(hiprandState *state, half *result, int n)
     hiprandState localState = *state;
 
     float x;
-    skipahead(id, &localState);
+    skipahead((unsigned long long)id, &localState);
     x = hiprand_uniform(&localState);
 
     result[id] = x;
@@ -100,7 +100,7 @@ __global__ void GenerateNormalHalf(hiprandState *state, half *result, int n, hal
     hiprandState localState = *state;
 
     float x;
-    skipahead(id, &localState);
+    skipahead((unsigned long long)id, &localState);
     x = hiprand_normal(&localState);
 
     result[id] = (float)mean + (float)stddev * x;
