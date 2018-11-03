@@ -8,6 +8,11 @@
 #include "Basics.h"
 #include "TensorShape.h"
 #include <hipdnn.h>
+#if CUDNN_MAJOR < 5
+	#error CNTK requires the NVIDIA cuDNN library 5.0 or higher to build, cf. https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Windows#cudnn or https://docs.microsoft.com/en-us/cognitive-toolkit/Setup-CNTK-on-Linux#cudnn for installation instructions.
+	#endif
+#endif
+
 #include <memory>
 #include "half.hpp"
 

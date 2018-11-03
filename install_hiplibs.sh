@@ -29,7 +29,7 @@ spaceb="-----\n\t\t"
 # {
 #	$clone/$1.git
 #	cd $1
-#	if [ "$1" != "hipDNN" ]; then
+#	if [ "$1" != "hipdnn" ]; then
 #		mkdir $build_dir -p
 #		cd $build_dir
 #		$cmake_it$2 $3 ..
@@ -167,7 +167,9 @@ repoList+=(rocRAND HcSPARSE hipBLAS hipDNN rocPRIM)
 commitList+=(1890bb31675a6cbaa7766e947c8e35c4d1010ad6 907a505c27bac57a6d1f372154b744dd14ced943 193e50ed975a02d5efad566239107e3d7c768712 898b9d9ae7ed58a46beecc0fb0b785716da204f9 caef132d64b29a7d857eb68af5323fc302d26766)
 installDir+=(hiprand hcsparse hipblas hipdnn hipcub)
 libList+=(hiprand hipsparse hipblas hipdnn hipcub)
+
 scpLIST+=(rocRAND_SCP HcSPARSE_SCP hipBLAS_SCP hipdnn_SCP rocPRIM_SCP)
+
 headerList+=(hiprand hipsparse hipblas hipdnn hipcub)
 
 echo -e "\n\n"

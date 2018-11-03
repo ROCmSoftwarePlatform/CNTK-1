@@ -199,8 +199,10 @@ endif
   ifdef HIPDNN_PATH
     INCLUDEPATH += $(HIPDNN_PATH)/include
     LIBPATH += $(INSTALL_DIR)/lib64
+
 	LIBPATH += ${INSTALL_DIR}/hipdnn/lib
 	LIBS_LIST += hipdnn
+
     COMMON_FLAGS +=-DUSE_HIPDNN
   endif
   INCLUDEPATH += $(HIP_PATH)/include
