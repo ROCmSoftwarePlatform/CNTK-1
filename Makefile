@@ -298,8 +298,8 @@ ifeq ("$(BUILDTYPE)","debug")
   endif
 
   CXXFLAGS += -g
-  LDFLAGS += -rdynamic
-  COMMON_FLAGS += -D_DEBUG -DNO_SYNC
+  LDFLAGS += -rdynamic 
+  COMMON_FLAGS += -D_DEBUG -DNO_SYNC -D_HIPDBG_
   CUFLAGS += -O0 -g -lineinfo  $(GENCODE_FLAGS)
 endif
 
