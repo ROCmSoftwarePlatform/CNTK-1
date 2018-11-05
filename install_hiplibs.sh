@@ -16,28 +16,11 @@ clone="git clone https://github.com/ROCmSoftwarePlatform"
 #build steps
 
 build_dir=build
-cmake_it="cmake "
 build_test=("" "-DCMAKE_MODULE_PATH=$rootDir/$externalDir/hip/cmake -DBUILD_TEST=OFF" "" "")
 install=0
 remove="rm -rf"
 spacef="\n\t\t-----"
 spaceb="-----\n\t\t"
-
-
-#function for building - TODO:
-#build ()
-# {
-#	$clone/$1.git
-#	cd $1
-#	if [ "$1" != "hipdnn" ]; then
-#		mkdir $build_dir -p
-#		cd $build_dir
-#		$cmake_it$2 $3 ..
-#		make
-#		make install
-#		cd ../../
-#	fi
-# }
 
 #function to check if local repo exists already
 
@@ -47,7 +30,7 @@ cmake_build(){
     mkdir -p build
     cd build
     $remove
-    $cmake_it -DCMAKE_INSTALL_PREFIX=$install_path ..
+    cmake  -DCMAKE_INSTALL_PREFIX=$install_path ..
     make all
     make install
 }
@@ -64,12 +47,9 @@ check()
 #HIP installation
 
 echo -e "$GREEN $spacef HIP LIBRARY INSTALLATION $spaceb"
-echo -e "$GREEN Please specify the local source code path. Press [ENTER] to skip :\n" 
+echo -e "$GREEN Please specify the local source code path. Press [ENTER] to skip :\n"
 read -p "$NC HIP SOURCE CODE :" HIP_SCP
 
-#if [[ -z "$HIP_SCP" ]]; then
-#    echo "No value entered"
-#else
 if [[ "$HIP_SCP" ]]; then
     #if [ !"$(ls -A $HIP_SCP)" ]; then
     if [ $(find $HIP_SCP -maxdepth 0 -type d -empty 2>/dev/null) ]; then
@@ -106,6 +86,25 @@ if [ "$hipRepo" == "1" ]; then
     fi
 fi
 
+# Installing HIP libraries(ROCm) from apt
+if  [ "$install" = "0" ]; then
+    sudo apt-get update -y -qq && sudo apt dist-upgrade -y -qq
+    wget -qO - http://repo.radeon.com/rocm/apt/debian/rocm.gpg.key | sudo apt-key add - &&
+    echo 'deb [arch=amd64] http://repo.radeon.com/rocm/apt/debian/ xenial main' | sudo tee /etc/apt/sources.list.d/rocm.list
+    sudo apt-get update -y &>/dev/null
+    echo -e "$NC $spacef HIP[ROCm-libs] from apt $spaceb"
+    sudo apt-get install rocm-libs -y
+    if [ $? -eq 0 ];then
+        install=1
+    else
+        echo -e "$RED $spacef apt-get of rocm-libs Failed! HIP will be freshly installed from source $spaceb "
+    fi
+    # Echo in bashrc for Linking
+    echo -e "\n## ---Added HIP-libs ROCm installation---" >> ~/.bashrc
+    echo "export LD_LIBRARY_PATH=/opt/rocm/lib:/opt/rocm/lib64:$LD_LIBRARY_PATH"
+fi
+
+# Installing HIP libraries(ROCm) from Source (incase apt fails)
 if [ "$install" == "0" ]; then
     if [[ -z "$HIP_SCP" ]]; then
         echo -e "$NC $spacef CLONING HIP $spaceb"
@@ -122,14 +121,14 @@ if [ "$install" == "0" ]; then
         cd $HIP_SCP
     fi
     mkdir $build_dir -p && cd $build_dir
-    $cmake_it .. && make && sudo make install
+    cmake  .. && make && sudo make install
     cd $rootDir/$externalDir
 fi
 
 echo -e "$NC $spacef HIP installation complete $spaceb"
 export HIP_PATH=$rocmDir/hip
 
-#platform deducing
+#Platform deducing
 
 platform=$($HIP_PATH/bin/hipconfig --platform)
 
@@ -152,25 +151,30 @@ for package in "${dependencies[@]}"; do
     fi
 done
 
-#repos needed for AMD
-
-if [ "$platform" == "hcc" ]; then
-    repoList+=(rocBLAS MIOpenGEMM MIOpen)
-    commitList+=(cb738e830f4239a14b6b73f9a58fdf943d914030 9547fb9e8499a5a9f16da83b1e6b749de82dd9fb 08114baa029a519ea12b52c5274c0bd8f4ad0d26)
-    installDir+=(rocblas miopengemm miopen)
-    libList+=(rocblas miopengemm MIOpen)
-    headerList+=(rocblas miogemm miopen)
-    scpLIST+=(rocBLAS_SCP MIOpenGEMM_SCP MIOpen_SCP)
-fi
+#repos needed for AMD and Nvidia
 
 repoList+=(rocRAND HcSPARSE hipBLAS hipDNN rocPRIM)
 commitList+=(1890bb31675a6cbaa7766e947c8e35c4d1010ad6 907a505c27bac57a6d1f372154b744dd14ced943 193e50ed975a02d5efad566239107e3d7c768712 898b9d9ae7ed58a46beecc0fb0b785716da204f9 caef132d64b29a7d857eb68af5323fc302d26766)
 installDir+=(hiprand hcsparse hipblas hipdnn hipcub)
 libList+=(hiprand hipsparse hipblas hipdnn hipcub)
-
-scpLIST+=(rocRAND_SCP HcSPARSE_SCP hipBLAS_SCP hipdnn_SCP rocPRIM_SCP)
-
+scpLIST+=(rocRAND_SCP HcSPARSE_SCP hipBLAS_SCP hipDNN_SCP rocPRIM_SCP)
 headerList+=(hiprand hipsparse hipblas hipdnn hipcub)
+
+if [ "$platform" == "hcc" ]; then
+    repoList+=(MIOpenGEMM MIOpen rocBLAS )
+    commitList+=(9547fb9e8499a5a9f16da83b1e6b749de82dd9fb 08114baa029a519ea12b52c5274c0bd8f4ad0d26 cb738e830f4239a14b6b73f9a58fdf943d914030)
+    installDir+=(miopengemm miopen rocblas)
+    libList+=(miopengemm MIOpen rocblas)
+    headerList+=(miogemm miopen rocblas)
+    scpLIST+=(MIOpenGEMM_SCP MIOpen_SCP rocBLAS_SCP)
+elif [ "$platform" == "nvcc" ]; then
+     repoList+=(cub)
+     commitList+=(c3cceac115c072fb63df1836ff46d8c60d9eb304)
+     installDir+=(hipcub)
+     libList+=(hipcub) #dummy
+     headerList+=(cub)
+     scpLIST+=(CUB_SCP)
+fi
 
 echo -e "\n\n"
 
@@ -198,15 +202,15 @@ done
 
 echo -e "\n\n"
 
+# MIopen installation on AMD
+
 if [ "$platform" == "hcc" ]; then
 	export HIP_SUPPORT=on
 	export CXX=/opt/rocm/bin/hcc
-#dependencies for miopengemm
 
+    # dependencies for miopengemm
     #opencl
-    #sudo apt update
-    sudo apt install ocl-icd-opencl-dev
-
+    sudo apt install ocl-icd-opencl-dev -y
     #rocm make package
     check rocm-cmake
     rocmcmakeRepo=$?
@@ -215,13 +219,12 @@ if [ "$platform" == "hcc" ]; then
         git clone https://github.com/RadeonOpenCompute/rocm-cmake.git
         cd rocm-cmake
         mkdir $build_dir -p && cd $build_dir
-        $cmake_it/ ..
+        cmake/ ..
         sudo cmake --build . --target install
     fi
     cd $rootDir/$externalDir
 
-#dependencies for miopen
-
+    # dependencies for miopen
     #clang-ocl
     check clang-ocl
     clangoclRepo=$?
@@ -230,13 +233,20 @@ if [ "$platform" == "hcc" ]; then
         git clone https://github.com/RadeonOpenCompute/clang-ocl.git
         cd clang-ocl
         mkdir $build_dir -p && cd $build_dir
-        $cmake_it/ ..
+        cmake/ ..
         sudo cmake --build . --target install
     fi
     cd $rootDir/$externalDir
-
     #ssl
-    #sudo apt-get install libssl-dev
+    #sudo apt-get install libssl-dev -y
+
+    # Install MIOpen from apt
+    echo -e "$NC $spacef Installing MIopen from apt $spaceb"
+    sudo apt-get install miopen-hip -y -q
+    miopenApt=$?
+    if [ $miopenApt -ne 0 ]; then
+        echo -e "$RED $spacef apt-get of MIOpen Failed! MIopen will be freshly installed from source $spaceb "
+    fi
 fi
 
 #cloning and install
@@ -253,11 +263,11 @@ do
         if [ "${repoList[$i]}" == "MIOpenGEMM" ]; then
             HEADER=`find $rocmDir/${installDir[$i]} -iname miogemm.hpp -print -quit`
         else
-            HEADER=`find $rocmDir/${installDir[$i]} \( -iname ${headerList[$i]}.h -o -iname ${headerList[$i]}.hpp \) -print -quit`
+            HEADER=`find $rocmDir/${installDir[$i]} \( -iname ${headerList[$i]}.h -o -iname ${headerList[$i]}.hpp -o -iname ${headerList[$i]}.cuh \) -print -quit`
         fi
         if [ -n "$HEADER" ]; then
             echo -e "$GREEN Found ${repoList[$i]} header \t: $HEADER"
-            if [ "${repoList[$i]}" != rocPRIM ]; then
+            if [ "${repoList[$i]}" != rocPRIM ] && [ "${repoList[$i]}" != cub-hip ]; then
                 FILE=`find $rocmDir/${installDir[$i]} -iname lib${libList[$i]}.so -print -quit`
             fi
             if [ -n "$FILE" ]; then
@@ -281,7 +291,11 @@ do
         if [[ -z "${pathlist["${scpLIST[$i]}"]}" ]]; then
             echo -e "$NC $spacef CLONING ${repoList[$i]} $spaceb"
             rm -rf ${repoList[$i]}
-            $clone/${repoList[$i]}.git
+            if [ ${repoList[$i]} == "cub" ]; then
+                git clone https://github.com/NVlabs/cub.git
+            else
+                $clone/${repoList[$i]}.git
+            fi
             cd ${repoList[$i]}
             if [ "$FREEZE_COMMIT" == "1" ]; then
                 git reset --hard ${commitList[$i]}
@@ -292,21 +306,21 @@ do
             cd ${pathlist["${scpLIST[$i]}"]}
         fi
         echo -e "$NC $spacef INSTALLING ${repoList[$i]} $spaceb"
-        if [ "${repoList[$i]}" != "MIOpen" ] && [ "${repoList[$i]}" != "rocPRIM" ]; then
+        if [ "${repoList[$i]}" != "MIOpen" ] && [ "${repoList[$i]}" != "cub" ]; then
             mkdir $build_dir -p && cd $build_dir
-            $cmake_it .. && make -j $(nproc) && sudo make install
+            cmake -DBUILD_TEST=OFF .. && make -j $(nproc) && sudo make install
         elif [ "${repoList[$i]}" == "MIOpen" ]; then
             export LD_LIBRARY_PATH=/usr/local/boost-1.60.0/lib:$LD_LIBRARY_PATH
             export PATH=/usr/local/boost-1.60.0/:$PATH
 	        #export miopengemm_DIR=$rootDir/$externalDir/miopengemm/lib/cmake/miopengemm
-            wget -O half.zip https://sourceforge.net/projects/half/files/half/1.12.0/half-1.12.0.zip/download && unzip half.zip -d half && cd half/include 
+            wget -O half.zip https://sourceforge.net/projects/half/files/half/1.12.0/half-1.12.0.zip/download && unzip half.zip -d half && cd half/include
             HALF_DIRECTORY=$(pwd)
             cd $rootDir/$externalDir/${repoList[$i]}
             mkdir $build_dir -p && cd $build_dir
             CXX=/opt/rocm/hcc/bin/hcc cmake -DMIOPEN_BACKEND=HIP -DCMAKE_PREFIX_PATH="/opt/rocm/hcc;${HIP_PATH}" -DHALF_INCLUDE_DIR=$HALF_DIRECTORY -DCMAKE_CXX_FLAGS="-isystem /usr/include/x86_64-linux-gnu/" .. && make -j $(nproc) && sudo make install
-        elif [ "${repoList[$i]}" == "rocPRIM" ]; then
-            mkdir $build_dir -p && cd $build_dir
-            cmake -DBUILD_TEST=OFF .. && make && sudo make install
+        elif [ "${repoList[$i]}" == "cub" ]; then
+            sudo mkdir -p $rocmDir/${installDir[$i]}/
+            sudo cp -r $rootDir/${externalDir}/${repoList[$i]}/cub $rocmDir/${installDir[$i]}/
         else
             make -j $(nproc)
         fi
@@ -314,20 +328,20 @@ do
     fi
 done
 
-#copying shared objects
+# #copying shared objects
 
-repoList+=(hipRAND hipCUB)
-installDir+=(rocrand)
-libList+=(rocrand)
-headerList+=(rocrand)
+# repoList+=(hipRAND hipCUB)
+# installDir+=(rocrand)
+# libList+=(rocrand)
+# headerList+=(rocrand)
 
-if [ "$platform" == "hcc" ];then
-    installDir+=(rocprim)
-    headerList+=(rocprim)
-elif [ "$platform" == "nvcc" ];then
-    installDir+=(cub)
-    headerList+=(cub.cuh)
-fi
+# if [ "$platform" == "hcc" ];then
+#     installDir+=(rocprim)
+#     headerList+=(rocprim)
+# elif [ "$platform" == "nvcc" ];then
+#     installDir+=(cub)
+#     headerList+=(cub.cuh)
+# fi
 
 for DIR in "${!installDir[@]}"
 do
@@ -352,10 +366,10 @@ do
     check ${installDir[$i]}
     localRepo=$?
     if [ "$localRepo" == "1" ]; then
-        HEADER=`find $rocmDir/${installDir[$i]} \( -name ${headerList[$i]}.h -o -name ${headerList[$i]}.hpp -o -name ${headerList[$i]} \) -print -quit`
+        HEADER=`find $rocmDir/${installDir[$i]} \( -name ${headerList[$i]}.h -o -name ${headerList[$i]}.hpp -o -name ${headerList[$i]}.cuh \) -print -quit`
         if [ -n "$HEADER" ]; then
             #echo -e "Found ${repoList[$i]} header \t: $HEADER"
-            if [ "${repoList[$i]}" != "hipCUB" ] && [ "${repoList[$i]}" != "rocPRIM" ]; then
+            if [ "${repoList[$i]}" != "cub" ] && [ "${repoList[$i]}" != "rocPRIM" ]; then
                 FILE=`find $rocmDir/${installDir[$i]} -name lib${libList[$i]}.so -print -quit`
             else
                 FILE=0
