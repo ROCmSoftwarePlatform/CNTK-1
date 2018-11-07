@@ -4,13 +4,14 @@ EXIT=""
 HL="\e[41m"  # Error highlight
 RS="\e[49m"
 
-
+mkdir -p external/dependency/
+cd external/dependency/
 echo "CNTK-deps installation error log: $(date +%d-%m-%y_%T) " > install_failed.log
 ERR_LOGGER="| tee -a install_failed.log"
 
- apt-get -y update
- apt-get -y upgrade
- apt-get -y autoremove
+sudo apt-get -y update
+sudo apt-get -y upgrade
+sudo apt-get -y autoremove
 
 ## Basic dependency list
 ARRAY=(  git autoconf automake libtool curl make
@@ -19,7 +20,7 @@ libgtk2.0-dev pkg-config libavcodec-dev libavformat-dev libswscale-dev # OpenCV 
 )
 
 for package in "${ARRAY[@]}"; do
-   apt-get -y install $package -f -q #> /dev/null
+  sudo apt-get -y install $package -f -q #> /dev/null
 done
 
 for package in "${ARRAY[@]}"; do
@@ -32,15 +33,15 @@ for package in "${ARRAY[@]}"; do
 done
 
 ## Install MKL-ml and MKL-dnn
- mkdir /usr/local/mklml -p && \
+sudo mkdir /usr/local/mklml -p && \
 wget https://github.com/01org/mkl-dnn/releases/download/v0.12/mklml_lnx_2018.0.1.20171227.tgz && \
- tar -xzf mklml_lnx_2018.0.1.20171227.tgz -C /usr/local/mklml && \
+sudo tar -xzf mklml_lnx_2018.0.1.20171227.tgz -C /usr/local/mklml && \
 wget --no-verbose -O - https://github.com/01org/mkl-dnn/archive/v0.12.tar.gz | tar -xzf - && \
 cd mkl-dnn-0.12 && \
- ln -s /usr/local external && \
+sudo ln -s /usr/local external && \
 mkdir -p build && cd build && \
 cmake .. && make && \
- make install && \
+sudo make install && \
 cd ../.. && rm -rf mkl-dnn-0.12
 if [ $? -ne 0 ] ; then
   echo -e "${HL}FAILED in Intel-MKL; check if conflicting packages or same package already installed${RS}" $ERR_LOGGER
@@ -52,7 +53,7 @@ wget https://www.open-mpi.org/software/ompi/v1.10/downloads/openmpi-1.10.3.tar.g
 tar -xzvf ./openmpi-1.10.3.tar.gz && \
 cd openmpi-1.10.3 && \
 ./configure --prefix=/usr/local/mpi && \
-make clean && make -j "$(nproc)" all &&  make install
+make clean && make -j "$(nproc)" all && sudo make install
 if [ $? -ne 0 ] ; then
   echo -e "${HL}FAILED in open-MPI; check if conflicting packages or same package already installed${RS}" $ERR_LOGGER
   ${EXIT}
@@ -68,7 +69,7 @@ wget https://github.com/google/protobuf/archive/v3.1.0.tar.gz && \
 tar -xzf v3.1.0.tar.gz && \
 cd protobuf-3.1.0 && ./autogen.sh && \
 ./configure CFLAGS=-fPIC CXXFLAGS=-fPIC --disable-shared --prefix=/usr/local/protobuf-3.1.0 && \
-make clean && make -j $(nproc) && make install
+make clean && make -j $(nproc) &&sudo make install
 if [ $? -ne 0 ] ; then
   echo -e "${HL}FAILED in Google protobuf installation; check if conflicting packages or same package already installed${RS}" $ERR_LOGGER
   ${EXIT}
@@ -78,7 +79,7 @@ fi
 wget http://nih.at/libzip/libzip-1.1.2.tar.gz && \
 tar -xzvf ./libzip-1.1.2.tar.gz && \
 cd libzip-1.1.2 &&
-./configure && make clean && make -j $(nproc) all && make install
+./configure && make clean && make -j $(nproc) all &&sudo make install
 if [ $? -ne 0 ] ; then
   echo -e "${HL}FAILED in libzip installation; check if conflicting packages or same package already installed${RS}"  $ERR_LOGGER
   ${EXIT}
@@ -90,7 +91,7 @@ echo "export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH"  >> ~/.bashrc && 
 wget -O - https://sourceforge.net/projects/boost/files/boost/1.60.0/boost_1_60_0.tar.gz/download | tar -xzf - && \
 cd boost_1_60_0 && \
 ./bootstrap.sh --prefix=/usr/local/boost-1.60.0 && \
- ./b2 -d0 -j $(nproc) install
+sudo ./b2 -d0 -j $(nproc) install
 if [ $? -ne 0 ] ; then
   echo -e "${HL}FAILED in Boost library installation; check if conflicting packages or same package already installed${RS}" $ERR_LOGGER
   ${EXIT}
@@ -102,8 +103,8 @@ echo "export LD_LIBRARY_PATH=/usr/local/boost-1.60.0\$LD_LIBRARY_PATH" >> ~/.bas
 ## Install OpenCV
 wget https://github.com/Itseez/opencv/archive/3.1.0.zip && unzip 3.1.0.zip && \
 cd opencv-3.1.0 && mkdir release && cd release && \
- cmake -D WITH_CUDA=OFF -D CMAKE_BUILD_TYPE=RELEASE -D CMAKE_INSTALL_PREFIX=/usr/local/opencv-3.1.0 .. && \
- make clean &&  make all &&  make install
+sudo cmake -D WITH_CUDA=OFF -D CMAKE_BUILD_TYPE=RELEASE -D CMAKE_INSTALL_PREFIX=/usr/local/opencv-3.1.0 .. && \
+sudo make clean && sudo make all && sudo make install
 if [ $? -ne 0 ] ; then
   echo -e "${HL}FAILED in OpenCV installation; check if conflicting packages or same package already installed${RS}" $ERR_LOGGER
   ${EXIT}
@@ -113,5 +114,8 @@ fi
 echo "export LD_LIBRARY_PATH=/opt/rocm/lib:/opt/rocm/lib64:\$LD_LIBRARY_PATH"  >> ~/.bashrc && source ~/.bashrc
 echo "##--- end cntk deps---" >> ~/.bashrc
 
- apt -y update
- apt -y upgrade
+sudo apt -y update
+sudo apt -y upgrade
+
+echo "!!! Dependencies are unpacked at external/dependency !!!"
+echo "!!! Check failedlog to know if any installation failed !!!"
