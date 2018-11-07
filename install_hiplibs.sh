@@ -267,7 +267,7 @@ do
         fi
         if [ -n "$HEADER" ]; then
             echo -e "$GREEN Found ${repoList[$i]} header \t: $HEADER"
-            if [ "${repoList[$i]}" != rocPRIM ] && [ "${repoList[$i]}" != cub-hip ]; then
+            if [ "${repoList[$i]}" != rocPRIM ] && [ "${repoList[$i]}" != cub ]; then
                 FILE=`find $rocmDir/${installDir[$i]} -iname lib${libList[$i]}.so -print -quit`
             fi
             if [ -n "$FILE" ]; then
