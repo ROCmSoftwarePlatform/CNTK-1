@@ -49,15 +49,13 @@ static __inline__ __device__ double atomicAdd(double* address, double val)
     return __longlong_as_double(old);
 }
 #endif
-#endif
-#ifdef __HIP_ENABLE_HALF__
+#endif // __HIP_PLATFORM_NVCC__
 // overload atomicAdd for half
 static __inline__ __device__ half atomicAdd(half* address, half val)
 {
     assert(false); // TODO: implement later
     return val;
 }
-#endif /*__HIP_ENABLE_HALF__*/
 
 
 // TODO: replace this with TensorOps.h LogAdd(). It differs in using ElemType throughout, while this one seems to use 'double' versions of exp() and log().

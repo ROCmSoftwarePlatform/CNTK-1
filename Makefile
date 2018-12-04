@@ -180,9 +180,11 @@ ifeq ($(HIP_PLATFORM), nvcc)
 endif
 
 ifeq ($(HIP_PLATFORM), hcc)
-  LIBS_LIST += hipblas hip_hcc hiprand hipsparse MIOpen
+  LIBS_LIST += hipblas hip_hcc hiprand hipsparse MIOpen hipdnn
   INCLUDEPATH += ${INSTALL_DIR}/miopen/include/
   INCLUDEPATH += $(INSTALL_DIR)/rocprim/include/
+  INCLUDEPATH += $(INSTALL_DIR)/hipdnn/include/
+
 endif
 
   ifndef CUB_PATH
@@ -197,6 +199,7 @@ endif
 # Set up CUDA includes and libraries
   ifdef HIPDNN_PATH
     INCLUDEPATH += $(HIPDNN_PATH)/include
+    LIBPATH += /opt/rocm/lib64
     LIBPATH += $(INSTALL_DIR)/lib64
 
 	LIBPATH += ${INSTALL_DIR}/hipdnn/lib
@@ -338,7 +341,7 @@ ORIGINDIR:='$$ORIGIN'
 # Components VERSION info
 ########################################
 
-CNTK_COMPONENT_VERSION := 2.4
+CNTK_COMPONENT_VERSION := 2.5
 ifeq ("$(BUILDTYPE)","debug")
 CNTK_COMPONENT_VERSION := $(CNTK_COMPONENT_VERSION)d
 endif
@@ -437,6 +440,7 @@ MATH_SRC =\
 	$(SOURCEDIR)/Math/CPUMatrixTensorFloat.cpp \
 	$(SOURCEDIR)/Math/CPUMatrixTensorDouble.cpp \
 	$(SOURCEDIR)/Math/CPUMatrixTensorHalf.cpp \
+	$(SOURCEDIR)/Math/CPUMatrixTensorSpecial.cpp \
 	$(SOURCEDIR)/Math/CPURNGHandle.cpp \
 	$(SOURCEDIR)/Math/CPUSparseMatrix.cpp \
 	$(SOURCEDIR)/Math/ConvolutionEngine.cpp \
@@ -485,7 +489,7 @@ $(CNTKMATH_LIB): $(MATH_OBJ) | $(PERF_PROFILER_LIB)
 	@echo creating $@ for $(ARCH) with build type $(BUILDTYPE)
 	@mkdir -p $(dir $@)
 ifeq ($(HIP_PLATFORM), hcc)
-	$(HIPCC) $(LDFLAGS) -fPIC -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) -o $@ $^ $(LIBS) -fopenmp=libiomp5 -l$(PERF_PROFILER)
+	$(HIPCC) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) -o $@ $^ $(LIBS) -fopenmp=libiomp5 -l$(PERF_PROFILER)
 else
 	$(CXX) $(LDFLAGS) -shared $(patsubst %,-L%, $(LIBPATH) $(LIBDIR) $(GDK_NVML_LIB_PATH)) $(patsubst %,$(RPATH)%, $(ORIGINDIR) $(LIBPATH)) -o $@ $^ $(LIBS) -fopenmp -l$(PERF_PROFILER) 
 endif

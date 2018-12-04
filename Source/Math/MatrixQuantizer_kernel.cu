@@ -135,7 +135,7 @@ __device__ void allreduce(T& var)
 template <class ElemType, bool ZeroThresholdFor1Bit>
 __global__ void _ComputeQuantiStatParj(const ElemType* us, const ElemType* inResidual, long M, long N, size_t ldNbits, char* qpackage)
 {
-    size_t subset = hipThreadIdx_x; // first thread computes 0, 64, 128; second thread 1, 65, 129 etc.
+/*    size_t subset = hipThreadIdx_x; // first thread computes 0, 64, 128; second thread 1, 65, 129 etc.
     size_t j = hipBlockIdx_x;       // we process one column per *block*, j=column index; note: j is never out of range
 
     size_t rows = M; // we compute from 0..rows-1
@@ -144,7 +144,7 @@ __global__ void _ComputeQuantiStatParj(const ElemType* us, const ElemType* inRes
     auto& qcol = *(Microsoft::MSR::CNTK::QuantizedColumn<ElemType>*) &qpackage[colSizeByte * j];
 
     Microsoft::MSR::CNTK::ColumnQuantizer<ElemType>::template ComputeRangeStatColjSubset<ZeroThresholdFor1Bit>(us, inResidual, M, j, bits, qcol.lower, qcol.upper,
-                                                                                                      subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int, REDUCTION_BLOCK_SIZE>);
+                                          subset, REDUCTION_BLOCK_SIZE, allreduce<ElemType, REDUCTION_BLOCK_SIZE>, allreduce<unsigned int, REDUCTION_BLOCK_SIZE>);*/
 }
 
 //caller: griddim and blockdim should be both 1d
