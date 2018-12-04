@@ -1237,10 +1237,12 @@ BOOST_AUTO_TEST_CASE(PoolingBackward)
                 HalfMatrix gradBufHalf(baseDeviceId);
                 HalfMatrix gradB = initMatHalf(gradBufHalf, crowIn, n, bufHalf);
 
-                testEng->BackwardPooling(out, srcGrad, in, grad, true);
-                baseEng->BackwardPooling(outB, srcGradB, inB, gradB, true);
-                testEng->BackwardPooling(out, srcGrad, in, grad, true);
-                baseEng->BackwardPooling(outB, srcGradB, inB, gradB, true);
+                bool accGrad = false;
+
+                testEng->BackwardPooling(out, srcGrad, in, grad, accGrad);
+                baseEng->BackwardPooling(outB, srcGradB, inB, gradB, accGrad);
+                testEng->BackwardPooling(out, srcGrad, in, grad, accGrad);
+                baseEng->BackwardPooling(outB, srcGradB, inB, gradB, accGrad);
 
                 SingleMatrix gradReset(grad.DeepClone(), baseDeviceId);
                 HalfMatrix gradBReset(gradB.DeepClone(), baseDeviceId);
