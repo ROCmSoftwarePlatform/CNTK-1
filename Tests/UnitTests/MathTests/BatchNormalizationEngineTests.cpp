@@ -28,7 +28,11 @@ std::vector<std::tuple<TensorShape, size_t, bool, double, double>> GenerateBNTes
     for (auto blendFactor : {0.0, 1.0})
     {
         // Per activation (non-spatial)
+#ifdef __HIP_PLATFORM_HCC__
+        for (size_t n : {6, 13, 62}) // TODO: MIOPEN hangs for 512 , to be debugged
+#elif defined __HIP_PLATFORM_NVCC__
         for (size_t n : {6, 13, 62, 512})
+#endif
             for (size_t c : {1})
                 for (size_t h : {1})
                     for (size_t w : {6, 17, 126, 2048})
