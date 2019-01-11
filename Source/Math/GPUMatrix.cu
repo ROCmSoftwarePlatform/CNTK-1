@@ -19,7 +19,6 @@
 #include "TensorOps.h"
 #ifdef __HIP_PLATFORM_NVCC__
 #include "device_launch_parameters.h"
-#include <hip.h>
 #endif // nv platform check
 #include <hip/hip_runtime.h>
 #include <hiprand.h>
