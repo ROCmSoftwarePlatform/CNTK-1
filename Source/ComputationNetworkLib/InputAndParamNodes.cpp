@@ -651,8 +651,6 @@ template <class ElemType>
 
 template class LearnableParameter<float>;
 template class LearnableParameter<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class LearnableParameter<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 }}}

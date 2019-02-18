@@ -9,9 +9,8 @@
 #include "Utils.h"
 #include "Serialization.h"
 
-#ifdef __HIP_ENABLE_HALF__
 #define DISPATCH_TO_TYPED_UPDATE_FUNCTION                                                                     \
-switch (gradientValue->GetDataType())                                                                     \
+    switch (gradientValue->GetDataType())                                                                     \
     {                                                                                                         \
     case DataType::Float:                                                                                     \
         Update<float>(parameter, gradientValue, smoothedGradientValue, trainingSampleCount);                  \
@@ -25,20 +24,6 @@ switch (gradientValue->GetDataType())                                           
     default:                                                                                                  \
         NOT_IMPLEMENTED;                                                                                      \
     }
-#else
-#define DISPATCH_TO_TYPED_UPDATE_FUNCTION                                                                     \
-switch (gradientValue->GetDataType())                                                                     \
-    {                                                                                                         \
-    case DataType::Float:                                                                                     \
-        Update<float>(parameter, gradientValue, smoothedGradientValue, trainingSampleCount);                  \
-        break;                                                                                                \
-    case DataType::Double:                                                                                    \
-        Update<double>(parameter, gradientValue, smoothedGradientValue, trainingSampleCount);                 \
-        break;                                                                                                \
-    default:                                                                                                  \
-        NOT_IMPLEMENTED;                                                                                      \
-    }
-#endif /*__HIP_ENABLE_HALF__*/
 
 #define GET_WRITABLE_MATRICES                                                                                 \
     const auto& smoothedGradientMatrix = GetWritableMatrix<ElementType>(smoothedGradientValue);               \
@@ -286,13 +271,11 @@ namespace CNTK
             auto matrix = GetMatrix<double>(parameter.Value());
             return{ matrix->GetNumRows(), matrix->GetNumCols() };
         }
-#ifdef __HIP_ENABLE_HALF__
         else
         {
             auto matrix = GetMatrix<half>(parameter.Value());
             return{ matrix->GetNumRows(), matrix->GetNumCols() };
         }
-#endif /*__HIP_ENABLE_HALF__*/
     }
 
     /*virtual*/ bool LearnerBase::Update(unordered_map<Parameter, NDArrayViewPtr>& gradientValues, size_t trainingSampleCount, bool sweepEnd) /*override*/
@@ -320,11 +303,7 @@ namespace CNTK
             {
                 // convert fp16 parameter to fp32
                 auto sg = smoothedGradientValue->GetWritableMatrix<float>();
-#ifdef __HIP_ENABLE_HALF__
                 auto pv16 = parameter.Value()->GetWritableMatrix<half>();
-#else
-                auto pv16 = parameter.Value()->GetWritableMatrix<double>();
-#endif /*__HIP_ENABLE_HALF__*/
                 size_t factor = sg->GetNumCols() / pv16->GetNumCols();
                 auto pv = sg->ColumnSlice(pv16->GetNumCols() * (factor - 1), pv16->GetNumCols());
                 pv.CastAssignValuesOf(*pv16);
@@ -390,11 +369,7 @@ namespace CNTK
         {
             // convert fp32 parameter to fp16 after update
             auto sg = smoothedGradientValue->GetWritableMatrix<float>();
-#ifdef __HIP_ENABLE_HALF__
             auto pv16 = parameterValue->GetWritableMatrix<half>();
-#else
-            auto pv16 = parameterValue->GetWritableMatrix<double>();
-#endif /*__HIP_ENABLE_HALF__*/
             size_t factor = sg->GetNumCols() / pv16->GetNumCols();
             auto pv = sg->ColumnSlice(pv16->GetNumCols() * (factor - 1), pv16->GetNumCols());
             pv16->CastAssignValuesOf(pv);
@@ -641,11 +616,7 @@ namespace CNTK
         const NDArrayViewPtr& smoothedGradientValue, size_t trainingSampleCount) const
     {
         const auto& compoundMatrix = GetWritableMatrix<float>(smoothedGradientValue);
-#ifdef __HIP_ENABLE_HALF__
         const auto& gradientMatrix = GetWritableMatrix<half>(gradientValue);
-#else
-        const auto& gradientMatrix = GetWritableMatrix<double>(gradientValue);
-#endif /*__HIP_ENABLE_HALF__*/
         auto smoothedGradientMatrix = compoundMatrix->ColumnSlice(0, gradientMatrix->GetNumCols());
         auto tempGradientMatrix = compoundMatrix->ColumnSlice(gradientMatrix->GetNumCols(), gradientMatrix->GetNumCols());
         auto parameterMatrix = compoundMatrix->ColumnSlice(2 * gradientMatrix->GetNumCols(), gradientMatrix->GetNumCols());
@@ -697,11 +668,7 @@ namespace CNTK
         const NDArrayViewPtr& smoothedGradientValue, size_t trainingSampleCount) const
     {
         const auto& compoundMatrix = GetWritableMatrix<float>(smoothedGradientValue);
-#ifdef __HIP_ENABLE_HALF__
         const auto& gradientMatrix = GetWritableMatrix<half>(gradientValue);
-#else
-        const auto& gradientMatrix = GetWritableMatrix<double>(gradientValue);
-#endif /*__HIP_ENABLE_HALF__*/
         auto smoothedGradientMatrix = compoundMatrix->ColumnSlice(0, gradientMatrix->GetNumCols());
         auto tempGradientMatrix = compoundMatrix->ColumnSlice(gradientMatrix->GetNumCols(), gradientMatrix->GetNumCols());
         auto parameterMatrix = compoundMatrix->ColumnSlice(2 * gradientMatrix->GetNumCols(), gradientMatrix->GetNumCols());
@@ -778,11 +745,9 @@ namespace CNTK
         case DataType::Double:
             Update<double, double>(parameter, gradientValue, smoothedGradientValue, trainingSampleCount);
             break;
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
             Update<half, float>(parameter, gradientValue, smoothedGradientValue, trainingSampleCount);
             break;
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             NOT_IMPLEMENTED;
         }
@@ -802,12 +767,7 @@ namespace CNTK
         const auto& gradientMatrix = GetWritableMatrix<GradType>(gradientValue);
         const auto& smoothedGradientMatrix = GetWritableMatrix<AccumType>(smoothedGradientValue);
         // parameter is accumulated to fp32 for fp16 gradient in the master copy (allocated in last part in smoothedGradient)
-#ifdef __HIP_ENABLE_HALF__
         auto parameterMatrix = (std::is_same<GradType, half>::value) ?
-#else
-        auto parameterMatrix = (std::is_same<GradType, double>::value) ?
-
-#endif /*__HIP_ENABLE_HALF__*/
             smoothedGradientMatrix->ColumnSlice(smoothedGradientMatrix->GetNumCols() - gradientMatrix->GetNumCols(), gradientMatrix->GetNumCols()) :
             GetWritableMatrix<AccumType>(parameter.Value())->ColumnSlice(0, gradientMatrix->GetNumCols());
 

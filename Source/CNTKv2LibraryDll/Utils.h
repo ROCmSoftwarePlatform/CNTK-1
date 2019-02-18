@@ -750,12 +750,10 @@ namespace CNTK
         });
     }
 
-#ifdef __HIP_ENABLE_HALF__
     // half is V1 ElemType, so specialize here instead of in CNTKLibrary.h
     template<>
     inline DataType AsDataType<half>()
     {
         return DataType::Float16;
     }
-#endif /*__HIP_ENABLE_HALF__*/
 }

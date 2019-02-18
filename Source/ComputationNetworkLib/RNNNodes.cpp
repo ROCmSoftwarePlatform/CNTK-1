@@ -341,8 +341,6 @@ void OptimizedRNNStackNode<ElemType>::UnpackSequencesFromCuDNN(const Matrix<Elem
 
 template class OptimizedRNNStackNode<float>;
 template class OptimizedRNNStackNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class OptimizedRNNStackNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 }}}

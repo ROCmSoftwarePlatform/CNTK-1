@@ -91,9 +91,7 @@ public:
 
 template class PlusNode<float>;
 template class PlusNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class PlusNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // LogPlusNode (summand1, summand2)
@@ -168,9 +166,7 @@ public:
 
 template class LogPlusNode<float>;
 template class LogPlusNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class LogPlusNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 
 // -----------------------------------------------------------------------
@@ -231,9 +227,7 @@ public:
 
 template class PowNode<float>;
 template class PowNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class PowNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 
 // -----------------------------------------------------------------------
@@ -296,9 +290,7 @@ public:
 
 template class MinusNode<float>;
 template class MinusNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class MinusNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // ElementTimesNode (factor1, factor2)
@@ -372,9 +364,7 @@ public:
 
 template class ElementTimesNode<float>;
 template class ElementTimesNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class ElementTimesNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // TimesNodeBase (A, B, outputRank=1)
@@ -1128,9 +1118,7 @@ public:
 
 template class TimesNode<float>;
 template class TimesNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class TimesNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // TransposeTimesNode (A', B)
@@ -1160,9 +1148,7 @@ public:
 
 template class TransposeTimesNode<float>;
 template class TransposeTimesNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class TransposeTimesNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // Fixed-point matrix product. This scales inputs to 16bit signed integers by Symmetric quantizers, performs
 // integer multiplication using SSE/AVX2, and transforms the results back.
@@ -1253,9 +1239,7 @@ public:
 
 template class QuantizedTimesNode<float>;
 template class QuantizedTimesNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class QuantizedTimesNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // SumElementsNode (input)
@@ -1491,9 +1475,7 @@ private:
 
 template class TransposeDimensionsNode<float>;
 template class TransposeDimensionsNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class TransposeDimensionsNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // CosDistanceNode (left, right)
@@ -1614,9 +1596,7 @@ private:
 
 template class CosDistanceNode<float>;
 template class CosDistanceNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class CosDistanceNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // KhatriRaoProductNode (left, right)
@@ -1943,9 +1923,7 @@ private:
 
 template class CosDistanceWithNegativeSamplesNode<float>;
 template class CosDistanceWithNegativeSamplesNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class CosDistanceWithNegativeSamplesNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 template <class ElemType>
 void UpdateRunningAverage(ComputationNode<ElemType>& newInput, TensorView<ElemType>& runningAverage,
@@ -2063,14 +2041,10 @@ public:
     virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return false; }
 };
 
-#ifdef __HIP_ENABLE_HALF__
 template class CastNode<half, float>;
 template class CastNode<half, double>;
 template class CastNode<float, half>;
-#endif /*__HIP_ENABLE_HALF__*/
 template class CastNode<float, double>;
-#ifdef __HIP_ENABLE_HALF__
 template class CastNode<double, half>;
-#endif /*__HIP_ENABLE_HALF__*/
 template class CastNode<double, float>;
 }}}

@@ -416,10 +416,8 @@ namespace CNTK
             return builder.template TypedCreateLearnableParameter<float>(name, AsTensorShape(shape));
         case DataType::Double:
             return builder.template TypedCreateLearnableParameter<double>(name, AsTensorShape(shape));
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
             return builder.template TypedCreateLearnableParameter<half>(name, AsTensorShape(shape));
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             return builder.CreateLearnableParameter(name, AsTensorShape(shape));
         }
@@ -433,10 +431,8 @@ namespace CNTK
             return (dynamic_cast<ComputationNode<float>*>(&*node))->Value().CastAssignValuesOf(*matrix);
         case DataType::Double:
             return (dynamic_cast<ComputationNode<double>*>(&*node))->Value().CastAssignValuesOf(*matrix);
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
             return (dynamic_cast<ComputationNode<half>*>(&*node))->Value().CastAssignValuesOf(*matrix);
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             LogicError("Unsupported data type");
         }
@@ -501,11 +497,9 @@ namespace CNTK
                 case DataType::Double:
                     std::dynamic_pointer_cast<ComputationNode<double>>(computationNodePtr)->Value() = std::dynamic_pointer_cast<const Matrix<double>>(valueMatrix)->AsReference();
                     break;
-#ifdef __HIP_ENABLE_HALF__
                 case DataType::Float16:
                     std::dynamic_pointer_cast<ComputationNode<half>>(computationNodePtr)->Value() = std::dynamic_pointer_cast<const Matrix<half>>(valueMatrix)->AsReference();
                     break;
-#endif /*__HIP_ENABLE_HALF__*/
                 default:
                     LogicError("Unsupported data type");
                 }
@@ -536,7 +530,6 @@ namespace CNTK
                     nodeValue = std::move(clonedMatrix);
                     break;
                 }
-#ifdef __HIP_ENABLE_HALF__
                 case DataType::Float16:
                 {
                     Matrix<half>& nodeValue = dynamic_cast<ComputationNode<half>*>(&*computationNodePtr)->Value();
@@ -546,7 +539,6 @@ namespace CNTK
                     nodeValue = std::move(clonedMatrix);
                     break;
                 }
-#endif /*__HIP_ENABLE_HALF__*/
                 default:
                     LogicError("Unsupported data type");
                 }
@@ -701,13 +693,10 @@ namespace CNTK
                 inputNodeType = DataType::Float;
             else if (std::dynamic_pointer_cast<ComputationNode<double>, ComputationNodeBase>(inputNodes[0]))
                 inputNodeType = DataType::Double;
-#ifdef __HIP_ENABLE_HALF__
             else if (std::dynamic_pointer_cast<ComputationNode<half>, ComputationNodeBase>(inputNodes[0]))
                 inputNodeType = DataType::Float16;
-#endif /*__HIP_ENABLE_HALF__*/
         }
 
-#ifdef __HIP_ENABLE_HALF__
 #define ASSIGN_NEW_NODE(nodeClass, ...)                               \
     do {                                                              \
         if (inputNodeType == DataType::Float)                         \
@@ -717,6 +706,7 @@ namespace CNTK
         else if (inputNodeType == DataType::Float16)                  \
             computationNodePtr = New<nodeClass<half>>(__VA_ARGS__);   \
     } while(0)
+
 #define ASSIGN_NEW_NODE2(nodeClass, dtype, ...)                              \
     do {                                                                     \
         if (inputNodeType == DataType::Float)                                \
@@ -726,23 +716,6 @@ namespace CNTK
         else if (inputNodeType == DataType::Float16)                         \
             computationNodePtr = New<nodeClass<dtype, half>>(__VA_ARGS__);   \
     } while(0)
-#else
-#define ASSIGN_NEW_NODE(nodeClass, ...)                               \
-    do {                                                              \
-        if (inputNodeType == DataType::Float)                         \
-            computationNodePtr = New<nodeClass<float>>(__VA_ARGS__);  \
-        else if (inputNodeType == DataType::Double)                   \
-            computationNodePtr = New<nodeClass<double>>(__VA_ARGS__); \
-    } while(0)
-#define ASSIGN_NEW_NODE2(nodeClass, dtype, ...)                              \
-    do {                                                                     \
-        if (inputNodeType == DataType::Float)                                \
-            computationNodePtr = New<nodeClass<dtype, float>>(__VA_ARGS__);  \
-        else if (inputNodeType == DataType::Double)                          \
-            computationNodePtr = New<nodeClass<dtype, double>>(__VA_ARGS__); \
-    } while(0)
- #endif /*__HIP_ENABLE_HALF__*/
-
 
         auto outputs = function->RawOutputs();
         if (variable == outputs[0])
@@ -1343,11 +1316,9 @@ namespace CNTK
                     case DataType::Double:
                         ASSIGN_NEW_NODE2(CastNode, double, network->GetDeviceId(), internalNodeName);
                         break;
-#ifdef __HIP_ENABLE_HALF__
                     case DataType::Float16:
                         ASSIGN_NEW_NODE2(CastNode, half, network->GetDeviceId(), internalNodeName);
                         break;
-#endif /*__HIP_ENABLE_HALF__*/
                     }
                     break;
                 }
@@ -1887,11 +1858,9 @@ namespace CNTK
             case DataType::Double:
                 PopulateComputationNodeValue<double>({ argument, argumentValue }, argumentComputationNode, layoutsPopulated);
                 break;
-#ifdef __HIP_ENABLE_HALF__
             case DataType::Float16:
                 PopulateComputationNodeValue<half>({ argument, argumentValue }, argumentComputationNode, layoutsPopulated);
                 break;
-#endif /*__HIP_ENABLE_HALF__*/
             default:
                 LogicError("Function '%S' Forward: Unsupported DataType %s.", AsString().c_str(), DataTypeName(argumentValue->GetDataType()));
                 break;
@@ -1935,11 +1904,9 @@ namespace CNTK
             case DataType::Double:
                 PopulateComputationNodeGradient<double>(gradientVarValuePair, outputComputationNode);
                 break;
-#ifdef __HIP_ENABLE_HALF__
             case DataType::Float16:
                 PopulateComputationNodeGradient<half>(gradientVarValuePair, outputComputationNode);
                 break;
-#endif /*__HIP_ENABLE_HALF__*/
             default:
                 LogicError("Function '%S' Backward: Unsupported DataType %s.", AsString().c_str(), DataTypeName(gradientValue->GetDataType()));
                 break;
@@ -1981,7 +1948,6 @@ namespace CNTK
                 nodeValue = Utils::GetValueObjectFromCNTKImplMatrixAndMBLayout<double>(var, computationNode, matrix, layout);
             break;
         }
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
         {
             auto& matrix = getGradient ? computationNode->As<ComputationNode<half>>()->Gradient() : computationNode->As<ComputationNode<half>>()->Value();
@@ -1991,7 +1957,6 @@ namespace CNTK
                 nodeValue = Utils::GetValueObjectFromCNTKImplMatrixAndMBLayout<half>(var, computationNode, matrix, layout);
             break;
         }
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             CNTK::LogicError("CompositeFunction::Forward/Backward: Unsupported DataType %s", DataTypeName(var.GetDataType()));
             break;
@@ -2149,10 +2114,8 @@ namespace CNTK
             GetComputationNetwork<float>(computeDevice, outputsToRetainBackwardStateFor, requestedOutputVariables, inputsToExcludeGradientsFor, true);
         else if (dataType == DataType::Double)
             GetComputationNetwork<double>(computeDevice, outputsToRetainBackwardStateFor, requestedOutputVariables, inputsToExcludeGradientsFor, true);
-#ifdef __HIP_ENABLE_HALF__
         else if (dataType == DataType::Float16)
             GetComputationNetwork<half>(computeDevice, outputsToRetainBackwardStateFor, requestedOutputVariables, inputsToExcludeGradientsFor, true);
-#endif /*__HIP_ENABLE_HALF__*/
         else
             InvalidArgument("Unsupported DataType %s", DataTypeName(dataType));
 

@@ -373,9 +373,7 @@ template <class ElemType>
 
 template class ReduceElementsNode<float>;
 template class ReduceElementsNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class ReduceElementsNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // Where(bitVector) -- extract indices of non-0 values in a sequence
@@ -493,9 +491,7 @@ template <class ElemType>
 
 template class WhereNode<float>;
 template class WhereNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class WhereNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // PackedIndexNode(targetObject, indexSequence) -- map sequence
@@ -557,9 +553,7 @@ template <class ElemType>
 
 template class PackedIndexNode<float>;
 template class PackedIndexNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class PackedIndexNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // GatherPackedNode(packedIndex, sourceData) -- gather operation
@@ -632,9 +626,7 @@ template <class ElemType>
 
 template class GatherPackedNode<float>;
 template class GatherPackedNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class GatherPackedNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // ScatterPackedNode(layoutData, packedIndex, sourceData) -- scatter operation
@@ -698,9 +690,7 @@ template <class ElemType>
 
 template class ScatterPackedNode<float>;
 template class ScatterPackedNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class ScatterPackedNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // CropNode -- crop operation, crops first input according to shape of second
@@ -1041,8 +1031,6 @@ bool CropNode<ElemType>::SupportsTransformOnInput(size_t inputIndex)
 
 template class CropNode<float>;
 template class CropNode<double>;
-#ifdef __HIP_ENABLE_HALF__
 template class CropNode<half>;
-#endif /*__HIP_ENABLE_HALF__*/
 
 }}}

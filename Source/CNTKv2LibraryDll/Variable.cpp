@@ -140,13 +140,11 @@ namespace CNTK
                     m_dataFields->m_value = CreateValueFromParameterInitializer<double>(Shape(), *m_dataFields->m_valueInitializer, *m_dataFields->m_valueInitializationDevice);
                     break;
                 }
-#ifdef __HIP_ENABLE_HALF__
                 case DataType::Float16:
                 {
                     m_dataFields->m_value = CreateValueFromParameterInitializer<half>(Shape(), *m_dataFields->m_valueInitializer, *m_dataFields->m_valueInitializationDevice);
                     break;
                 }
-#endif /*__HIP_ENABLE_HALF__*/
                 default:
                     LogicError("Variable '%S' Value(): Unsupported DataType %s", AsString().c_str(), DataTypeName(GetDataType()));
                     break;

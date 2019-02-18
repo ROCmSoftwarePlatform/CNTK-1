@@ -979,16 +979,11 @@ template <class ElemType>
 
 template vector<float>  File::LoadMatrixFromTextFile<float> (const std::wstring& filePath, size_t& /*out*/ numRows, size_t& /*out*/ numCols);
 template vector<double> File::LoadMatrixFromTextFile<double>(const std::wstring& filePath, size_t& /*out*/ numRows, size_t& /*out*/ numCols);
-
-#ifdef __HIP_ENABLE_HALF__
 template vector<half> File::LoadMatrixFromTextFile<half>(const std::wstring& filePath, size_t& /*out*/ numRows, size_t& /*out*/ numCols);
-#endif /*__HIP_ENABLE_HALF__*/
 
 template vector<float>  File::LoadMatrixFromStringLiteral<float> (const std::string& literal, size_t& /*out*/ numRows, size_t& /*out*/ numCols);
 template vector<double> File::LoadMatrixFromStringLiteral<double>(const std::string& literal, size_t& /*out*/ numRows, size_t& /*out*/ numCols);
-#ifdef __HIP_ENABLE_HALF__
 template vector<half> File::LoadMatrixFromStringLiteral<half>(const std::string& literal, size_t& /*out*/ numRows, size_t& /*out*/ numCols);
-#endif /*__HIP_ENABLE_HALF__*/
 
 #ifndef CNTK_COMPONENT_VERSION
 #error CNTK_COMPONENT_VERSION must be set

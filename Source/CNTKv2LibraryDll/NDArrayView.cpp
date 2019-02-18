@@ -23,13 +23,11 @@ namespace CNTK
         return std::numeric_limits<ElemType>::quiet_NaN();
     }
 
-#ifdef __HIP_ENABLE_HALF__
     template<>
     inline float16 quiet_NaN<float16>()
     {
         return float16(std::numeric_limits<float>::quiet_NaN());
     }
-#endif /*__HIP_ENABLE_HALF__*/
 
     template <typename V1ElemType>
     static TensorView<V1ElemType>* AllocateTensorView(const NDShape& viewShape,
@@ -61,10 +59,8 @@ namespace CNTK
             return AllocateTensorView<float>(viewShape, device, dataBuffer, bufferSizeInBytes);
         case DataType::Double:
             return AllocateTensorView<double>(viewShape, device, dataBuffer, bufferSizeInBytes);
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
             return AllocateTensorView<half>(viewShape, device, dataBuffer, bufferSizeInBytes);
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             LogicError("Unsupported DataType %s", DataTypeName(dataType));
             break;
@@ -99,10 +95,8 @@ namespace CNTK
             return AllocateTensorView<float>(viewShape, storageType, device, numNonZeroValues);
         case DataType::Double:
             return AllocateTensorView<double>(viewShape, storageType, device, numNonZeroValues);
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
             return AllocateTensorView<half>(viewShape, storageType, device, numNonZeroValues);
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             LogicError("Unsupported DataType %s", DataTypeName(dataType));
             break;
@@ -135,14 +129,12 @@ namespace CNTK
                 sparseMatrix->SetMatrixFromCSCFormat(colStarts, rowIndices, (const double*)nonZeroValues, numNonZeroValues, sparseMatrix->GetNumRows(), sparseMatrix->GetNumCols());
                 break;
             }
-#ifdef __HIP_ENABLE_HALF__
             case DataType::Float16:
             {
                 auto sparseMatrix = GetWritableMatrix<half>(1);
                 sparseMatrix->SetMatrixFromCSCFormat(colStarts, rowIndices, (const half*)nonZeroValues, numNonZeroValues, sparseMatrix->GetNumRows(), sparseMatrix->GetNumCols());
                 break;
             }
-#endif /*__HIP_ENABLE_HALF__*/
             default:
                 LogicError("Unsupported DataType %s", DataTypeName(dataType));
                 break;
@@ -162,11 +154,9 @@ namespace CNTK
             case DataType::Double:
                 delete GetTensorView<double>();
                 break;
-#ifdef __HIP_ENABLE_HALF__
             case DataType::Float16:
                 delete GetTensorView<half>();
                 break;
-#endif /*__HIP_ENABLE_HALF__*/
             default:
                 LogicError("Unsupported DataType %s", DataTypeName(m_dataType));
                 break;
@@ -185,10 +175,8 @@ namespace CNTK
     {
         if (GetDataType() == DataType::Double)
             SetValue((double)value);
-#ifdef __HIP_ENABLE_HALF__
         else if (GetDataType() == DataType::Float16)
             SetValue((float16)value);
-#endif /*__HIP_ENABLE_HALF__*/
         else
         {
             if (IsSparse())
@@ -220,18 +208,15 @@ namespace CNTK
             auto currentMatrix = GetMatrix<double>();
             return currentMatrix->IsView();
         }
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
         {
             auto currentMatrix = GetMatrix<half>();
             return currentMatrix->IsView();
         }
-#endif /*__HIP_ENABLE_HALF__*/
         }
         return false;
     }
 
-#ifdef __HIP_ENABLE_HALF__
     void NDArrayView::SetValue(float16 value)
     {
         if (IsSparse())
@@ -239,7 +224,6 @@ namespace CNTK
 
         GetWritableMatrix<half>()->SetValue(*reinterpret_cast<half*>(&value));
     }
-#endif /*__HIP_ENABLE_HALF__*/
 
     template <typename V1ElemType>
     /*static*/ std::shared_ptr<Matrix<V1ElemType>> NDArrayView::GetMatrixImpl(const TensorView<V1ElemType>* tensorView, size_t rowColSplitPoint)
@@ -303,10 +287,8 @@ namespace CNTK
             return GetMatrixImpl<float>(GetTensorView<float>(), rowColSplitPoint);
         case DataType::Double:
             return GetMatrixImpl<double>(GetTensorView<double>(), rowColSplitPoint);
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
             return GetMatrixImpl<half>(GetTensorView<half>(), rowColSplitPoint);
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             LogicError("Unknown m_dataType %d", (int)m_dataType);
         }
@@ -321,10 +303,8 @@ namespace CNTK
             return GetMatrixImpl<float>(GetWritableTensorView<float>(), rowColSplitPoint);
         case DataType::Double:
             return GetMatrixImpl<double>(GetWritableTensorView<double>(), rowColSplitPoint);
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
             return GetMatrixImpl<half>(GetWritableTensorView<half>(), rowColSplitPoint);
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             LogicError("Unknown m_dataType %d", (int)m_dataType);
         }
@@ -368,7 +348,6 @@ namespace CNTK
             newMatrix->AssignValuesOf(*thisMatrix);
             break;
         }
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
         {
             auto newMatrix = newView->GetWritableMatrix<half>();
@@ -376,7 +355,6 @@ namespace CNTK
             newMatrix->AssignValuesOf(*thisMatrix);
             break;
         }
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             LogicError("NDArrayView::DeepClone: Unsupported DataType %s", DataTypeName(m_dataType));
             break;
@@ -411,7 +389,6 @@ namespace CNTK
             destMatrix->AssignValuesOf(*sourceMatrix);
             break;
         }
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
         {
             auto sourceMatrix = source.GetMatrix<half>();
@@ -419,7 +396,6 @@ namespace CNTK
             destMatrix->AssignValuesOf(*sourceMatrix);
             break;
         }
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             LogicError("NDArrayView::CopyFrom: Unsupported DataType %s", DataTypeName(m_dataType));
             break;
@@ -437,11 +413,9 @@ namespace CNTK
         case DataType::Double:
             tensorView = new TensorView<double>(*(GetTensorView<double>()));
             break;
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
             tensorView = new TensorView<half>(*(GetTensorView<half>()));
             break;
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             LogicError("NDArrayView::Alias: Unsupported DataType %s", DataTypeName(m_dataType));
             break;
@@ -514,7 +488,6 @@ namespace CNTK
             tensorView = new TensorView<double>(slicedMatrixView, AsTensorViewShape(sliceViewShape));
             break;
         }
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
         {
             auto currentMatrix = GetMatrix<half>();
@@ -528,7 +501,6 @@ namespace CNTK
             tensorView = new TensorView<half>(slicedMatrixView, AsTensorViewShape(sliceViewShape));
             break;
         }
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             LogicError("NDArrayView::SliceView: Unsupported DataType %s", DataTypeName(m_dataType));
             break;
@@ -556,11 +528,9 @@ namespace CNTK
         case DataType::Double:
             tensorView = new TensorView<double>(*(GetTensorView<double>()), newTensorShape);
             break;
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
             tensorView = new TensorView<half>(*(GetTensorView<half>()), newTensorShape);
             break;
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             LogicError("NDArrayView::AsShape: Unsupported DataType %s", DataTypeName(m_dataType));
             break;
@@ -585,13 +555,11 @@ namespace CNTK
         return const_cast<ElementType*>(_DataBuffer<ElementType, ElementType>());
     }
 
-#ifdef __HIP_ENABLE_HALF__
     template<>
     const float16* NDArrayView::DataBuffer<float16>() const
     {
         return const_cast<float16*>(_DataBuffer<float16, half>());
     }
-#endif /*__HIP_ENABLE_HALF__*/
 
     // TODO: This could actually be strided?
     template <typename ElementType, typename V1ElemType>
@@ -615,13 +583,11 @@ namespace CNTK
         return _SparseCSCDataBuffers<ElementType, ElementType>();
     }
 
-#ifdef __HIP_ENABLE_HALF__
     template <>
     std::tuple<const float16 *, const SparseIndexType*, const SparseIndexType*, size_t> NDArrayView::SparseCSCDataBuffers<float16>() const
     {
         return _SparseCSCDataBuffers<float16, half>();
     }
-#endif /*__HIP_ENABLE_HALF__*/
 
     template <typename ElementType, typename V1ElemType>
     std::tuple<const ElementType *, const SparseIndexType*, const SparseIndexType*, size_t> NDArrayView::_SparseCSCDataBuffers() const
@@ -684,13 +650,11 @@ namespace CNTK
         return _SparseBlockColumnDataBuffers<ElementType, ElementType>();
     }
 
-#ifdef __HIP_ENABLE_HALF__
     template <>
     std::tuple<const void *, const SparseIndexType*, const SparseIndexType*, size_t, size_t, size_t> NDArrayView::SparseBlockColumnDataBuffers<float16>() const
     {
         return _SparseBlockColumnDataBuffers<float16, half>();
     }
-#endif /*__HIP_ENABLE_HALF__*/
 
     template <typename ElementType, typename V1ElemType>
     std::tuple<const void *, const SparseIndexType*, const SparseIndexType*, size_t, size_t, size_t> NDArrayView::_SparseBlockColumnDataBuffers() const
@@ -776,7 +740,6 @@ namespace CNTK
             matrix->CollapseDataLocation();
             break;
         }
-#ifdef __HIP_ENABLE_HALF__
         case DataType::Float16:
         {
             auto matrix = GetMatrix<half>();
@@ -784,7 +747,6 @@ namespace CNTK
             matrix->CollapseDataLocation();
             break;
         }
-#endif /*__HIP_ENABLE_HALF__*/
         default:
             LogicError("NDArrayView::ChangeDevice: Unsupported DataType %s", DataTypeName(m_dataType));
             break;
@@ -799,13 +761,12 @@ namespace CNTK
         return NDArrayView::_RandomNormal<ElementType, ElementType>(shape, mean, stdDev, seed, device);
     }
 
-#ifdef __HIP_ENABLE_HALF__
     template <>
     /*static*/ NDArrayViewPtr NDArrayView::RandomNormal<float16>(const NDShape& shape, double mean, double stdDev, unsigned long seed, const DeviceDescriptor& device)
     {
         return NDArrayView::_RandomNormal<float16, half>(shape, mean, stdDev, seed, device);
     }
-#endif /*__HIP_ENABLE_HALF__*/
+
     template <typename ElementType, typename V1ElemType>
     /*static*/ NDArrayViewPtr NDArrayView::_RandomNormal(const NDShape& shape, double mean, double stdDev, unsigned long seed, const DeviceDescriptor& device /*= DeviceDescriptor::UseDefaultDevice()*/)
     {
@@ -822,13 +783,11 @@ namespace CNTK
         return NDArrayView::_RandomUniform<ElementType, ElementType>(shape, rangeBegin, rangeEnd, seed, device);
     }
 
-#ifdef __HIP_ENABLE_HALF__
     template <>
     /*static*/ NDArrayViewPtr NDArrayView::RandomUniform<float16>(const NDShape& shape, double rangeBegin, double rangeEnd, unsigned long seed, const DeviceDescriptor& device)
     {
         return NDArrayView::_RandomUniform<float16, half>(shape, rangeBegin, rangeEnd, seed, device);
     }
-#endif /*__HIP_ENABLE_HALF__*/
 
     template <typename ElementType, typename V1ElemType>
     /*static*/ NDArrayViewPtr NDArrayView::_RandomUniform(const NDShape& shape, double rangeBegin, double rangeEnd, unsigned long seed, const DeviceDescriptor& device/* = DeviceDescriptor::UseDefaultDevice()*/)
@@ -846,13 +805,11 @@ namespace CNTK
         return _AsScalar<ElementType, ElementType>();
     }
 
-#ifdef __HIP_ENABLE_HALF__
     template <>
     float16 NDArrayView::AsScalar<float16>() const
     {
         return _AsScalar<float16, half>();
     }
-#endif /*__HIP_ENABLE_HALF__*/
 
     template <typename ElementType, typename V1ElemType>
     ElementType NDArrayView::_AsScalar() const
@@ -876,10 +833,8 @@ namespace CNTK
             scalar = *(cpuData->DataBuffer<float>());
         else if (scalarData->GetDataType() == DataType::Double)
             scalar = static_cast<ElementType>(*(cpuData->DataBuffer<double>()));
-#ifdef __HIP_ENABLE_HALF__
         else if (scalarData->GetDataType() == DataType::Float16)
             scalar = static_cast<ElementType>(*(cpuData->DataBuffer<float16>()));
-#endif/*__HIP_ENABLE_HALF__*/
         else
             LogicError("NDArrayView::AsScalar: Unsupported DataType");
 
@@ -897,66 +852,44 @@ namespace CNTK
     // Explicit template instantiations
     template CNTK_API NDArrayViewPtr NDArrayView::RandomUniform<float>(const NDShape& shape, double rangeBegin, double rangeEnd, unsigned long seed, const DeviceDescriptor& device/* = DeviceDescriptor::UseDefaultDevice()*/);
     template CNTK_API NDArrayViewPtr NDArrayView::RandomUniform<double>(const NDShape& shape, double rangeBegin, double rangeEnd, unsigned long seed, const DeviceDescriptor& device/* = DeviceDescriptor::UseDefaultDevice()*/);
-#ifdef __HIP_ENABLE_HALF__
     template CNTK_API NDArrayViewPtr NDArrayView::RandomUniform<float16>(const NDShape& shape, double rangeBegin, double rangeEnd, unsigned long seed, const DeviceDescriptor& device/* = DeviceDescriptor::UseDefaultDevice()*/);
-#endif /*__HIP_ENABLE_HALF__*/
 
     template CNTK_API NDArrayViewPtr NDArrayView::RandomNormal<float>(const NDShape& shape, double mean, double stdDev, unsigned long seed, const DeviceDescriptor& device/* = DeviceDescriptor::UseDefaultDevice()*/);
     template CNTK_API NDArrayViewPtr NDArrayView::RandomNormal<double>(const NDShape& shape, double mean, double stdDev, unsigned long seed, const DeviceDescriptor& device/* = DeviceDescriptor::UseDefaultDevice()*/);
-#ifdef __HIP_ENABLE_HALF__
     template CNTK_API NDArrayViewPtr NDArrayView::RandomNormal<float16>(const NDShape& shape, double mean, double stdDev, unsigned long seed, const DeviceDescriptor& device/* = DeviceDescriptor::UseDefaultDevice()*/);
-#endif /*__HIP_ENABLE_HALF__*/
 
     template CNTK_API const float* NDArrayView::DataBuffer<float>() const;
     template CNTK_API const double* NDArrayView::DataBuffer<double>() const;
-#ifdef __HIP_ENABLE_HALF__
     template CNTK_API const float16* NDArrayView::DataBuffer<float16>() const;
-#endif /*__HIP_ENABLE_HALF__*/
 
     template CNTK_API const TensorView<float>* NDArrayView::GetTensorView<float>() const;
     template CNTK_API const TensorView<double>* NDArrayView::GetTensorView<double>() const;
-#ifdef __HIP_ENABLE_HALF__
     template CNTK_API const TensorView<half>* NDArrayView::GetTensorView<half>() const;
-#endif /*__HIP_ENABLE_HALF__*/
 
     template CNTK_API std::tuple<const float*, const SparseIndexType*, const SparseIndexType*, size_t> NDArrayView::SparseCSCDataBuffers<float>() const;
     template CNTK_API std::tuple<const double*, const SparseIndexType*, const SparseIndexType*, size_t> NDArrayView::SparseCSCDataBuffers<double>() const;
-#ifdef __HIP_ENABLE_HALF__
     template CNTK_API std::tuple<const float16*, const SparseIndexType*, const SparseIndexType*, size_t> NDArrayView::SparseCSCDataBuffers<float16>() const;
-#endif /*__HIP_ENABLE_HALF__*/
 
     template CNTK_API std::tuple<const void*, const SparseIndexType*, const SparseIndexType*, size_t, size_t, size_t> NDArrayView::SparseBlockColumnDataBuffers<float>() const;
     template CNTK_API std::tuple<const void*, const SparseIndexType*, const SparseIndexType*, size_t, size_t, size_t> NDArrayView::SparseBlockColumnDataBuffers<double>() const;
-#ifdef __HIP_ENABLE_HALF__
     template CNTK_API std::tuple<const void*, const SparseIndexType*, const SparseIndexType*, size_t, size_t, size_t> NDArrayView::SparseBlockColumnDataBuffers<float16>() const;
-#endif /*__HIP_ENABLE_HALF__*/
 
     template CNTK_API float* NDArrayView::WritableDataBuffer<float>();
     template CNTK_API double* NDArrayView::WritableDataBuffer<double>();
-#ifdef __HIP_ENABLE_HALF__
     template CNTK_API float16* NDArrayView::WritableDataBuffer<float16>();
-#endif /*__HIP_ENABLE_HALF__*/
 
     template std::shared_ptr<const Matrix<float>> NDArrayView::GetMatrix(size_t rowColSplitPoint/* = AutoSelectRowColSplitPoint*/) const;
     template std::shared_ptr<const Matrix<double>> NDArrayView::GetMatrix(size_t rowColSplitPoint/* = AutoSelectRowColSplitPoint*/) const;
-#ifdef __HIP_ENABLE_HALF__
     template std::shared_ptr<const Matrix<half>> NDArrayView::GetMatrix(size_t rowColSplitPoint/* = AutoSelectRowColSplitPoint*/) const;
-#endif /*__HIP_ENABLE_HALF__*/
 
     template std::shared_ptr<Matrix<float>> NDArrayView::GetWritableMatrix<float>(size_t rowColSplitPoint/* = AutoSelectRowColSplitPoint*/);
     template std::shared_ptr<Matrix<double>> NDArrayView::GetWritableMatrix<double>(size_t rowColSplitPoint/* = AutoSelectRowColSplitPoint*/);
-#ifdef __HIP_ENABLE_HALF__
     template std::shared_ptr<Matrix<half>> NDArrayView::GetWritableMatrix<half>(size_t rowColSplitPoint/* = AutoSelectRowColSplitPoint*/);
-#endif
     template TensorView<float>* NDArrayView::GetWritableTensorView<float>();
     template TensorView<double>* NDArrayView::GetWritableTensorView<double>();
-#ifdef __HIP_ENABLE_HALF__
     template TensorView<half>* NDArrayView::GetWritableTensorView<half>();
-#endif /*__HIP_ENABLE_HALF__*/
 
     template float NDArrayView::AsScalar<float>() const;
     template double NDArrayView::AsScalar<double>() const;
-#ifdef __HIP_ENABLE_HALF__
     template float16 NDArrayView::AsScalar<float16>() const;
-#endif /*__HIP_ENABLE_HALF__*/
 }

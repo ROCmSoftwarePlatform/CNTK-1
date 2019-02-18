@@ -1158,14 +1158,10 @@ public:
         void release(bool cpumode);
         void setloglls(const Microsoft::MSR::CNTK::Matrix<float>& loglls);
         void setloglls(const Microsoft::MSR::CNTK::Matrix<double>& loglls);
-#ifdef __HIP_ENABLE_HALF__
         void setloglls(const Microsoft::MSR::CNTK::Matrix<half>& loglls);
-#endif /*__HIP_ENABLE_HALF__*/
         void getgamma(Microsoft::MSR::CNTK::Matrix<float>& loglls);
         void getgamma(Microsoft::MSR::CNTK::Matrix<double>& loglls);
-#ifdef __HIP_ENABLE_HALF__
         void getgamma(Microsoft::MSR::CNTK::Matrix<half>& loglls);
-#endif /*__HIP_ENABLE_HALF__*/
     };
 
     // forward-backward function

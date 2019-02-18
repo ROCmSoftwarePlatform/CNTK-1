@@ -47,13 +47,11 @@ vector<MemRequestInfo<double>>& MatrixPool::GetMemRequestInfoVec<double>()
     return m_memRequestInfoDoubleVec;
 }
 
-#ifdef __HIP_ENABLE_HALF__
 template <>
 vector<MemRequestInfo<half>>& MatrixPool::GetMemRequestInfoVec<half>()
 {
     return m_memRequestInfoHalfVec;
 }
-#endif /*__HIP_ENABLE_HALF__*/
 
 // -----------------------------------------------------------------------
 // construction
@@ -149,10 +147,8 @@ void ComputationNetwork::SaveToFileImpl(const wstring& fileName, const FileOptio
             precision = ElemTypeName<float>();
         else if (nodePtr->Is<ComputationNode<double>>())
             precision = ElemTypeName<double>();
-#ifdef __HIP_ENABLE_HALF__
         else if (nodePtr->Is<ComputationNode<half>>())
             precision = ElemTypeName<half>();
-#endif /*__HIP_ENABLE_HALF__*/
         else LogicError("Unexpected node type.");
         fstream << precision;
 #endif
@@ -265,10 +261,8 @@ void ComputationNetwork::ReadPersistableParameters(size_t modelVersion, File& fs
             node = ComputationNetworkBuilder<float>::NewNode(opName, m_deviceId, nodeName);
         else if (precision == L"double")
             node = ComputationNetworkBuilder<double>::NewNode(opName, m_deviceId, nodeName);
-#ifdef __HIP_ENABLE_HALF__
         else if (precision == L"half")
             node = ComputationNetworkBuilder<half>::NewNode(opName, m_deviceId, nodeName);
-#endif /*__HIP_ENABLE_HALF__*/
         else if (precision == L"") // old file format: default to <ElemType>
             node = ComputationNetworkBuilder<ElemType>::NewNode(opName, m_deviceId, nodeName);
         else
@@ -461,16 +455,10 @@ void ComputationNetwork::InitLearnableParameters(const ComputationNodeBasePtr& n
                                                  bool initOnCPUOnly /*= false*/) const
 {
     randomSeed += GetRandomSeedOffset();
-#ifdef __HIP_ENABLE_HALF__
     if (TryPostInitParameters<float> (node, initString, initValue, randomSeed, initOnCPUOnly) ||
         TryPostInitParameters<double>(node, initString, initValue, randomSeed, initOnCPUOnly) ||
         TryPostInitParameters<half>  (node, initString, initValue, randomSeed, initOnCPUOnly))
-    	return;
-#else  //__HIP_ENABLE_HALF__
-    if (TryPostInitParameters<float> (node, initString, initValue, randomSeed, initOnCPUOnly) ||
-        TryPostInitParameters<double>(node, initString, initValue, randomSeed, initOnCPUOnly))
-    	return;
-#endif /*__HIP_ENABLE_HALF__*/
+        return;
     LogicError("InitLearnableParameters: Input node is not a LearnableParameter<float or double or half>");
 }
 
@@ -701,11 +689,9 @@ void ComputationNetwork::SetSeqParam(ComputationNetworkPtr net,
             auto noded = dynamic_pointer_cast<ConvolutionNode<double>>(*nodeIter);
             if (noded)
                 noded->SetmMaxTempMemSizeInSamples(maxTempMemSizeInSamples);
-#ifdef __HIP_ENABLE_HALF__
             auto nodeh = dynamic_pointer_cast<ConvolutionNode<half>>(*nodeIter);
             if (nodeh)
                 nodeh->SetmMaxTempMemSizeInSamples(maxTempMemSizeInSamples);
-#endif /*__HIP_ENABLE_HALF__*/        
         }
     }
 }
@@ -1576,17 +1562,14 @@ template void ComputationNetwork::SetSeqParam<double>(ComputationNetworkPtr net,
                                                       const double& amf, const double& lmf, const double& wp, const double& bMMIfactor, const bool& sMBR);
 template void ComputationNetwork::SaveToDbnFile<double>(ComputationNetworkPtr net, const std::wstring& fileName) const;
 
-#ifdef __HIP_ENABLE_HALF__
 template void ComputationNetwork::InitLearnableParametersWithBilinearFill<half>(const ComputationNodeBasePtr& node, size_t kernelWidth, size_t kernelHeight);
 template void ComputationNetwork::Read<half>(const wstring& fileName);
 template void ComputationNetwork::ReadPersistableParameters<half>(size_t modelVersion, File& fstream, bool create);
 template void ComputationNetwork::PerformSVDecomposition<half>(const map<wstring, float>& SVDConfig, size_t alignedsize);
 template /*static*/ void ComputationNetwork::SetBatchNormalizationTimeConstants<half>(ComputationNetworkPtr net, const ComputationNodeBasePtr& criterionNode, const double normalizationTimeConstant, double& prevNormalizationTimeConstant, double blendTimeConstant, double& prevBlendTimeConstant);
 template void ComputationNetwork::SetSeqParam<half>(ComputationNetworkPtr net, const ComputationNodeBasePtr criterionNode, const double& hsmoothingWeight, const double& frameDropThresh, const bool& doreferencealign,
-		const double& amf, const double& lmf, const double& wp, const double& bMMIfactor, const bool& sMBR);
+    const double& amf, const double& lmf, const double& wp, const double& bMMIfactor, const bool& sMBR);
 template void ComputationNetwork::SaveToDbnFile<half>(ComputationNetworkPtr net, const std::wstring& fileName) const;
-#endif /*__HIP_ENABLE_HALF__*/
-
 
 // register ComputationNetwork with the ScriptableObject system
 ScriptableObjects::ConfigurableRuntimeTypeRegister::Add<ComputationNetwork> registerComputationNetwork(L"ComputationNetwork");

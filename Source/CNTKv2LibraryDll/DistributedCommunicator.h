@@ -144,8 +144,6 @@ namespace CNTK
         template <typename ElemType>
         void AllReduceData(ElemType* inputData, ElemType* outputData, size_t numElements, std::vector<MPI_Request>* pAllReduceRequests, bool dataOnCPU, MPI_Op op = MPI_SUM, bool forceSync = false);
 
-#ifdef __HIP_ENABLE_HALF__
         void AllReduceDataHalf(half* inputData, half* outputData, size_t numElements, std::vector<MPI_Request>* pAllReduceRequests, bool dataOnCPU, MPI_Op op = MPI_SUM, bool forceSync = false);
-#endif /*__HIP_ENABLE_HALF__*/
     };
 }
