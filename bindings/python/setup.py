@@ -92,7 +92,7 @@ else:
 
 # copy CNTK_VERSION_BANNER to VERSION file
 version_file = open(os.path.join(os.path.dirname(__file__), "cntk", "VERSION"), 'w')
-version_file.write(os.environ['CNTK_VERSION_BANNER'])
+version_file.write(os.environ['CNTK_VERSION'])
 version_file.close()
 
 # Filtering out undesired libs
