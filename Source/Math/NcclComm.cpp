@@ -10,6 +10,8 @@
 #include <hip/hip_runtime_api.h>
 #ifdef __HIP_PLATFORM_NVCC__
 #include <nccl.h>
+#include <nvml.h>
+#include <cuda_runtime.h>
 #endif
 
 namespace Microsoft { namespace MSR { namespace CNTK {

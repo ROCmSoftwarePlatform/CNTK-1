@@ -2136,13 +2136,14 @@ namespace CNTK
         return BinaryOp(PrimitiveOpType::EditDistanceError, prediction, labels, std::move(additionalProperties), name);
     }
 
-    FunctionPtr LatticeSequenceWithSoftmax(const Variable& labels, const Variable& prediction, const Variable& scaledLogLikelihood, const Variable& lattice, const std::wstring& symListPath, const std::wstring& phonePath, const std::wstring& stateListPath, const std::wstring& transProbPath, float hSmoothingWeight, float frameDropThresh, bool doReferenceAlign, bool seqGammarUsesMBR, float seqGammarAMF, float seqGammarLMF, float seqGammarBMMIFactor, float seqGammarWordPen, const std::wstring& name)
+    FunctionPtr LatticeSequenceWithSoftmax(const Variable& labels, const Variable& prediction, const Variable& scaledLogLikelihood, const Variable& lattice, const std::wstring& symListPath, const std::wstring& phonePath, const std::wstring& stateListPath, const std::wstring& transProbPath, const std::wstring& latticeConfigPath, float hSmoothingWeight, float frameDropThresh, bool doReferenceAlign, bool seqGammarUsesMBR, float seqGammarAMF, float seqGammarLMF, float seqGammarBMMIFactor, float seqGammarWordPen, const std::wstring& name)
     {
         auto additionalProperties = Dictionary();
         additionalProperties[PrimitiveFunction::AttributeNameSymListPath] = symListPath;
         additionalProperties[PrimitiveFunction::AttributeNamePhonePath] = phonePath;
         additionalProperties[PrimitiveFunction::AttributeNameStateListPath] = stateListPath;
         additionalProperties[PrimitiveFunction::AttributeNameTransProbPath] = transProbPath;
+        additionalProperties[PrimitiveFunction::AttributeNameLatticeConfigPath] = latticeConfigPath;
         additionalProperties[PrimitiveFunction::AttributeNameHSmoothingWeight] = hSmoothingWeight;
         additionalProperties[PrimitiveFunction::AttributeNameFrameDropThresh] = frameDropThresh;
         additionalProperties[PrimitiveFunction::AttributeNameDoReferenceAlign] = doReferenceAlign;
@@ -2339,7 +2340,7 @@ namespace CNTK
 
         size_t channels = operand.Shape()[2];
         if (channels != biases.size())
-            LogicError("ImageScaler: number of biase (%d) does not equal channels of the image (%d)", (int)biases.size(), (int)(channels));
+            LogicError("ImageScaler: number of biases (%d) does not equal channels of the image (%d)", (int)biases.size(), (int)(channels));
 
         auto additionalProperties = Dictionary();
         additionalProperties[L"Scaler"] = scale;
@@ -2372,6 +2373,39 @@ namespace CNTK
         auto meanPlaceholder = PlaceholderVariable(L"mean");
         auto invStdDevPlaceholder = PlaceholderVariable(L"invStdDev");
         return AsBlock(std::move(ElementTimes(Minus(operandPlaceholder, meanPlaceholder), invStdDevPlaceholder)), { { operandPlaceholder, operand },{ meanPlaceholder, mean },{ invStdDevPlaceholder, invStdDev } }, L"PerDimMeanVarianceNormalize", name);
+    }
+
+    FunctionPtr MeanVarianceNormalization(const Variable& operand, double epsilon, const bool useStatsAcrossChannels, const bool doVarianceScaling, const std::wstring& name)
+    {
+        Dictionary additionalAttributes;
+        additionalAttributes[PrimitiveFunction::AttributeNameUseStatsAcrossChannels] = useStatsAcrossChannels;
+        additionalAttributes[PrimitiveFunction::AttributeNameDoVarianceScaling] = doVarianceScaling;
+        additionalAttributes[PrimitiveFunction::AttributeNameEpsilon] = epsilon;
+
+        if (epsilon < 0)
+            InvalidArgument("Input argument epsilon must be non-negative.");
+        auto operandPlaceholder = PlaceholderVariable(L"operand");
+        size_t operandRank = operand.Shape().Rank();
+        if (operandRank < 2 && !useStatsAcrossChannels)
+            InvalidArgument("When rank of the operand is < 2, useStatsAcrossChannels must be set to false, because there is no channel dimension.");
+
+        auto numAxesToReduce = useStatsAcrossChannels ? operandRank : operandRank - 1; // Assuming last dim to be the channel dim.
+        std::vector<Axis> axesToReduce(numAxesToReduce);
+        for (size_t i = 0; i < numAxesToReduce; ++i)
+            axesToReduce[i] = Axis(i);
+        FunctionPtr operandMeanRemoved = Minus(operandPlaceholder, ReduceMean(operandPlaceholder, axesToReduce));
+        if (!doVarianceScaling)
+        {
+            return AsBlock(std::move(operandMeanRemoved), { { operandPlaceholder, operand } }, std::move(additionalAttributes), L"MeanVarianceNormalization", name);
+        }
+        else
+        {
+            return AsBlock(std::move(ElementDivide(operandMeanRemoved, 
+                Plus(Sqrt(ReduceMean(Square(operandMeanRemoved), axesToReduce)), 
+                    Constant({}, operand.GetDataType(), epsilon, DeviceDescriptor::UseDefaultDevice(), L"mvn_epsilon")))),
+                { { operandPlaceholder, operand } }, std::move(additionalAttributes),
+                L"MeanVarianceNormalization", name);
+        }
     }
 
     FunctionPtr Convolution(const Variable& convolutionMap,

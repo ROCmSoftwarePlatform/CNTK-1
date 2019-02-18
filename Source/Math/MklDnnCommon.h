@@ -1548,7 +1548,6 @@ inline void CHECK_MKL(dnnError_t err)
         RuntimeError("mkl err (%d)\n", err);
 }
 
-// adapter that converts data between user layout and primitive required layout
 template<typename ElemType>
 inline void dnnSafeDelete(dnnLayout_t& lt)
 {
