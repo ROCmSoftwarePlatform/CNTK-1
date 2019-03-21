@@ -216,7 +216,6 @@ endif
   INCLUDEPATH += $(INSTALL_DIR)/hiprand/include/
   INCLUDEPATH += $(INSTALL_DIR)/rocrand/include/
   INCLUDEPATH += $(INSTALL_DIR)/hcsparse/include/
-  INCLUDEPATH += $(INSTALL_DIR)/hipdnn/include
   LIBPATH += $(INSTALL_DIR)/lib64
 
 else
