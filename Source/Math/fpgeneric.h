@@ -43,6 +43,8 @@
 #define BLOCK_ROWS 8
 #define COPY_TILE_DIM 1024
 #define COPY_BLOCK_DIM 256
+#define WAVE_SIZE 64
+#define GROUP_SIZE 256
 
 typedef hiprandState_t hiprandState;
 
@@ -152,7 +154,44 @@ __global__ void copyFloat2Half(half *odata, const float *idata, const int n)
 */
 
 }
+__global__ void transform_csc_2_dense_kernel(ulong size,
+                       const int *col_offsets,
+                       const int *row_indices,
+                       const float *values,
+                       const int num_rows,
+                       const int num_cols,
+                       float *A, int subwave_size)
+{
+        const int global_id   = hipThreadIdx_x + hipBlockIdx_x * hipBlockDim_x;
+        const int local_id    = hipThreadIdx_x;
+        const int thread_lane = local_id & (subwave_size - 1);
+        const int vector_id   = global_id / subwave_size;
+        const int num_vectors = 256 / subwave_size;
+        for(int col = vector_id; col < num_cols; col += num_vectors)
+        {
+            const int col_start = col_offsets[col];
+            const int col_end   = col_offsets[col+1];
+            for(int j = col_start + thread_lane; j < col_end; j += subwave_size)
+                A[row_indices[j] + num_rows * col] = values[j];
+        }
+}
 
+inline void hipScsc2dense(int m, int n, const float *cscValA, const int *cscRowIndA, const int *cscColPtrA, float *A) {
+
+    hipMemset(A, 0, sizeof(float) *m * n);
+
+    int blocks = ((n-1)/256)+1;
+    int subwave_size = WAVE_SIZE;
+    ulong elements_per_col = (n * m) / n; // assumed number elements per col;
+
+    if (elements_per_col < 64) {  subwave_size = 32;  }
+    if (elements_per_col < 32) {  subwave_size = 16;  }
+    if (elements_per_col < 16) {  subwave_size = 8;  }
+    if (elements_per_col < 8)  {  subwave_size = 4;  }
+    if (elements_per_col < 4)  {  subwave_size = 2;  }
+
+    hipLaunchKernelGGL(transform_csc_2_dense_kernel, blocks, 256, 0, 0 ,(ulong)m * n, cscColPtrA, cscRowIndA, cscValA, m, n, A, subwave_size);
+}
 // Generalize library calls to be use in template functions
 
 // gemm
@@ -565,11 +604,12 @@ inline hipsparseStatus_t hipsparsecsr2denseHelper(hipsparseHandle_t,int,int,cons
 
 inline hipsparseStatus_t hipsparsecsc2denseHelper(hipsparseHandle_t handle, int m, int n, const hipsparseMatDescr_t descrA, const float *cscValA, const int *cscRowIndA, const int *cscColPtrA, float *A, int lda)
 {
-    return hipsparseScsc2dense(handle, m, n, descrA, cscValA, cscRowIndA, cscColPtrA, A, lda);
+    hipScsc2dense(m, n, cscValA, cscRowIndA, cscColPtrA, A);
+    return HIPSPARSE_STATUS_SUCCESS;
 }
 inline hipsparseStatus_t hipsparsecsc2denseHelper(hipsparseHandle_t handle, int m, int n, const hipsparseMatDescr_t descrA, const double *cscValA, const int *cscRowIndA, const int *cscColPtrA, double *A, int lda)
 {
-    return hipsparseDcsc2dense(handle, m, n, descrA, cscValA, cscRowIndA, cscColPtrA, A, lda);
+    RuntimeError("Unsupported template argument(double) in GPUSparseMatrix");
 }
 
 inline hipsparseStatus_t hipsparsecsc2denseHelper(hipsparseHandle_t,int,int,const hipsparseMatDescr_t, const half *, const int *, const int *, half *, int)
