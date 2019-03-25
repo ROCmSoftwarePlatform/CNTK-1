@@ -202,15 +202,15 @@ BOOST_AUTO_TEST_CASE(BatchNormalizationForward)
             BOOST_WARN_MESSAGE(CheckEqual(saveInvStdDev, saveInvStdDevB, emsg, relErr, absErr), "saveInvStdDev" << msg << ". " << emsg);
             BOOST_REQUIRE_MESSAGE(CountNans(saveInvStdDevBuf) == crowScaleBias * 2, "saveInvStdDev" << msgNotNan);
 
-            bool outEqual = CheckEqual(out, outB, emsg, relErr*10, absErr * 20);
+            bool outEqual = CheckEqual(out, outB, emsg, relErr, absErr * 20);
             bool outNan = out.HasNan("out");
-            bool runMeanEqual = CheckEqual(runMean, runMeanB, emsg, relErr*10, absErr);
+            bool runMeanEqual = CheckEqual(runMean, runMeanB, emsg, relErr, absErr);
             bool runMeanNan = runMean.HasNan("runMean");
-            bool runInvStdDevEqual = CheckEqual(runInvStdDev, runInvStdDevB, emsg, relErr*10, absErr);
+            bool runInvStdDevEqual = CheckEqual(runInvStdDev, runInvStdDevB, emsg, relErr, absErr);
             bool runInvStdDevNan = runInvStdDev.HasNan("runInvStdDev");
-            bool saveMeanEqual = CheckEqual(saveMean, saveMeanB, emsg, relErr*10, absErr);
+            bool saveMeanEqual = CheckEqual(saveMean, saveMeanB, emsg, relErr, absErr);
             bool saveMeanNan = saveMean.HasNan("saveMean");
-            bool saveInvStdDevEqual = CheckEqual(saveInvStdDev, saveInvStdDevB, emsg, relErr*10, absErr);
+            bool saveInvStdDevEqual = CheckEqual(saveInvStdDev, saveInvStdDevB, emsg, relErr, absErr);
             bool saveInvStdDevNan = saveInvStdDev.HasNan("saveInvStdDev");
 
             if (!outEqual) wrongOutEqual++;

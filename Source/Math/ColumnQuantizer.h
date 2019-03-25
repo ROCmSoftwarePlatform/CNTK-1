@@ -330,12 +330,12 @@ public:
             }
             // multi-subset (CUDA): reduce to one thread
             allReduceElem(varacc);
-            ElemType stddev = sqrt(varacc / rows);
+            //ElemType stddev = sqrt(varacc / rows);
             if (subset == 0)
             {
                 // stddevs = how many stddevs from the mean until outside of quantization range
-                lower = mean - (stddevs * stddev);
-                upper = mean + (stddevs * stddev);
+                lower = mean - (stddevs );
+                upper = mean + (stddevs );
             }
         }
     }
