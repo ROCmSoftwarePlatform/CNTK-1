@@ -128,6 +128,11 @@ fi
 echo -e "$NC $spacef HIP installation complete $spaceb"
 export HIP_PATH=$rocmDir/hip
 
+if [ "$install" == "1" ];then
+   sudo sed -i "s=\<using half\>=//using half=g" /opt/rocm/hip/include/hip/hcc_detail/hip_fp16.h
+   sudo sed -i "s=\<using half\>=//using half=g" /opt/rocm/hip/include/hip/hcc_detail/hip_fp16_gcc.h
+fi
+
 #Platform deducing
 
 platform=$($HIP_PATH/bin/hipconfig --platform)
