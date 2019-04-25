@@ -42,6 +42,7 @@ void CopyVecFromHalfToFloat(vecHalf& from, vec& to)
 
 bool AreEqual(float a, float b, float maxRelError, float maxAbsError)
 {
+    std::cout<<"\n"<<a<<"\t"<<b;
     float diff = std::abs(a - b);
     if (diff <= maxAbsError)
         return true;
@@ -1106,7 +1107,7 @@ BOOST_AUTO_TEST_CASE(ConvolutionBackwardKernel)
 
             BOOST_REQUIRE_MESSAGE(!kernel.HasNan("kernel"), "kernel" << msgNan);
             // Todo: check the threashold value after we have setttings regard determinstics in place.
-            BOOST_WARN_MESSAGE(CheckEqual(kernel, kernelB, emsg, relErr, absErr * 16), "kernel" << msg << ". " << emsg);
+            BOOST_REQUIRE_MESSAGE(CheckEqual(kernel, kernelB, emsg, relErr, absErr * 16), "kernel" << msg << ". " << emsg);
             BOOST_REQUIRE_MESSAGE(CountNans(kernelBuf) == kernel.GetNumElements() * 2, "kernel" << msgNotNan);
 
 	        bool equal = CheckEqual(kernel, kernelB, emsg, relErr , absErr * 16);
