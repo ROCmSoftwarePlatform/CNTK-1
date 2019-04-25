@@ -1080,10 +1080,10 @@ BOOST_AUTO_TEST_CASE(ConvolutionBackwardKernel)
 
             BOOST_REQUIRE_MESSAGE(!kernel.HasNan("kernel"), "kernel" << msgNan);
             // Todo: check the threashold value after we have setttings regard determinstics in place.
-            BOOST_WARN_MESSAGE(CheckEqual(kernel, kernelB, emsg, relErr, absErr * 16), "kernel" << msg << ". " << emsg);
+            BOOST_REQUIRE_MESSAGE(CheckEqual(kernel, kernelB, emsg, relErr, absErr * 16), "kernel" << msg << ". " << emsg);
             BOOST_REQUIRE_MESSAGE(CountNans(kernelBuf) == kernel.GetNumElements() * 2, "kernel" << msgNotNan);
 
-	        bool equal = CheckEqual(kernel, kernelB, emsg, relErr , absErr * 16);
+            bool equal = CheckEqual(kernel, kernelB, emsg, relErr , absErr * 16);
             bool hasNaN = kernel.HasNan("kernel");
             if(!equal) testWithWrongResult++;
            if(hasNaN) testWithNaN++;
