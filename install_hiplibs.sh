@@ -159,7 +159,7 @@ done
 #repos needed for AMD and Nvidia
 
 repoList+=(rocRAND HcSPARSE hipBLAS hipDNN rocPRIM)
-commitList+=(1890bb31675a6cbaa7766e947c8e35c4d1010ad6 907a505c27bac57a6d1f372154b744dd14ced943 193e50ed975a02d5efad566239107e3d7c768712 898b9d9ae7ed58a46beecc0fb0b785716da204f9 caef132d64b29a7d857eb68af5323fc302d26766)
+commitList+=(7278524ea37f449795fdafcd0bf5307f61f06ba9 ad4fb4c61e14cc482581502f8f66e6941d98c312 193e50ed975a02d5efad566239107e3d7c768712 41ff492c0be6bd084dad09be7e358dc682e51447 41ff492c0be6bd084dad09be7e358dc682e51447)
 installDir+=(hiprand hcsparse hipblas hipdnn hipcub)
 libList+=(hiprand hipsparse hipblas hipdnn hipcub)
 scpLIST+=(rocRAND_SCP HcSPARSE_SCP hipBLAS_SCP hipDNN_SCP rocPRIM_SCP)
@@ -167,7 +167,7 @@ headerList+=(hiprand hipsparse hipblas hipdnn hipcub)
 
 if [ "$platform" == "hcc" ]; then
     repoList+=(MIOpenGEMM MIOpen rocBLAS )
-    commitList+=(9547fb9e8499a5a9f16da83b1e6b749de82dd9fb 08114baa029a519ea12b52c5274c0bd8f4ad0d26 cb738e830f4239a14b6b73f9a58fdf943d914030)
+    commitList+=(9547fb9e8499a5a9f16da83b1e6b749de82dd9fb 2333ed495b84f763c39b71d1f70152d23556bebf 2333ed495b84f763c39b71d1f70152d23556bebf)
     installDir+=(miopengemm miopen rocblas)
     libList+=(miopengemm MIOpen rocblas)
     headerList+=(miogemm miopen rocblas)
